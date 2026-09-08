@@ -441,6 +441,42 @@ const ART = (() => {
     '.o.o........o.o.'], WOOD, 'plank');
   const puff = [sprite(['.ww.', 'wWWw', 'wWWw', '.ww.'], { w: '#b9c8d4', W: '#eef3f6' }, 'puff'), sprite(['..ww..', '.wWWw.', 'wWWWWw', 'wWWWWw', '.wWWw.', '..ww..'], { w: '#b9c8d4', W: '#eef3f6' }, 'puff2')];
   const star = sprite(['.o.', 'ooo', '.o.'], { o: '#fff2b8' }, 'star');
+  const drop = sprite(['..oo..', '.oWLo.', 'oWWLLo', 'oLLLlo', '.oLlo.', '..oo..'], { o: '#1d4a55', W: '#e8fbff', L: '#8fd9d0', l: '#2f7f88' }, 'drop');
+  const FIRE = { o: '#5a1a0a', R: '#d9503a', O: '#f28b2a', Y: '#ffd34a', W: '#fff3b0', k: '#2a1a14', g: '#4a3a2a' };
+  const fire = [sprite([
+    '.......Y........',
+    '......YY....Y...',
+    '.....OYY...Y....',
+    '....OOYY..OY....',
+    '...ROOYYY.OOY...',
+    '..RROOYYYROOYY..',
+    '..RROOYYYROOYYR.',
+    '.RRROOYYYROOYYR.',
+    '.RRROOOYYYOOOYRR',
+    'RRRROOOYYYOOORRR',
+    'RRRRROOOOOOORRRR',
+    '.RRRRROOOOORRRR.',
+    '..RRRRRRRRRRRR..',
+    '.ggkkgkkgkkgkkgg',
+    'gkkggkkgkkgkkgkk',
+    '.ggggggggggggg..'], FIRE, 'fire'), sprite([
+    '....Y...........',
+    '....YY.....Y....',
+    '...OYY....YY....',
+    '...OOYY..OYY....',
+    '..ROOYY.ROOY....',
+    '..ROOYYYROOYY...',
+    '.RROOYYYROOYYR..',
+    '.RROOOYYYOOYYRR.',
+    'RRROOOYYYOOOYRRR',
+    'RRRROOOYYYOOORRR',
+    'RRRRROOOOOOORRRR',
+    '.RRRRROOOOORRRR.',
+    '..RRRRRRRRRRRR..',
+    '.ggkkgkkgkkgkkgg',
+    'gkkggkkgkkgkkgkk',
+    '.ggggggggggggg..'], FIRE, 'fire2')];
+  const ash = sprite(['.kk.', 'kggk', 'kggk', '.kk.'], { k: '#2a1a14', g: '#4a3a2a' }, 'ash');
   const cracked = sprite([
     'oooooooooooooooo',
     'oLLLLLsLLLLLLLLo',
@@ -646,6 +682,6 @@ const ART = (() => {
 
   return { sprite, flip, tint, canvas, rng, text, textWidth, wrap, glyph, logo, background, THEMES, GROUND, WATER,
     nila, fish, hand, snail, frogSit, frogJump, mosquito, crab, heronBody, heronFly, wingUp, wingDown, wingMid, egg,
-    crate, rock, pearl, heart, heartEmpty, lantern, sign, boat, mushroom, mushroomSquash, thorns, gate, target, lily, plank, puff, star, cracked,
+    crate, rock, pearl, heart, drop, fire, ash, heartEmpty, lantern, sign, boat, mushroom, mushroomSquash, thorns, gate, target, lily, plank, puff, star, cracked,
     dirt, grassCap, roots, edgeL, edgeR, water, waterDeep, reed, tuft, shroomDeco };
 })();

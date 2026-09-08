@@ -4,7 +4,7 @@
 //   #  barro sólido        =  tablón (se atraviesa desde abajo)   w  nenúfar (igual, flota)
 //   ~  agua (te hundes)    ^  espinas            x  piedra agrietada (una pedrada rompe todo el bloque)
 //   G  compuerta (se abre con su diana, por orden)   T  diana (golpéala con algo escupido)
-//   %  seta saltarina      c  caja               r  piedra
+//   %  seta saltarina      c  caja               r  piedra   F  hoguera (se apaga con agua)
 //   s  caracol   f  rana   m  mosquito   K  cangrejo   B  la Garza
 //   *  perla     H  corazón   L  farol (punto de control)   E  barca (salida)   @  Nila
 //   ?  cartel (los textos van en `signs`, por orden)   , ' "  decoración (mata, junco, seta)
@@ -62,7 +62,7 @@ const LEVELS = (() => {
       '...===........===...',
       '....................',
       '....................',
-      '.....f........f.....',
+      '..?..f........f.....',
       '####################',
       '####################',
       '####################'),
@@ -103,6 +103,7 @@ const LEVELS = (() => {
     'Nila y Bigotes. {move} para moverte y {jump} para saltar.',
     'Mantén {fish} y Bigotes sorbe lo que tenga delante. Suéltalo cuando trague.',
     'Con la boca llena, pulsa {fish} para escupir. Apunta al muro agrietado.',
+    'Con la boca vacía, un toque de {fish} es un soplido: aparta y aturde a los bichos.',
     'Las cajas se quedan donde caen. Escúpela contra el saliente y súbete.'];
 
   const juncos = join(
@@ -145,6 +146,22 @@ const LEVELS = (() => {
       '...............L....',
       '##~~w~~w~~~w~~######',
       '##~~~~~~~~~~~~######',
+      '####################'),
+    screen(
+      '....................',
+      '....................',
+      '....................',
+      '..?........,..FFF.*.',
+      '#####~~#############',
+      '#####~~#############',
+      '####################'),
+    screen(
+      '....................',
+      '.......*...*...*....',
+      '....................',
+      '..?..............L..',
+      '####~~~~~~~~~~######',
+      '####~~~~~~~~~~######',
       '####################'),
     screen(
       '....................',
@@ -195,13 +212,15 @@ const LEVELS = (() => {
       '####################'));
   const juncosSigns = [
     'Golpea la diana con algo escupido y la compuerta se abrirá.',
+    'Bigotes también sorbe agua de la charca. Escúpela sobre la hoguera para apagarla.',
+    'Con agua en la boca, mantén {fish} en el aire: el chorro te sostiene mientras dure.',
     'Mantén {up} mientras escupes para lanzar hacia arriba.'];
 
   const cueva = join(
     screen(
       '....................',
       '....................',
-      '..@.....?...r.....K.',
+      '..@..?..?...r.....K.',
       '####################',
       '####################',
       '####################'),
@@ -215,6 +234,14 @@ const LEVELS = (() => {
       '...%....^^^^^....%..',
       '####################',
       '####################',
+      '####################'),
+    screen(
+      '....................',
+      '....................',
+      '...........*........',
+      '........FFFF...K....',
+      '###~~###############',
+      '###~~###############',
       '####################'),
     screen(
       '..........*.*.......',
@@ -236,6 +263,14 @@ const LEVELS = (() => {
       '..........K.......L.',
       '###~~w~~~###~~w~~###',
       '###~~~~~~###~~~~~###',
+      '####################'),
+    screen(
+      '....................',
+      '....m.......m.......',
+      '......*.....*.......',
+      '....................',
+      '####~~~~~~~~~~~~####',
+      '####~~~~~~~~~~~~####',
       '####################'),
     screen(
       '....................',
@@ -280,6 +315,7 @@ const LEVELS = (() => {
       '############~~~~~~~~',
       '####################'));
   const cuevaSigns = [
+    'Mantén {fish} con la boca llena y suelta: el escupitajo cargado sale recto y atraviesa bichos.',
     'El cangrejo se agarra al barro y no se deja sorber. Voltéalo con una pedrada.',
     'Esa diana está muy alta. Bigotes también escupe hacia arriba.'];
 

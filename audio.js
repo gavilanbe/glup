@@ -70,6 +70,10 @@ const Sound = (() => {
     clear() { const t = ctx.currentTime; ['C5', 'E5', 'G5', 'C6', 'G5', 'C6'].forEach((n, i) => osc('triangle', freq(n), t + i * .1, .25, .16, sfxBus, null, .005, .15)); },
     text() { const t = ctx.currentTime; osc('square', 1200, t, .02, .05, sfxBus, null, .002, .02); },
     splash() { const t = ctx.currentTime; noise(t, .4, .35, 'lowpass', 2000, 300, .7); osc('sine', 400, t, .15, .12, sfxBus, 80); },
+    charge() { const t = ctx.currentTime; osc('sawtooth', 120, t, .55, .08, sfxBus, 420, .05, .2); },
+    charged() { const t = ctx.currentTime; osc('square', 660, t, .06, .12, sfxBus, null, .003, .04); osc('square', 990, t + .06, .1, .12, sfxBus, null, .003, .06); noise(t, .12, .1, 'highpass', 3000); },
+    bigspit() { const t = ctx.currentTime; noise(t, .3, .45, 'bandpass', 500, 3000, 1.2); osc('square', 140, t, .12, .2, sfxBus, 1200); osc('sine', 60, t, .18, .3, sfxBus, 30); },
+    hiss() { const t = ctx.currentTime; noise(t, .7, .3, 'highpass', 2500, 900, .8); osc('sine', 300, t, .2, .06, sfxBus, 120); },
     win() { const t = ctx.currentTime; ['D4', 'F4', 'A4', 'D5', 'C5', 'D5', 'F5', 'A5'].forEach((n, i) => osc('triangle', freq(n), t + i * .12, .3, .16, sfxBus, null, .005, .2)); } };
   function play(name) { if (!ctx || muted) return; try { sfx[name] && sfx[name](); } catch (e) { /* audio is never fatal */ } }
   // The suction is a looping wind: a noise through a bandpass that rises while the mouth is open.
@@ -84,6 +88,18 @@ const Sound = (() => {
     } else if (!on && suckNode) {
       const n = suckNode; suckNode = null; n.g.gain.setTargetAtTime(0, ctx.currentTime, .05); n.src.stop(ctx.currentTime + .3); n.lfo.stop(ctx.currentTime + .3);
     }
+  }
+
+  // The water jet is a soft hiss that follows the hover.
+  let jetNode = null;
+  function jet(on) {
+    if (!ctx) return;
+    if (on && !jetNode) {
+      const src = ctx.createBufferSource(); src.buffer = noiseBuffer; src.loop = true;
+      const fl = ctx.createBiquadFilter(); fl.type = 'bandpass'; fl.Q.value = 1.2; fl.frequency.value = 2600;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0, ctx.currentTime); g.gain.linearRampToValueAtTime(.16, ctx.currentTime + .08);
+      src.connect(fl); fl.connect(g); g.connect(sfxBus); src.start(); jetNode = { src, g };
+    } else if (!on && jetNode) { const n = jetNode; jetNode = null; n.g.gain.setTargetAtTime(0, ctx.currentTime, .05); n.src.stop(ctx.currentTime + .3); }
   }
 
   // ---------------------------------------------------------------- Música
@@ -187,5 +203,5 @@ const Sound = (() => {
   function stopMusic() { music.name = null; music.song = null; }
   function duck(on) { if (musicBus) musicBus.gain.setTargetAtTime(on ? .18 : .5, ctx.currentTime, .1); }
   function resume() { if (ctx && ctx.state === 'suspended') ctx.resume(); if (music.song && ctx) music.next = Math.max(music.next, ctx.currentTime + .05); }
-  return { init, play, suck, playMusic, stopMusic, duck, setMuted, isMuted, resume, get ready() { return !!ctx; } };
+  return { init, play, suck, jet, playMusic, stopMusic, duck, setMuted, isMuted, resume, get ready() { return !!ctx; } };
 })();
