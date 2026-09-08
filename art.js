@@ -65,13 +65,20 @@ const ART = (() => {
     dangle1: ['..orro...orro.', '..oRRo...oRRo.'],
     dangle2: ['...orro.orro..', '...oRRo.oRRo..'] };
   const blank = '..............';
-  function nilaFrame(body, f, bob = 0) {
+  const hemL = '.oyyyyyyyyyo..', hemR = '...oyyyyyyyyyo';
+  function nilaFrame(body, f, bob = 0, hem = 0) {
     const rows = body.slice(); if (bob) rows.unshift(blank);
+    if (hem) rows[rows.length - 1] = hem < 0 ? hemL : hemR;
     const out = rows.concat(feet[f]); while (out.length < 20) out.push(blank); return sprite(out.slice(0, 20), NILA, 'nila');
   }
+  const nilaBreath = [blank].concat(nilaBody.slice(0, 12), ['..oYYYYYYYYYo.', '..oYyYYYYYYyo.', '..oyyYYYYYyyo.', '..oyyyyyyyyyo.']);
+  const nilaTuck = nilaBody.slice(1, 13).concat(['..oyyYYYYYyyo.', '..oyyyyyyyyyo.', '...orroorro...', '...oRRooRRo...']);
   const nila = {
-    idle: [nilaFrame(nilaBody, 'stand'), nilaFrame(nilaBlink, 'stand')],
-    run: [nilaFrame(nilaBody, 'stand'), nilaFrame(nilaBody, 'spread', 1), nilaFrame(nilaBody, 'together'), nilaFrame(nilaBody, 'spread', 1)],
+    idle: [nilaFrame(nilaBody, 'stand'), nilaFrame(nilaBlink, 'stand'), sprite(nilaBreath.concat(feet.stand), NILA, 'nila-breath')],
+    run: [nilaFrame(nilaBody, 'wide', 0, -1), nilaFrame(nilaBody, 'spread', 1, -1), nilaFrame(nilaBody, 'together', 1, 0), nilaFrame(nilaBody, 'wide', 0, 1), nilaFrame(nilaBody, 'spread', 1, 1), nilaFrame(nilaBody, 'together', 1, 0)],
+    apex: nilaFrame(nilaBody, 'together'),
+    tuck: sprite(nilaTuck, NILA, 'nila-tuck'),
+    skid: nilaFrame(nilaBody.map((r, i) => i === 11 ? '.oYyksmomskyYo' : r), 'wide', 1),
     jump: nilaFrame(nilaBody.slice(0, 17), 'jump'),
     fall: nilaFrame(nilaBody, 'fall'),
     hurt: nilaFrame(nilaBody.map((r, i) => i === 8 || i === 9 ? r.replace(/e/g, 'k') : i === 11 ? '.oYykssmmskyYo' : r), 'spread', 1),
@@ -119,7 +126,7 @@ const ART = (() => {
   const fishFullOpen = fishFull.map((r, i) => i === 5 ? '.oBBooBBBBBBBBBBBHEoo.' : i === 6 ? '.oBBBBBBBBBBBBBBBBommo' : i === 7 ? '.oBo.obWWWWWWWWWWWoFo.' : r);
   const fishTail = fishClosed.map((r, i) => i >= 1 && i <= 4 ? fishClosed[i + 1].slice(0, 5) + r.slice(5) : i === 5 ? '.oBBo' + r.slice(5) : r);
   const fishSquint = fishFull.map((r, i) => i === 5 ? r.replace('HE', 'oo') : r);
-  const fish = { tail: sprite(fishTail, FISH, 'fish-tail'), squint: sprite(fishSquint, FISH, 'fish-squint'), closed: sprite(fishClosed, FISH, 'fish'), open: sprite(fishOpen, FISH, 'fish-open'), full: sprite(fishFull, FISH, 'fish-full'), spit: sprite(fishSpit, FISH, 'fish-spit'), swallow: sprite(fishFullOpen, FISH, 'fish-swallow') };
+  const fish = { blink: sprite(fishClosed.map(r => r.replace('HE', 'oo')), FISH, 'fish-blink'), tail: sprite(fishTail, FISH, 'fish-tail'), squint: sprite(fishSquint, FISH, 'fish-squint'), closed: sprite(fishClosed, FISH, 'fish'), open: sprite(fishOpen, FISH, 'fish-open'), full: sprite(fishFull, FISH, 'fish-full'), spit: sprite(fishSpit, FISH, 'fish-spit'), swallow: sprite(fishFullOpen, FISH, 'fish-swallow') };
   const hand = sprite(['.ooo.', 'oYYYo', 'oYyYo', '.ooo.'], NILA, 'hand');
 
   // ---------------------------------------------------------------- Enemigos
@@ -564,6 +571,23 @@ const ART = (() => {
     for (let i = 0; i < 6; i++) { const x = (r() * 480) | 0, y = 6 + (r() * 30) | 0, w = 30 + (r() * 50) | 0; for (let k = 0; k < 5; k++) { const bw = (w * (0.4 + r() * 0.6)) | 0, bh = 3 + (r() * 5) | 0; g.fillRect(x + ((r() * w) | 0) - bw / 2, y + k * 2 - bh / 2, bw, bh); } }
     return c;
   }
+  const mossWall = sprite([
+    'dDdgDdDDdgDdDDdd',
+    'DdgDDdgDDdgDDdgD',
+    'dDgdDvDdgDdDvDdD',
+    'DDdDvdDdDdDvdDdD',
+    'dgDdvDdgDgDvDdgd',
+    'DdDdvDDdDdDvDDdD',
+    'DDgdvdgDdgdvdDDd',
+    'dDdDvDDdDDDvDgDd',
+    'DgDdvdDgDdDvdDdD',
+    'dDdDvDdDdgDvDdDd',
+    'DDdgvDDdDDdvDDgD',
+    'dgDdvdDgdDDvdDdD',
+    'DdDDvDdDDgDvDDdD',
+    'dDgdvDgdDdDvDdgd',
+    'DDdDvdDDdDdvdDdD',
+    'dgDdDdgDdgDDDdgd'], { d: '#4a3222', D: '#5a3d28', g: '#5e8a2e', v: '#3f7a2a' }, 'mosswall');
   const cracked = sprite([
     'oooooooooooooooo',
     'oLLLLLsLLLLLLLLo',
@@ -769,6 +793,6 @@ const ART = (() => {
 
   return { sprite, flip, tint, canvas, rng, text, textWidth, wrap, glyph, logo, background, THEMES, GROUND, WATER,
     nila, fish, hand, snail, frogSit, frogJump, mosquito, crab, heronBody, heronFly, wingUp, wingDown, wingMid, egg,
-    crate, rock, pearl, heart, drop, fire, ash, ring, plate, pinwheel, hard, raft, heartEmpty, lantern, sign, boat, mushroom, mushroomSquash, thorns, gate, target, lily, plank, puff, star, cracked,
+    crate, rock, pearl, heart, drop, fire, ash, ring, plate, pinwheel, hard, raft, mossWall, heartEmpty, lantern, sign, boat, mushroom, mushroomSquash, thorns, gate, target, lily, plank, puff, star, cracked,
     dirt, grassCap, roots, edgeL, edgeR, water, waterDeep, reed, tuft, shroomDeco };
 })();

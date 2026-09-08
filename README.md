@@ -20,11 +20,21 @@ El agua es agua: el escupitajo es un reguero de gotas enlazadas con estela; el c
 - **Escupitajo cargado** (mantén con la boca llena y suelta): sale recto y rápido, atraviesa enemigos, voltea cangrejos de lejos, hace doble daño a la Garza y es lo único que rompe la **piedra reforzada**.
 - **Chorro** (con agua, mantén BIGOTES en el aire): Bigotes te sostiene flotando mientras dure la barra de agua. Para ríos anchos.
 
-Nila, por su parte, corre, salta (soltar pronto acorta el salto), **se agacha** con ↓ para pasar por huecos bajos, se apoya al sorber y cargar, deja las piernas colgando al flotar o izarse y retrocede al escupir.
+Nila, por su parte, tiene un repertorio de plataformas completo:
+
+- **Salto** con altura variable (soltar pronto lo acorta), *coyote time* y *buffer*.
+- **Salto doble**: pulsa salto otra vez en el aire y Bigotes **aletea** (se ve el golpe de cola) para darte un segundo impulso. Llega a salientes de cuatro celdas.
+- **Muros de raíces**: al empujar contra ellos Nila **resbala** despacio y puede **saltar de pared en pared**.
+- **Planchazo**: ↓ y salto en el aire; Nila se hace un ovillo, Bigotes se pone boca abajo y caen a plomo. Rompe suelo agrietado, aturde a los bichos cercanos y sobre una seta rebota altísimo.
+- **Deslizamiento**: ↓ corriendo; pasa por huecos bajos a toda velocidad. Parada, ↓ **agacha**.
+- **Trepar salientes**: si llega al borde con las manos, se encarama sola.
+- Derrapa al cambiar de sentido, se apoya al sorber y cargar, deja las piernas colgando al flotar o izarse y retrocede al escupir. Carrera de seis fotogramas con bamboleo de capucha y vaivén del chubasquero, respiración en reposo, parpadeo, subida, ápice y caída distintos.
+
+Bigotes nunca está quieto: su cola tiene inercia (un muelle que reacciona a frenazos, saltos y aterrizajes), respira, parpadea y aletea en el salto doble.
 
 Además: las **dianas** abren su compuerta para siempre, las **setas** rojas te lanzan muy alto, los **faroles** son puntos de control, las **perlas** cuentan por nivel y los **corazones** curan. Los **cangrejos** no se dejan sorber hasta que los volteas con una pedrada. El agua del pantano te traga; las espinas y las hogueras hieren.
 
-Cada nivel está construido sobre esos puzles: el embarcadero enseña a sorber, escupir, agacharse, soplar, apilar y izarse; los juncos combinan dianas, agua y fuego, chorro, placa y balsa; la cueva de barro, a oscuras salvo por faroles, hogueras y perlas, pide el escupitajo cargado, el molinillo, un pozo de tres aros y disparos hacia arriba; y en el nido espera la Garza, que deja caer piedras, planea y se lanza en picado.
+Cada nivel está construido sobre esos puzles y alturas: tres celdas se saltan, cuatro piden el aleteo, cinco piden caja y aleteo, y más arriba sólo llegan los aros o los muros de raíces. El embarcadero enseña a sorber, escupir, planchar, agacharse, aletear, trepar muros, soplar, apilar e izarse; los juncos combinan dianas, agua y fuego, chorro, placa y balsa; la cueva de barro, a oscuras salvo por faroles, hogueras y perlas, pide el escupitajo cargado, el molinillo, un pozo de tres aros y disparos hacia arriba; y en el nido espera la Garza, que deja caer piedras, planea y se lanza en picado.
 
 ## Juice
 
@@ -32,11 +42,11 @@ Onomatopeyas flotantes (GLUP, PFF, ¡CRAC!, ¡ZAS!, ¡BOING!, ¡ARO!, ¡GIRA!, C
 
 ## Controles
 
-**Teclado:** flechas o WASD mover · Z, K o espacio saltar (soltar pronto acorta el salto) · X, J o C Bigotes · ↑/↓ al escupir apuntan · Esc o P pausa · M sonido · F pantalla completa.
+**Teclado:** flechas o WASD mover · Z, K o espacio saltar (otra vez en el aire: aleteo; ↓ y salto: planchazo) · X, J o C Bigotes · ↑ apunta arriba · ↓ agacha, desliza o suelta · Esc o P pausa · M sonido · F pantalla completa.
 
 **Mando:** stick o cruceta · A saltar · X, B o gatillos Bigotes · Start pausa.
 
-**Móvil:** en horizontal los mandos flotan sobre el juego (cruceta a la izquierda, ▲ BIGOTES y SALTO a la derecha); en vertical el juego queda arriba y los mandos debajo. Se puede deslizar el pulgar entre ◀ y ▶ sin levantarlo. Los carteles del juego cambian sus textos según juegues con teclado, mando o pantalla táctil. La barra superior tiene pausa, sonido y pantalla completa; se respetan las zonas seguras del teléfono y al pasar la página a segundo plano el juego se pausa solo.
+**Móvil:** en horizontal los mandos flotan sobre el juego (cruceta a la izquierda; ▲, ▼, BIGOTES y SALTO a la derecha); en vertical el juego queda arriba y los mandos debajo. Se puede deslizar el pulgar entre ◀ y ▶ sin levantarlo. Los carteles del juego cambian sus textos según juegues con teclado, mando o pantalla táctil. La barra superior tiene pausa, sonido y pantalla completa; se respetan las zonas seguras del teléfono y al pasar la página a segundo plano el juego se pausa solo.
 
 Progreso y sonido se guardan en el navegador. El selector de niveles muestra las perlas y el mejor tiempo de cada uno.
 

@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GLUP">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 <main id="shell" aria-label="GLUP">
@@ -28,15 +28,15 @@
     <button type="button" data-act="right" aria-label="Derecha">▶</button>
   </div>
   <div id="touch-buttons" class="touch-only" aria-label="Acciones">
-    <button type="button" data-act="up" class="small" aria-label="Apuntar arriba">▲</button>
+    <div class="aim"><button type="button" data-act="up" class="small" aria-label="Arriba">▲</button><button type="button" data-act="down" class="small" aria-label="Abajo">▼</button></div>
     <button type="button" data-act="fish" class="big fish"><b>Bigotes</b><span>sorber · escupir</span></button>
     <button type="button" data-act="jump" class="big jump"><b>Salto</b></button>
   </div>
 </main>
-<div id="hint" hidden>Flechas o WASD · Z o espacio salta · X: mantén para sorber, pulsa para escupir · ↑ al escupir lanza arriba · Esc pausa · M sonido · F pantalla completa</div>
+<div id="hint" hidden>Flechas o WASD · Z salta (otra vez en el aire: aleteo) · X: mantén para sorber, pulsa para escupir · ↑ apunta arriba · ↓ agacha, desliza, suelta; ↓ y Z: planchazo · Esc pausa · M sonido</div>
 <script>
 (function () {
-  const version = location.protocol === 'file:' ? Date.now() : '4';
+  const version = location.protocol === 'file:' ? Date.now() : '5';
   for (const src of ['art.js', 'audio.js', 'levels.js', 'game.js']) document.write('<script src="' + src + '?v=' + version + '"><\/script>');
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !location.search.includes('escena')) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 })();

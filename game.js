@@ -123,7 +123,7 @@ const key = (x, y) => x + ',' + y;
 
 // ---------------------------------------------------------------- Nivel
 const L = { rows: null, t: null, w: 0, h: 0, def: null, index: 0, ents: [], projs: [], parts: [], solids: [], signs: [], broken: new Set(), targets: new Map(), gates: [], gateOpen: new Set(), lit: new Set(), taken: new Set(), start: null, checkpoint: null, pearlsTotal: 0, pearls: 0, time: 0, bg: null, boss: null, breakQueue: [], gateQueue: [], mush: new Map(), hitTargets: new Set(), boatSpawned: false, exit: null, words: [], ghosts: [], lily: new Map(), triggerIdx: new Map() };
-const SOLID = { '#': 1, 'x': 1, 'G': 1, 'X': 1 };
+const SOLID = { '#': 1, 'x': 1, 'G': 1, 'X': 1, 'M': 1 };
 function tileAt(tx, ty) { if (tx < 0 || tx >= L.w) return '#'; if (ty < 0 || ty >= L.h) return '.'; return L.t[ty][tx]; }
 function setTile(tx, ty, ch) { if (tx >= 0 && tx < L.w && ty >= 0 && ty < L.h) L.t[ty][tx] = ch; }
 function solidChar(ch) { return SOLID[ch] === 1; }
@@ -241,8 +241,8 @@ const CHARGE_FULL = 40, AMMO_NAMES = { rock: 'Piedra', crate: 'Caja', snail: 'Ca
 const Player = {
   x: 0, y: 0, w: 10, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, coyote: 0, jumpBuf: 0, held: null, sucking: false, suckT: 0, hp: 3, inv: 0, animT: 0, sx: 1, sy: 1,
   dead: false, deadT: 0, spitT: 0, swallowT: 0, blink: 0, hurtT: 0, stepT: 0, dropping: false, win: false, nearSign: null, airT: 0, puffCd: 0, jumpCut: false,
-  charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0,
-  reset(x, y, full) { Object.assign(Player, { x, y, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, held: null, sucking: false, inv: 0, dead: false, deadT: 0, spitT: 0, swallowT: 0, sx: 1, sy: 1, win: false, airT: 0, charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0 }); if (full) Player.hp = 3; Sound.suck(false); Sound.jet(false); },
+  charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, prevVx: 0, prevVy: 0, skidT: 0,
+  reset(x, y, full) { Object.assign(Player, { x, y, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, held: null, sucking: false, inv: 0, dead: false, deadT: 0, spitT: 0, swallowT: 0, sx: 1, sy: 1, win: false, airT: 0, charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, skidT: 0 }); if (full) Player.hp = 3; Sound.suck(false); Sound.jet(false); },
   // Where Bigotes' mouth is: in front of the arm, or above the head when aiming up.
   mouth() { const p = Player; if (p.aimUp) return { x: p.x + 5 + p.dir * 2, y: p.y - 12 }; return { x: p.dir > 0 ? p.x + 27 : p.x - 17, y: p.y + (p.crouch ? 6 : 12) }; },
   aim() { const p = Player; if (p.grapple && !p.hanging) { const m = p.mouth(); const dx = p.grapple.x + 5 - m.x, dy = p.grapple.y + 5 - m.y, d = Math.hypot(dx, dy) || 1; return { x: dx / d, y: dy / d }; } return p.aimUp ? { x: 0, y: -1 } : { x: p.dir, y: 0 }; },
@@ -252,32 +252,56 @@ const Player = {
     if (p.dead) { p.deadT++; p.vy += .25; p.y += p.vy; p.x += p.vx; if (p.deadT === 1) { Sound.play('death'); Sound.suck(false); Sound.jet(false); } if (p.deadT > 80) Game.respawn(); return; }
     if (p.win) { p.animT++; p.sx += (1 - p.sx) * .2; p.sy += (1 - p.sy) * .2; return; }
     // Crouch: shorter hitbox; stand back up only with headroom.
-    const wantCrouch = Input.held.down && p.onGround && !p.hover && !p.grapple;
+    if (p.mantleT > 0) { p.mantleT--; p.vx = 0; p.vy = 0; Player.fish(); p.animT++; return; }
+    // Running + down = a slide; standing + down = a crouch. Both shorten the hitbox; standing up needs headroom.
+    if (Input.pressed.down && p.onGround && Math.abs(p.vx) > 1.2 && !p.slide && !p.crouch && !p.hover && !p.grapple) { p.slide = 20; p.vx = p.dir * 2.8; Sound.play('step'); Cam.shake(1, 3); spawnParts(6, p.x + 5 - p.dir * 4, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2 - p.dir * .9, spread: .5, speed: [.5, 1.5], life: [10, 18], g: .03 }); }
+    if (p.slide > 0) { p.slide--; if (!p.onGround) p.slide = 0; }
+    const wantCrouch = (Input.held.down || p.slide > 0) && p.onGround && !p.hover && !p.grapple;
     if (wantCrouch && !p.crouch) { p.crouch = true; p.y += 6; p.h = 12; p.sx = 1.15; }
     else if (!wantCrouch && p.crouch && !rectSolid(p.x, p.y - 6, p.w, 18, p)) { p.crouch = false; p.y -= 6; p.h = 18; p.sy = 1.1; }
+    else if (!wantCrouch && p.crouch) p.slide = 0;
     const left = Input.held.left, right = Input.held.right, ax = p.onGround ? .22 : .14;
     const busy = p.sucking || p.charge > 8;
     const maxV = p.crouch ? 1.1 : busy ? .7 : 1.7;
-    if (p.grapple) { /* Bigotes does the moving */ }
-    else if (left && !right) { p.vx = Math.max(p.vx - ax, -maxV); if (!busy) p.dir = -1; }
-    else if (right && !left) { p.vx = Math.min(p.vx + ax, maxV); if (!busy) p.dir = 1; }
+    if (p.wallJumpT > 0) p.wallJumpT--;
+    if (p.grapple || p.pound) { /* Bigotes does the moving, or nothing moves */ }
+    else if (p.slide > 0) { p.vx = p.dir * 2.8 * Math.sqrt(p.slide / 20); if (p.slide % 3 === 0) spawnParts(1, p.x + 5 - p.dir * 5, p.y + p.h, { color: '#c9b08a', angle: -Math.PI / 2 - p.dir * .9, spread: .4, speed: [.4, 1], life: [8, 14], g: .03 }); }
+    else if (p.wallJumpT > 0) { /* the wall kick owns the first frames */ }
+    else if (left && !right) { if (p.onGround && p.vx > 1 && !p.skidT) { p.skidT = 8; spawnParts(5, p.x + 8, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2 + .8, spread: .5, speed: [.5, 1.5], life: [10, 18], g: .03 }); } p.vx = Math.max(p.vx - ax, -maxV); if (!busy) p.dir = -1; }
+    else if (right && !left) { if (p.onGround && p.vx < -1 && !p.skidT) { p.skidT = 8; spawnParts(5, p.x + 2, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2 - .8, spread: .5, speed: [.5, 1.5], life: [10, 18], g: .03 }); } p.vx = Math.min(p.vx + ax, maxV); if (!busy) p.dir = 1; }
     else { const f = p.onGround ? .3 : .06; if (Math.abs(p.vx) <= f) p.vx = 0; else p.vx -= Math.sign(p.vx) * f; }
     if ((busy || p.crouch) && Math.abs(p.vx) > maxV) p.vx = Math.sign(p.vx) * maxV;
     // Jump: buffered, with coyote time and a variable height. Jumping lets go of an anchor.
     if (Input.pressed.jump) p.jumpBuf = 7; else if (p.jumpBuf > 0) p.jumpBuf--;
-    if (p.onGround || p.hanging) p.coyote = 7; else if (p.coyote > 0) p.coyote--;
-    if (p.jumpBuf > 0 && p.coyote > 0 && !p.crouch) {
-      p.vy = -5.4; p.jumpCut = true; p.jumpBuf = 0; p.coyote = 0; p.onGround = false; p.sx = .8; p.sy = 1.25; Sound.play('jump');
-      if (p.grapple) { Player.letGo(); p.vx = Input.held.left ? -1.7 : Input.held.right ? 1.7 : 0; Game.word('¡HOP!', p.x + 5, p.y - 6, '#fff6d6', false); }
-      else spawnParts(5, p.x + 5, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.2, speed: [.5, 1.5], life: [10, 20], g: .05 });
+    if (p.onGround || p.hanging) { p.coyote = 7; p.airJumps = 1; } else if (p.coyote > 0) p.coyote--;
+    if (p.jumpBuf > 0 && !p.crouch) {
+      if (p.coyote > 0) {
+        p.vy = -5.4; p.jumpCut = true; p.jumpBuf = 0; p.coyote = 0; p.onGround = false; p.sx = .8; p.sy = 1.25; Sound.play('jump');
+        if (p.grapple) { Player.letGo(); p.vx = Input.held.left ? -1.7 : Input.held.right ? 1.7 : 0; Game.word('¡HOP!', p.x + 5, p.y - 6, '#fff6d6', false); }
+        else spawnParts(5, p.x + 5, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.2, speed: [.5, 1.5], life: [10, 20], g: .05 });
+      } else if (p.onWall) {
+        // Wall kick off the roots.
+        p.vy = -5.3; p.vx = -p.onWall * 2.7; p.dir = -p.onWall; p.wallJumpT = 11; p.jumpCut = true; p.jumpBuf = 0; p.sx = .8; p.sy = 1.25; Sound.play('jump'); Cam.shake(1, 3);
+        spawnParts(6, p.x + (p.onWall > 0 ? p.w : 0), p.y + 8, { color: ['#5e8a2e', '#c9b08a'], angle: p.onWall > 0 ? Math.PI : 0, spread: .8, speed: [.5, 2], life: [10, 18], g: .05 }); p.onWall = 0;
+      } else if (!p.hover && !p.grapple && !p.pound && Input.held.down) {
+        // Belly flop: hang a beat, then slam down.
+        p.pound = true; p.poundT = 9; p.vx = 0; p.vy = -1.2; p.jumpBuf = 0; p.airJumps = 0; Sound.play('charge'); p.sx = 1.2; p.sy = .8;
+      } else if (!p.hover && !p.grapple && !p.pound && p.airJumps > 0) {
+        // Bigotes flaps: a second jump in the air.
+        p.airJumps--; p.vy = -4.9; p.jumpCut = true; p.jumpBuf = 0; p.flap = 14; p.sx = .85; p.sy = 1.2; Sound.play('flap'); Input.rumble(50, .2, .3);
+        L.parts.push({ x: p.x - 3, y: p.y + p.h - 2, vx: 0, vy: 0, life: 8, color: '#cfe0e8', size: 1, g: 0, kind: 'ring' });
+        spawnParts(8, p.x + 5 + p.dir * 10, p.y + 12, { color: ['#cfe0e8', '#8fd9d0', '#e8fbff'], angle: Math.PI / 2, spread: 1, speed: [1, 2.5], life: [10, 18], g: .08 });
+      }
     }
     if (!Input.held.jump && p.jumpCut && p.vy < -1.5) p.vy = -1.5;
     if (p.vy >= 0) p.jumpCut = false;
     if (p.grapple) Player.pull();
+    else if (p.pound) { if (p.poundT > 0) { p.poundT--; p.vy = -.4; } else p.vy = Math.min(p.vy + .7, 9); }
     else if (p.hover) p.vy = Math.min(p.vy + .28, .45); else p.vy = Math.min(p.vy + .28, 5.5);
-    const hitWall = moveX(p, p.vx); if (hitWall) p.vx = 0;
+    const hitWall = moveX(p, p.vx); if (hitWall) { if (Player.mantle()) return; p.vx = 0; }
     const wasGround = p.onGround; p.onGround = false; p.carrier = null;
     const hit = p.grapple ? null : moveY(p, p.vy);
+    if (hit && p.vy > 0 && p.pound) Player.slam(hit);
     if (hit) {
       if (p.vy > 0) {
         p.onGround = true; if (hit.ent) p.carrier = hit.ent;
@@ -290,6 +314,12 @@ const Player = {
       } else { p.vy = 0; }
     }
     if (p.carrier && p.carrier.vx) moveX(p, p.carrier.vx);
+    // Sliding down a root wall while pushing into it.
+    p.onWall = 0;
+    if (!p.onGround && !p.grapple && !p.hover && !p.pound && p.vy > 0 && p.wallJumpT === 0) {
+      const d = Input.held.left ? -1 : Input.held.right ? 1 : 0;
+      if (d && Player.wallAt(d)) { p.onWall = d; p.dir = -d; p.vy = Math.min(p.vy, .75); p.airJumps = 1; if (p.animT % 5 === 0) spawnParts(1, p.x + (d > 0 ? p.w : 0), p.y + 4, { color: ['#5e8a2e', '#c9b08a'], speed: [.2, .6], life: [8, 14], g: .05 }); }
+    }
     p.airT = p.onGround || p.hanging ? 0 : p.airT + 1;
     if (p.onGround && p.vy === 0 && !groundBelow(p)) p.onGround = false;
     const feetY = p.y + p.h - 2;
@@ -297,12 +327,39 @@ const Player = {
     if (p.y > L.h * TS + 20) { Game.drown(true); return; }
     for (let ty = Math.floor(p.y) >> 4; ty <= Math.floor(p.y + p.h - 1) >> 4; ty++) for (let tx = Math.floor(p.x) >> 4; tx <= Math.floor(p.x + p.w - 1) >> 4; tx++) { const ch = tileAt(tx, ty); if ((ch === '^' && p.y + p.h > ty * TS + 6) || (ch === 'F' && p.y + p.h > ty * TS + 3)) Player.hurt(p.x < tx * TS + 8 ? -1 : 1); }
     Player.fish();
+    if (p.skidT > 0) p.skidT--; if (p.flap > 0) p.flap--;
+    // Bigotes' tail has inertia: it swings against every change of speed, then settles.
+    const dvx = p.vx - p.prevVx, dvy = p.vy - p.prevVy; p.prevVx = p.vx; p.prevVy = p.vy;
+    p.fishLagV += -dvy * .9; p.fishLagHV += dvx * p.dir * 1.3;
+    p.fishLagV -= p.fishLag * .22; p.fishLagV *= .8; p.fishLag = clamp(p.fishLag + p.fishLagV, -5, 5);
+    p.fishLagHV -= p.fishLagH * .22; p.fishLagHV *= .8; p.fishLagH = clamp(p.fishLagH + p.fishLagHV, -3, 3);
     if (p.spitT > 0) p.spitT--; if (p.swallowT > 0) p.swallowT--; if (p.inv > 0) p.inv--; if (p.hurtT > 0) p.hurtT--; if (p.puffCd > 0) p.puffCd--; if (p.puffT > 0) p.puffT--; if (p.dropT > 0) p.dropT--;
     p.sx += (1 - p.sx) * .18; p.sy += (1 - p.sy) * .18;
     p.animT++;
     if (p.onGround && Math.abs(p.vx) > .5 && !p.carrier) { p.stepT++; if (p.stepT % 12 === 6) { Sound.play('step'); spawnParts(1, p.x + 5 - p.dir * 3, p.y + p.h, { color: '#c9b08a', angle: -Math.PI / 2 - p.dir * .6, spread: .4, speed: [.3, .8], life: [8, 14], g: .03 }); } } else p.stepT = 0;
     if (p.blink > 0) p.blink--; else if (Math.random() < .006) p.blink = 6;
     p.nearSign = null; for (const e of L.ents) if (e.kind === 'sign' && Math.abs(e.x + 7 - (p.x + 5)) < 22 && Math.abs(e.y - p.y) < 30) p.nearSign = e;
+  },
+  wallAt(d) { const p = Player; const x = d > 0 ? p.x + p.w + 1 : p.x - 2; return tileAt(x >> 4, (p.y + 3) >> 4) === 'M' || tileAt(x >> 4, (p.y + p.h - 3) >> 4) === 'M'; },
+  // Reaching a ledge with the hands: Nila hauls herself up.
+  mantle() {
+    const p = Player; if (p.onGround || p.vy < 0 || p.grapple || p.hover || p.pound || p.crouch) return false;
+    const d = Math.sign(p.vx) || p.dir; const fx = d > 0 ? p.x + p.w + 1 : p.x - 1, tx = fx >> 4, ty = Math.floor((p.y + 5) / TS);
+    if (!solidChar(tileAt(tx, ty)) || solidChar(tileAt(tx, ty - 1)) || solidChar(tileAt(tx, ty - 2)) || (p.y + 5) - ty * TS > 9) return false;
+    const nx = tx * TS + (d > 0 ? 2 : TS - 2 - p.w), ny = ty * TS - p.h;
+    if (rectSolid(nx, ny, p.w, p.h, p)) return false;
+    p.x = nx; p.y = ny; p.vx = 0; p.vy = 0; p.mantleT = 8; p.onGround = true; p.airJumps = 1; p.sx = 1.15; p.sy = .85; Sound.play('step');
+    spawnParts(4, p.x + 5, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.2, speed: [.3, 1], life: [8, 14], g: .04 }); return true;
+  },
+  slam(hit) {
+    const p = Player; p.pound = false; p.sx = 1.5; p.sy = .6; Cam.shake(5, 12); Cam.punch(1.05); Game.hitStop = 3; Input.rumble(180, 1, .5); Sound.play('crack');
+    Game.word('¡PLAF!', p.x + 5, p.y - 8, '#fff6d6', true);
+    L.parts.push({ x: p.x - 3, y: p.y + p.h - 2, vx: 0, vy: 0, life: 8, color: '#c9b08a', size: 1, g: 0, kind: 'ring' });
+    spawnParts(14, p.x + 5, p.y + p.h, { color: ['#c9b08a', '#a08a6a', '#e8f0c8'], angle: -Math.PI / 2, spread: 1.6, speed: [.8, 3], life: [12, 26], g: .08 });
+    const ty = Math.floor((p.y + p.h + 1) / TS);
+    for (let tx = Math.floor(p.x - 4) >> 4; tx <= Math.floor(p.x + p.w + 3) >> 4; tx++) if (tileAt(tx, ty) === 'x') Game.breakCracked(tx, ty, 'x');
+    for (const e of L.ents) if (e.enemy && !e.dead && Math.abs(e.x + e.w / 2 - (p.x + 5)) < 48 && Math.abs(e.y - p.y) < 30) { e.stun = 50; e.vy = -2.5; e.vx = Math.sign(e.x - p.x) * 1.2; if (e.armored) e.tug = 20; }
+    if (hit.ch === '%') { p.vy = -11; p.jumpCut = false; p.onGround = false; Game.word('¡BOOING!', p.x + 5, p.y - 16, '#f6e6c8', true); }
   },
   // Bigotes: hold to suck (or to charge when full), tap to puff (or to spit when full), hold in the air with water to hover, down+tap to drop.
   fish() {
@@ -458,19 +515,27 @@ const Player = {
     let spr, sy = fy - 2;
     if (p.dead || p.hurtT > 0) spr = ART.nila.hurt;
     else if (p.win) spr = (p.animT >> 3) % 2 ? ART.nila.win : ART.nila.idle[0];
+    else if (p.mantleT > 0) { spr = ART.nila.crouch; sy = fy - 4 + Math.round(p.mantleT * .6); }
+    else if (p.slide > 0) { spr = ART.nila.crouch; sy = fy - 4; }
     else if (p.crouch) { spr = ART.nila.crouch; sy = fy - 4; }
+    else if (p.pound) spr = ART.nila.tuck;
+    else if (p.flap > 8) spr = ART.nila.tuck;
+    else if (p.onWall) spr = ART.nila.brace;
     else if (p.hover || p.grapple) spr = ART.nila.dangle[(p.animT >> 3) % 2];
     else if ((p.sucking || p.charge > 8) && p.onGround) spr = ART.nila.brace;
-    else if (!p.onGround) spr = p.vy < 0 ? ART.nila.jump : ART.nila.fall;
-    else if (Math.abs(p.vx) > .5) spr = ART.nila.run[(p.animT >> 3) % 4];
-    else spr = ART.nila.idle[p.blink > 0 ? 1 : 0];
+    else if (p.skidT > 0 && p.onGround) spr = ART.nila.skid;
+    else if (!p.onGround) spr = p.vy < -1.5 ? ART.nila.jump : p.vy < 1.5 ? ART.nila.apex : ART.nila.fall;
+    else if (Math.abs(p.vx) > .5) spr = ART.nila.run[Math.floor(p.animT / 5) % 6];
+    else spr = p.blink > 0 ? ART.nila.idle[1] : (p.animT % 240) < 40 ? ART.nila.idle[2] : ART.nila.idle[0];
     if (p.dir < 0) spr = ART.flip(spr);
     const cx = fx + 5, by = fy + p.h;
-    const lean = p.sucking && !p.aimUp && !p.grapple ? -p.dir * .1 : p.charge > 8 ? p.dir * .06 : 0;
+    let lean = p.sucking && !p.aimUp && !p.grapple ? -p.dir * .1 : p.charge > 8 ? p.dir * .06 : 0;
+    if (p.slide > 0) lean = p.dir * .25; else if (p.onWall) lean = p.onWall * -.12; else if (p.onGround && Math.abs(p.vx) > 1.2 && !p.sucking) lean = p.dir * .07;
+    if (p.slide > 0) { g.save(); g.translate(cx, by); g.scale(1.25, .85); g.translate(-cx, -by); }
     const recoil = p.spitT > 8 ? -p.dir * 1 : 0;
     g.save(); g.translate(cx, by); g.scale(p.sx, p.sy); if (lean) g.transform(1, 0, lean, 1, 0, 0); g.translate(-cx, -by);
     g.drawImage(spr, fx - 2 + recoil, sy);
-    g.restore();
+    g.restore(); if (p.slide > 0) g.restore();
     Player.drawFish(g, fx, fy);
     Player.drawWater(g);
   },
@@ -496,6 +561,13 @@ const Player = {
     if (p.puffT > 0) { lunge = -3 + p.puffT * .5; headStretch = 1.15; }
     if (p.hurtT > 0 || p.dead) { bend += .7; wave = 2.5; waveSpeed = .6; }
     if (p.dropT > 0) { bend += .5 * (p.dropT / 10); }
+    if (p.flap > 0) { const k = (14 - p.flap) / 14; bend += Math.sin(k * Math.PI) * 1.1; tailBend += -Math.sin(k * Math.PI * 2) * 1.3; headStretch = 1.1; wave = 0; }
+    if (p.pound) { bend = p.poundT > 0 ? -.4 : Math.PI / 2 * .8; hx = fx + 5 + p.dir * 3; hy = fy + 8; wave = .2; }
+    if (p.onWall) { bend += .35; hx = fx + 5 + p.dir * 6; }
+    if (p.slide > 0) { bend -= .25; hy += 2; wave = 1.2; waveSpeed = .5; }
+    bend += p.fishLag * .05; tailBend += p.fishLagH * .45;
+    const breath = 1 + Math.sin(t / 22) * .035;
+    if (!p.sucking && !p.held && p.spitT === 0 && p.swallowT === 0 && t % 230 < 5) fs = ART.fish.blink;
     const bulgeU = p.swallowT > 0 ? 1 - ((10 - p.swallowT) / 10) * .65 : -9;
     const water = p.held && p.held.kind === 'agua';
     const img = p.charge >= CHARGE_FULL && (t >> 1) % 3 === 0 ? ART.tint(fs, '#fff6d6') : fs;
@@ -507,8 +579,8 @@ const Player = {
     for (let c = PIV - 1; c >= 0; c--) { const u = (PIV - 1 - c) / (PIV - 1); const a = -tailBend * ease(u) - bend * .12 * u; px -= Math.cos(a); py -= Math.sin(a); cols[c] = { x: px, y: py, a }; }
     for (let c = 0; c < n; c++) {
       const sl = cols[c], u = c / (n - 1);
-      const off = Math.sin(t * waveSpeed + c * .45) * wave * (1 - u) * (1 - u) + (jitter ? (Math.random() - .5) * jitter : 0);
-      let sy = 1, dy = 0; if (bulgeU > -1) { const b = Math.max(0, 1 - Math.abs(u - bulgeU) * 4); sy = 1 + b * .55; dy = -b * 2.2; }
+      const off = Math.sin(t * waveSpeed + c * .45) * wave * (1 - u) * (1 - u) + (jitter ? (Math.random() - .5) * jitter : 0) + p.fishLag * (.15 + u * .5);
+      let sy = breath, dy = -(breath - 1) * 5; if (bulgeU > -1) { const b = Math.max(0, 1 - Math.abs(u - bulgeU) * 4); sy = 1 + b * .55; dy = -b * 2.2; }
       g.save(); g.translate(sl.x, sl.y); g.rotate(sl.a);
       g.drawImage(img, c, 0, 1, h, -.5, -5 + off + dy, 1.6, h * sy);
       if (tintW) { const lv = Math.max(2, Math.min(8, 4.5 + Math.sin(t / 5 + c * .55) * 1.6 + (1 - p.held.amount) * 3)); g.globalAlpha = .55; g.drawImage(tintW, c, lv, 1, h - lv, -.5, -5 + off + dy + lv * sy, 1.6, (h - lv) * sy); g.globalAlpha = 1; }
@@ -561,7 +633,7 @@ const Item = {
     e.t++;
     if (e.resting) { if (!rectSolid(e.x, e.y + 1, e.w, e.h) && !oneWayBelow(e.x, e.w, e.y + e.h, e.y + e.h + 1)) { e.vy = Math.min(e.vy + .25, 4); const hit = moveY(e, e.vy); if (hit) e.vy = 0; } else e.vy = 0; }
     if (e.t % 9 === 0 && Math.random() < .5) spawnParts(1, e.x + rnd(0, 7), e.y + rnd(0, 7), { color: '#e8fbff', speed: [0, .2], life: [10, 18], g: -.01 });
-    if (overlap({ x: e.x - 2, y: e.y - 2, w: e.w + 4, h: e.h + 4 }, Player.rect()) && !Player.dead) { e.dead = true; L.taken.add(e.id); L.pearls++; Sound.play('pearl'); spawnParts(10, e.x + 3, e.y + 3, { color: ['#ffffff', '#cfe8f0', '#9ecbd8'], speed: [.5, 2], life: [12, 24], g: 0 }); Game.pearlPop = 12; Game.word('+1', e.x + 3, e.y - 6, '#e8fbff', false); }
+    if (overlap({ x: e.x - 5, y: e.y - 5, w: e.w + 10, h: e.h + 10 }, Player.rect()) && !Player.dead) { e.dead = true; L.taken.add(e.id); L.pearls++; Sound.play('pearl'); spawnParts(10, e.x + 3, e.y + 3, { color: ['#ffffff', '#cfe8f0', '#9ecbd8'], speed: [.5, 2], life: [12, 24], g: 0 }); Game.pearlPop = 12; Game.word('+1', e.x + 3, e.y - 6, '#e8fbff', false); }
   },
   pearlDraw(e, g) { const bob = e.resting ? 0 : Math.round(Math.sin(e.t / 18) * 2); g.drawImage(ART.pearl[(e.t >> 4) % 3], Math.round(e.x - Cam.x), Math.round(e.y - Cam.y + bob)); },
   heart(x, y, id) { return { kind: 'heart', x, y, w: 9, h: 8, id, t: 0, update(e) { e.t++; if (overlap(e, Player.rect()) && !Player.dead) { e.dead = true; L.taken.add(e.id); Player.hp = Math.min(3, Player.hp + 1); Sound.play('heart'); spawnParts(12, e.x + 4, e.y + 4, { color: ['#e2445a', '#ffb0bd', '#ffffff'], speed: [.5, 2.2], life: [14, 28], g: -.02 }); } }, draw(e, g) { g.drawImage(ART.heart, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y + Math.sin(e.t / 15) * 2)); } }; },
@@ -867,7 +939,7 @@ const Game = {
     if (c.scene === 'sprites') { Game.state = 'sprites'; return; }
     if (c.scene === 'titulo') { Game.title(); Game.titleT = c.t; for (let i = 0; i < c.t; i++) Game.updateTitle(); return; }
     if (c.scene === 'icono') { Game.state = 'icon'; return; }
-    if (c.scene === 'nivel') { Game.startLevel(c.n); if (c.x >= 0) { Player.x = c.x; Player.y = 0; for (let i = 0; i < 60; i++) { Player.vy = Math.min(Player.vy + .28, 5.5); if (moveY(Player, Player.vy)) { Player.vy = 0; Player.onGround = true; break; } } Cam.snap(); } Game.banner = 0; for (let i = 0; i < c.t; i++) { Input.held = {}; Input.pressed = {}; for (const g of c.guion) if (i >= g.f0 && i <= g.f1) { Input.held[g.a] = true; if (i === g.f0) Input.pressed[g.a] = true; } Game.updatePlay(); } Input.held = {}; Input.pressed = {}; Game.frozen = true; if (params_debug()) console.log('ENTS', JSON.stringify(L.ents.map(e => [e.kind, Math.round(e.x), Math.round(e.y), e.dead ? 'dead' : ''])), 'PLAYER', Math.round(Player.x), Math.round(Player.y), Player.held ? Player.held.kind : '-', 'SUCK', Player.sucking, Player.waterT, Player.charge, Player.hover, Player.fishT, 'GRAP', !!Player.grapple, Player.hanging, Player.crouch, 'PROJS', JSON.stringify(L.projs.map(p => [p.kind, Math.round(p.x), Math.round(p.y)])), 'GATES', L.gates.map(g => g.map(t => tileAt(t.x, t.y)).join('')).join('|'), 'TARGETS', [...L.hitTargets].join(';')); return; }
+    if (c.scene === 'nivel') { Game.startLevel(c.n); if (c.x >= 0) { Player.x = c.x; Player.y = 0; for (let i = 0; i < 60; i++) { Player.vy = Math.min(Player.vy + .28, 5.5); if (moveY(Player, Player.vy)) { Player.vy = 0; Player.onGround = true; break; } } Cam.snap(); } Game.banner = 0; for (let i = 0; i < c.t; i++) { Input.held = {}; Input.pressed = {}; for (const g of c.guion) if (i >= g.f0 && i <= g.f1) { Input.held[g.a] = true; if (i === g.f0) Input.pressed[g.a] = true; } Game.updatePlay(); } Input.held = {}; Input.pressed = {}; Game.frozen = true; if (params_debug()) console.log('ENTS', JSON.stringify(L.ents.map(e => [e.kind, Math.round(e.x), Math.round(e.y), e.dead ? 'dead' : ''])), 'PLAYER', Math.round(Player.x), Math.round(Player.y), Player.held ? Player.held.kind : '-', 'SUCK', Player.sucking, Player.waterT, Player.charge, Player.hover, Player.fishT, 'GRAP', !!Player.grapple, Player.hanging, Player.crouch, 'MOVE', Player.onWall, Player.airJumps, Player.pound, Player.slide, Player.mantleT, 'PEARLS', L.pearls, 'PROJS', JSON.stringify(L.projs.map(p => [p.kind, Math.round(p.x), Math.round(p.y)])), 'GATES', L.gates.map(g => g.map(t => tileAt(t.x, t.y)).join('')).join('|'), 'TARGETS', [...L.hitTargets].join(';')); return; }
   },
   title() { Game.state = 'title'; Game.titleT = 0; Game.titleParts = []; Sound.playMusic('dock'); },
   frame(now) {
@@ -1080,6 +1152,7 @@ const Game = {
           case '^': g.drawImage(ART.thorns, px, py + 8); break;
           case 'x': g.drawImage(ART.cracked, px, py); break;
           case 'X': g.drawImage(ART.hard, px, py); break;
+          case 'M': g.drawImage(ART.mossWall, px, py); if (!solidChar(tileAt(tx, ty - 1))) g.drawImage(ART.grassCap[(tx + ty) & 1], px, py); break;
           case 'G': g.drawImage(ART.gate, px, py); break;
           case 'T': g.drawImage(L.hitTargets.has(key(tx, ty)) ? ART.target.on : ART.target.off, px, py); break;
           case '%': { const sq = L.mush.get(key(tx, ty)); if (sq) g.drawImage(ART.mushroomSquash, px, py + 10); else g.drawImage(ART.mushroom, px, py + 6); break; }
