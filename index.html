@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GLUP">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <main id="shell" aria-label="GLUP">
@@ -36,7 +36,7 @@
 <div id="hint" hidden>Flechas o WASD · Z o espacio salta · X: mantén para sorber, pulsa para escupir · ↑ al escupir lanza arriba · Esc pausa · M sonido · F pantalla completa</div>
 <script>
 (function () {
-  const version = location.protocol === 'file:' ? Date.now() : '3';
+  const version = location.protocol === 'file:' ? Date.now() : '4';
   for (const src of ['art.js', 'audio.js', 'levels.js', 'game.js']) document.write('<script src="' + src + '?v=' + version + '"><\/script>');
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !location.search.includes('escena')) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 })();

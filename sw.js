@@ -1,6 +1,6 @@
 // GLUP service worker: the whole game installs for offline play. Network first,
 // cached copy as fallback. Bump CACHE whenever the shipped files change.
-const CACHE = 'glup-3';
+const CACHE = 'glup-4';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './style.css', './art.js', './audio.js', './levels.js', './game.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/icon-180.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });

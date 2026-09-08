@@ -8,7 +8,9 @@ Todo es HTML + JS vanilla sin dependencias: 320×180 nativos escalados a enteros
 
 ## Las habilidades de Bigotes
 
-Dos botones y una cruceta. El HUD dice en todo momento qué lleva Bigotes en la boca, y el pez se mueve con cada acción: se lanza hacia delante al escupir, mira arriba cuando apuntas, se coloca boca abajo bajo Nila en el chorro, se estira hacia lo que sorbe, se hincha y entorna los ojos al cargar y mueve la cola en reposo.
+Dos botones y una cruceta. El HUD dice en todo momento qué lleva Bigotes en la boca. El pez tiene **columna vertebral**: se dibuja en rodajas sobre una espina que se dobla hacia lo que va a hacer, con la cola sujeta al brazo. Se curva hacia arriba al apuntar, hacia abajo en el chorro y hacia el aro al izar; ondula al correr; tiembla y alarga la cabeza al sorber; se arquea, se comprime y vibra al cargar; da un latigazo de cola y se lanza al escupir; el trago le recorre el cuerpo como un bulto, y con agua dentro se le ve chapotear en la barriga.
+
+El agua es agua: el escupitajo es un reguero de gotas enlazadas con estela; el chorro de flotar es una columna ondulante que salpica y hace ondas donde toca; al sorber de una charca sube un hilo de agua con ondas en la superficie; cada impacto deja salpicaduras, ondas y un charco que se seca; apagar una hoguera levanta vapor.
 
 - **Sorber** (mantén BIGOTES con la boca vacía): lo que entra en el cono se acerca hasta que hace *glup*. Caracoles, ranas, mosquitos, cajas, piedras… y **agua** de cualquier charca o río. Con ↑ apunta hacia arriba.
 - **Izarse** (sorbe un **aro** apuntando arriba): Bigotes se agarra y tira de Nila hasta dejarla colgando bajo el aro. Desde ahí, salta para soltarte o sigue sorbiendo hacia el siguiente aro. Así se suben pozos y salientes.
