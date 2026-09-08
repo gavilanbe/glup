@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>GLUP</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#10141c">
+<meta name="description" content="GLUP: plataformas en pixel art. Nila recorre el pantano con Bigotes, un pez gato que sorbe caracoles, cajas y piedras y los escupe.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GLUP">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<main id="shell" aria-label="GLUP">
+  <div id="screen"><canvas id="c" width="320" height="180" aria-label="GLUP. Nila y su pez gato Bigotes cruzan el pantano."></canvas></div>
+  <nav id="touch-top" class="touch-only" aria-label="Menú">
+    <button type="button" data-act="pause" aria-label="Pausa">II</button>
+    <button type="button" id="touch-sound" aria-label="Sonido" aria-pressed="false">♪</button>
+    <button type="button" id="touch-fs" aria-label="Pantalla completa">⛶</button>
+  </nav>
+  <div id="touch-pad" class="touch-only" aria-label="Cruceta">
+    <button type="button" data-act="left" aria-label="Izquierda">◀</button>
+    <button type="button" data-act="right" aria-label="Derecha">▶</button>
+  </div>
+  <div id="touch-buttons" class="touch-only" aria-label="Acciones">
+    <button type="button" data-act="up" class="small" aria-label="Apuntar arriba">▲</button>
+    <button type="button" data-act="fish" class="big fish"><b>Bigotes</b><span>sorber · escupir</span></button>
+    <button type="button" data-act="jump" class="big jump"><b>Salto</b></button>
+  </div>
+</main>
+<div id="hint" hidden>Flechas o WASD · Z o espacio salta · X: mantén para sorber, pulsa para escupir · ↑ al escupir lanza arriba · Esc pausa · M sonido · F pantalla completa</div>
+<script>
+(function () {
+  const version = location.protocol === 'file:' ? Date.now() : '1';
+  for (const src of ['art.js', 'audio.js', 'levels.js', 'game.js']) document.write('<script src="' + src + '?v=' + version + '"><\/script>');
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !location.search.includes('escena')) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+})();
+</script>
+</body>
+</html>

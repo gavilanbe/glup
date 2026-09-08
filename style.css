@@ -1,0 +1,48 @@
+/* GLUP — envoltorio. El lienzo de 320×180 se escala a enteros en escritorio y a lo que
+   quepa en móvil; los mandos táctiles flotan sobre el lienzo en horizontal y se colocan
+   debajo en vertical. */
+html, body { margin: 0; height: 100%; background: #10141c; overflow: hidden; }
+body { font: 14px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif; color: #9fc0cc; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; overscroll-behavior: none; }
+#shell { position: fixed; inset: 0; display: grid; grid-template-rows: minmax(0, 1fr); }
+#screen { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; }
+canvas { image-rendering: pixelated; image-rendering: crisp-edges; background: #10141c; display: block; }
+#hint { position: fixed; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 12px; color: #5f7899; pointer-events: none; padding: 0 12px; }
+.touch-only { display: none; }
+body.touch .touch-only { display: flex; }
+body.touch #hint { display: none; }
+
+/* Buttons share one language: dark glass with a whisker-orange edge when held. */
+.touch-only button { appearance: none; border: 2px solid rgba(207, 224, 232, .35); background: rgba(27, 36, 48, .55); color: #e8fbff; font: 700 15px/1 system-ui, sans-serif; border-radius: 50%; width: 56px; height: 56px; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; touch-action: none; -webkit-user-select: none; user-select: none; transition: transform .06s, background .06s; }
+.touch-only button:focus-visible { outline: 2px solid #e79b3f; outline-offset: 2px; }
+.touch-only button.held, .touch-only button:active { background: rgba(231, 155, 63, .75); border-color: #fff6d6; color: #1b2430; transform: scale(.94); }
+.touch-only button span { font-size: 9px; font-weight: 500; opacity: .85; }
+#touch-top { position: absolute; top: max(6px, env(safe-area-inset-top)); right: max(6px, env(safe-area-inset-right)); gap: 6px; z-index: 3; }
+#touch-top button { width: 38px; height: 38px; font-size: 14px; border-radius: 10px; }
+#touch-sound.off { opacity: .55; }
+#touch-pad { position: absolute; left: max(10px, env(safe-area-inset-left)); bottom: max(10px, env(safe-area-inset-bottom)); gap: 8px; z-index: 3; padding: 6px; border-radius: 40px; background: rgba(16, 20, 28, .35); }
+#touch-pad button { width: 64px; height: 64px; font-size: 22px; }
+#touch-buttons { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); gap: 8px; z-index: 3; align-items: flex-end; }
+#touch-buttons .big { width: 74px; height: 74px; }
+#touch-buttons .fish { border-color: rgba(231, 155, 63, .8); }
+#touch-buttons .jump { border-color: rgba(242, 197, 61, .8); }
+#touch-buttons .small { width: 46px; height: 46px; margin-bottom: 40px; }
+body.in-menu #touch-pad, body.in-menu #touch-buttons { opacity: .45; }
+
+/* Portrait: the swamp on top, the controls in their own band underneath. */
+body.portrait #shell { grid-template-rows: auto minmax(0, 1fr); padding-top: max(0px, env(safe-area-inset-top)); }
+body.portrait #screen { width: 100%; aspect-ratio: 16 / 9; align-items: flex-start; }
+body.portrait #touch-top { position: absolute; top: max(6px, env(safe-area-inset-top)); right: 6px; }
+body.portrait #touch-pad, body.portrait #touch-buttons { position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); }
+body.portrait #touch-pad { left: max(14px, env(safe-area-inset-left)); background: none; }
+body.portrait #touch-pad button { width: 72px; height: 72px; }
+body.portrait #touch-buttons { right: max(14px, env(safe-area-inset-right)); }
+body.portrait #touch-buttons .big { width: 84px; height: 84px; }
+body.portrait #touch-buttons .small { margin-bottom: 48px; }
+
+@media (max-height: 360px) and (orientation: landscape) {
+  #touch-pad button { width: 52px; height: 52px; }
+  #touch-buttons .big { width: 60px; height: 60px; }
+  #touch-buttons .small { width: 40px; height: 40px; margin-bottom: 30px; }
+  #touch-buttons .big span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .touch-only button { transition: none; } .touch-only button.held { transform: none; } }
