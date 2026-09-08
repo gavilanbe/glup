@@ -2,13 +2,16 @@
 // pegan de izquierda a derecha; las filas que faltan arriba se rellenan de aire.
 // Leyenda:
 //   #  barro sólido        =  tablón (se atraviesa desde abajo)   w  nenúfar (igual, flota)
-//   ~  agua (te hundes)    ^  espinas            x  piedra agrietada (una pedrada rompe todo el bloque)
-//   G  compuerta (se abre con su diana, por orden)   T  diana (golpéala con algo escupido)
-//   %  seta saltarina      c  caja               r  piedra   F  hoguera (se apaga con agua)
+//   ~  agua (te hundes)    ^  espinas            F  hoguera (se apaga con agua)
+//   x  piedra agrietada (una pedrada rompe todo el bloque)   X  piedra reforzada (sólo el escupitajo cargado)
+//   G  compuerta   T  diana (la abre para siempre)   P  placa (la abre mientras algo pese)   V  molinillo (la abre mientras gira con el soplido)
+//   O  aro: sorbe apuntando arriba y Bigotes iza a Nila hasta él      R  balsa: sopla hacia atrás para impulsarla
+//   %  seta saltarina      c  caja               r  piedra
 //   s  caracol   f  rana   m  mosquito   K  cangrejo   B  la Garza
 //   *  perla     H  corazón   L  farol (punto de control)   E  barca (salida)   @  Nila
 //   ?  cartel (los textos van en `signs`, por orden)   , ' "  decoración (mata, junco, seta)
 // Nila salta unas tres celdas: los muros que piden caja o compuerta tienen cuatro.
+// Las dianas, placas y molinillos se emparejan con las compuertas por orden de izquierda a derecha.
 'use strict';
 const LEVELS = (() => {
   const H = 14;
@@ -48,6 +51,14 @@ const LEVELS = (() => {
       '####################'),
     screen(
       '....................',
+      '....#########.......',
+      '....#########.......',
+      '..?....*.....,......',
+      '####################',
+      '####################',
+      '####################'),
+    screen(
+      '....................',
       '....................',
       '....................',
       '...,...........L....',
@@ -80,6 +91,21 @@ const LEVELS = (() => {
     screen(
       '....................',
       '....................',
+      '........*.*.H.......',
+      '........#######.O...',
+      '....................',
+      '....................',
+      '....................',
+      '....................',
+      '....................',
+      '....................',
+      '..?......,..........',
+      '####################',
+      '####################',
+      '####################'),
+    screen(
+      '....................',
+      '....................',
       '........*.*.*.......',
       '.......=======......',
       '....................',
@@ -103,8 +129,10 @@ const LEVELS = (() => {
     'Nila y Bigotes. {move} para moverte y {jump} para saltar.',
     'Mantén {fish} y Bigotes sorbe lo que tenga delante. Suéltalo cuando trague.',
     'Con la boca llena, pulsa {fish} para escupir. Apunta al muro agrietado.',
+    'Agáchate con {down} para pasar por los huecos bajos.',
     'Con la boca vacía, un toque de {fish} es un soplido: aparta y aturde a los bichos.',
-    'Las cajas se quedan donde caen. Escúpela contra el saliente y súbete.'];
+    'Las cajas se quedan donde caen. Escúpela contra el saliente y súbete. Con {down} y {fish} la sueltas a tus pies.',
+    'Mantén {up} y {fish} para que Bigotes mire arriba. Si sorbe un aro, te iza hasta él; salta para soltarte.'];
 
   const juncos = join(
     screen(
@@ -167,6 +195,27 @@ const LEVELS = (() => {
       '....................',
       '....................',
       '....................',
+      '..............G.....',
+      '.........PP...G.....',
+      '.........##...G.....',
+      '.........##...G.....',
+      '..c...?..##.......*.',
+      '####################',
+      '####################',
+      '####################'),
+    screen(
+      '....................',
+      '....................',
+      '.......*....*.......',
+      '....................',
+      '..?.R.............L.',
+      '###~~~~~~~~~~~~~~###',
+      '###~~~~~~~~~~~~~~###',
+      '####################'),
+    screen(
+      '....................',
+      '....................',
+      '....................',
       '....................',
       '....................',
       '......*.*.*.........',
@@ -192,35 +241,27 @@ const LEVELS = (() => {
       '####################'),
     screen(
       '....................',
-      '..............H.....',
       '....................',
-      '............########',
-      '............########',
-      '............########',
-      '..c...m.....########',
-      '####################',
-      '####################',
-      '####################'),
-    screen(
       '....................',
-      '####................',
-      '####................',
-      '####................',
       '####...s.....L....E.',
       '################~~~~',
       '################~~~~',
       '####################'));
   const juncosSigns = [
-    'Golpea la diana con algo escupido y la compuerta se abrirá.',
+    'Golpea la diana con algo escupido y la compuerta se abrirá para siempre.',
     'Bigotes también sorbe agua de la charca. Escúpela sobre la hoguera para apagarla.',
     'Con agua en la boca, mantén {fish} en el aire: el chorro te sostiene mientras dure.',
+    'Esta compuerta sólo se abre mientras algo pese sobre la placa. Sube la caja y suéltala allí con {down} y {fish}.',
+    'Súbete a la balsa y sopla hacia atrás: Bigotes la impulsa.',
     'Mantén {up} mientras escupes para lanzar hacia arriba.'];
 
   const cueva = join(
     screen(
       '....................',
-      '....................',
-      '..@..?..?...r.....K.',
+      '.................X..',
+      '.................X..',
+      '.................X..',
+      '..@..?...r.......X..',
       '####################',
       '####################',
       '####################'),
@@ -239,7 +280,7 @@ const LEVELS = (() => {
       '....................',
       '....................',
       '...........*........',
-      '........FFFF...K....',
+      '..?.....FFFF...K....',
       '###~~###############',
       '###~~###############',
       '####################'),
@@ -274,6 +315,46 @@ const LEVELS = (() => {
       '####################'),
     screen(
       '....................',
+      '....................',
+      '..............G.....',
+      '..............G.....',
+      '..............G.....',
+      '..?.......V...G..*..',
+      '####################',
+      '####################',
+      '####################'),
+    screen(
+      '............########',
+      '.........O..########',
+      '....................',
+      '....................',
+      '..........O.########',
+      '............########',
+      '............########',
+      '.........O..########',
+      '............########',
+      '............########',
+      '..?.........########',
+      '####################',
+      '####################',
+      '####################'),
+    screen(
+      '....................',
+      '....................',
+      '....................',
+      '.........*..........',
+      '#####...............',
+      '#####...............',
+      '#####...............',
+      '#####......H........',
+      '#####...............',
+      '#####...........s...',
+      '#####...............',
+      '####################',
+      '####################',
+      '####################'),
+    screen(
+      '....................',
       '.........T..........',
       '......###...........',
       '....................',
@@ -281,18 +362,6 @@ const LEVELS = (() => {
       '..............G.....',
       '..............G.....',
       '..r..?........G..H..',
-      '####################',
-      '####################',
-      '####################'),
-    screen(
-      '....................',
-      '.....*........*.....',
-      '....===......===....',
-      '..........f.........',
-      '.........===........',
-      '....................',
-      '....................',
-      '..%.^^^^^^^^^^^^.%..',
       '####################',
       '####################',
       '####################'),
@@ -315,8 +384,10 @@ const LEVELS = (() => {
       '############~~~~~~~~',
       '####################'));
   const cuevaSigns = [
-    'Mantén {fish} con la boca llena y suelta: el escupitajo cargado sale recto y atraviesa bichos.',
-    'El cangrejo se agarra al barro y no se deja sorber. Voltéalo con una pedrada.',
+    'Mantén {fish} con la boca llena y suelta: el escupitajo cargado sale recto y rompe la piedra reforzada.',
+    'Esa charca da para apagar la hoguera. El cangrejo de detrás no se deja sorber: voltéalo con una pedrada.',
+    'Sopla al molinillo: la compuerta se abre mientras gira. Date prisa.',
+    'Tres aros hacia arriba. Sorbe apuntando con {up}, y desde cada aro busca el siguiente.',
     'Esa diana está muy alta. Bigotes también escupe hacia arriba.'];
 
   const nido = join(

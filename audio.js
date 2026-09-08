@@ -74,6 +74,7 @@ const Sound = (() => {
     charged() { const t = ctx.currentTime; osc('square', 660, t, .06, .12, sfxBus, null, .003, .04); osc('square', 990, t + .06, .1, .12, sfxBus, null, .003, .06); noise(t, .12, .1, 'highpass', 3000); },
     bigspit() { const t = ctx.currentTime; noise(t, .3, .45, 'bandpass', 500, 3000, 1.2); osc('square', 140, t, .12, .2, sfxBus, 1200); osc('sine', 60, t, .18, .3, sfxBus, 30); },
     hiss() { const t = ctx.currentTime; noise(t, .7, .3, 'highpass', 2500, 900, .8); osc('sine', 300, t, .2, .06, sfxBus, 120); },
+    clang() { const t = ctx.currentTime; osc('square', 1800, t, .08, .1, sfxBus, 900, .002, .1); osc('triangle', 2400, t, .12, .06, sfxBus, 1200, .002, .1); noise(t, .06, .1, 'highpass', 4000); },
     win() { const t = ctx.currentTime; ['D4', 'F4', 'A4', 'D5', 'C5', 'D5', 'F5', 'A5'].forEach((n, i) => osc('triangle', freq(n), t + i * .12, .3, .16, sfxBus, null, .005, .2)); } };
   function play(name) { if (!ctx || muted) return; try { sfx[name] && sfx[name](); } catch (e) { /* audio is never fatal */ } }
   // The suction is a looping wind: a noise through a bandpass that rises while the mouth is open.

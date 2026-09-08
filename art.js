@@ -60,7 +60,10 @@ const ART = (() => {
     spread: ['.orro....orro.', '.oRRo....oRRo.'],
     together: ['....orroorro..', '....oRRooRRo..'],
     jump: ['...orro.orro..', '...oRRo.oRRo..'],
-    fall: ['.orro....orro.', '.oRRo....oRRo.'] };
+    fall: ['.orro....orro.', '.oRRo....oRRo.'],
+    wide: ['orro......orro', 'oRRo......oRRo'],
+    dangle1: ['..orro...orro.', '..oRRo...oRRo.'],
+    dangle2: ['...orro.orro..', '...oRRo.oRRo..'] };
   const blank = '..............';
   function nilaFrame(body, f, bob = 0) {
     const rows = body.slice(); if (bob) rows.unshift(blank);
@@ -72,7 +75,10 @@ const ART = (() => {
     jump: nilaFrame(nilaBody.slice(0, 17), 'jump'),
     fall: nilaFrame(nilaBody, 'fall'),
     hurt: nilaFrame(nilaBody.map((r, i) => i === 8 || i === 9 ? r.replace(/e/g, 'k') : i === 11 ? '.oYykssmmskyYo' : r), 'spread', 1),
-    win: nilaFrame(nilaBody.map((r, i) => i === 11 ? '.oYyksmmmmkyYo' : r), 'together') };
+    win: nilaFrame(nilaBody.map((r, i) => i === 11 ? '.oYyksmmmmkyYo' : r), 'together'),
+    brace: nilaFrame(nilaBody, 'wide', 1),
+    dangle: [nilaFrame(nilaBody, 'dangle1'), nilaFrame(nilaBody, 'dangle2')],
+    crouch: sprite(nilaBody.slice(1, 13).concat(['..oyyYYYYYyyo.', '..oyyyyyyyyyo.', '.orro....orro.', '.oRRo....oRRo.']), NILA, 'nila-crouch') };
 
   // ---------------------------------------------------------------- Bigotes, el pez gato
   const FISH = { o: '#26303f', B: '#5f7899', b: '#43597a', L: '#8aa3c0', W: '#d3dbe2', w: '#a7b4c1', E: '#161a24', H: '#f4f6f8', F: '#e79b3f', f: '#b8692a', m: '#7c2f44', t: '#d96a7c' };
@@ -111,7 +117,9 @@ const ART = (() => {
     '.o....ooooooooooooo..F'];
   const fishSpit = fishOpen.map((r, i) => i === 6 ? '.oBBBBBBBBBBBBBBotttoF' : i === 7 ? '.oBo.obWWWWWWWWWottoF.' : r);
   const fishFullOpen = fishFull.map((r, i) => i === 5 ? '.oBBooBBBBBBBBBBBHEoo.' : i === 6 ? '.oBBBBBBBBBBBBBBBBommo' : i === 7 ? '.oBo.obWWWWWWWWWWWoFo.' : r);
-  const fish = { closed: sprite(fishClosed, FISH, 'fish'), open: sprite(fishOpen, FISH, 'fish-open'), full: sprite(fishFull, FISH, 'fish-full'), spit: sprite(fishSpit, FISH, 'fish-spit'), swallow: sprite(fishFullOpen, FISH, 'fish-swallow') };
+  const fishTail = fishClosed.map((r, i) => i >= 1 && i <= 4 ? fishClosed[i + 1].slice(0, 5) + r.slice(5) : i === 5 ? '.oBBo' + r.slice(5) : r);
+  const fishSquint = fishFull.map((r, i) => i === 5 ? r.replace('HE', 'oo') : r);
+  const fish = { tail: sprite(fishTail, FISH, 'fish-tail'), squint: sprite(fishSquint, FISH, 'fish-squint'), closed: sprite(fishClosed, FISH, 'fish'), open: sprite(fishOpen, FISH, 'fish-open'), full: sprite(fishFull, FISH, 'fish-full'), spit: sprite(fishSpit, FISH, 'fish-spit'), swallow: sprite(fishFullOpen, FISH, 'fish-swallow') };
   const hand = sprite(['.ooo.', 'oYYYo', 'oYyYo', '.ooo.'], NILA, 'hand');
 
   // ---------------------------------------------------------------- Enemigos
@@ -477,6 +485,85 @@ const ART = (() => {
     'gkkggkkgkkgkkgkk',
     '.ggggggggggggg..'], FIRE, 'fire2')];
   const ash = sprite(['.kk.', 'kggk', 'kggk', '.kk.'], { k: '#2a1a14', g: '#4a3a2a' }, 'ash');
+  const ring = sprite([
+    '....oo....',
+    '....oo....',
+    '...oMMo...',
+    '..oMLLMo..',
+    '.oMLooLMo.',
+    '.oMo..oMo.',
+    '.oMLooLMo.',
+    '..oMmmMo..',
+    '...oMMo...',
+    '....oo....'], { o: '#2a2418', M: '#b98a3a', L: '#e6c46a', m: '#8a6428' }, 'ring');
+  const PLATE = { o: '#2e2f3a', S: '#7d8290', s: '#565a68', L: '#a6abb8', R: '#d9503a', G: '#6cbf4e' };
+  const plate = { off: sprite(['..oooooooooooo..', '.oLLLLLLLLLLLLo.', '.oSSSRRRRRRSSSo.', 'oosssssssssssso.', 'oooooooooooooooo'], PLATE, 'plate'),
+    on: sprite(['................', '................', '..oooooooooooo..', 'ooLLGGGGGGGGLLoo', 'oooooooooooooooo'], PLATE, 'plate-on') };
+  const PIN = { o: '#3a2416', P: '#6b4a30', p: '#4a3020', W: '#e8f0c8', w: '#c8d0a8', R: '#d95a4a', Y: '#f2c53d', B: '#5fae5a' };
+  const pinwheel = [sprite([
+    '.......oo.......',
+    '..oo..oWWo..oo..',
+    '.oRRo.oWWo.oYYo.',
+    '.oRRRooWWooYYYo.',
+    '..oRRRoWWoYYYo..',
+    '...ooRRWWYYoo...',
+    'ooooooWWWWoooooo',
+    'oBBBBBWWWWRRRRRo',
+    'oBBBBBWWWWRRRRRo',
+    'ooooooWWWWoooooo',
+    '...ooYYWWBBoo...',
+    '..oYYYoWWoBBBo..',
+    '.oYYYooWWooBBBo.',
+    '.oYYo.oWWo.oBBo.',
+    '..oo..oPpo..oo..',
+    '......oPpo......'], PIN, 'pinwheel'), sprite([
+    'oo.....oo.....oo',
+    'oRRo..oWWo..oYYo',
+    'oRRRo.oWWo.oYYYo',
+    '.oRRRooWWooYYYo.',
+    '..oRRRoWWoYYYo..',
+    '...ooRRWWYYoo...',
+    '....ooWWWWoo....',
+    '...oBBWWWWRRo...',
+    '...oBBWWWWRRo...',
+    '....ooWWWWoo....',
+    '...ooYYWWBBoo...',
+    '..oYYYoWWoBBBo..',
+    '.oYYYooWWooBBBo.',
+    'oYYYo.oWWo.oBBBo',
+    'oYYo..oPpo..oBBo',
+    'oo....oPpo....oo'], PIN, 'pinwheel2')];
+  const hard = sprite([
+    'oooooooooooooooo',
+    'oLLLLLsLLLLLLLLo',
+    'oLSSSsSSSSSsSSSo',
+    'oMMMMMMMMMMMMMMo',
+    'oLSsSSSSSSsSSSSo',
+    'oSsSSSSSSSsSSSSo',
+    'oSSsSSSSSsSSSSSo',
+    'oSSSsSSSsSSSSSSo',
+    'oSSSSsSsSSSSSSSo',
+    'oSSSSSsSSSSSSSSo',
+    'oSSSSSSsSSSSSSSo',
+    'oSSSSSSSsSSSSSSo',
+    'oMMMMMMMMMMMMMMo',
+    'oSSSSSSSSSsSSSSo',
+    'osssssssssssssso',
+    'oooooooooooooooo'], { o: '#2b2f38', S: '#6f747c', s: '#3f444c', L: '#8d9299', M: '#b98a3a' }, 'hard');
+  const raft = sprite([
+    '.oooooooooooooooooooooo.',
+    'oWwWwWwWwWwWwWwWwWwWwWwo',
+    'oWWWWWWWWWWWWWWWWWWWWWWo',
+    'oPwwwwwwwwwwwwwwwwwwwwPo',
+    'oPPPPPPPPPPPPPPPPPPPPPPo',
+    '.oooooooooooooooooooooo.',
+    '..oPPo..........oPPo....',
+    '..oooo..........oooo....'], { o: '#3a2416', W: '#c78d4e', w: '#a56f38', P: '#6b4a30' }, 'raft');
+  function cloudLayer(color, seed) {
+    const c = canvas(480, 50), g = c.getContext('2d'), r = rng(seed); g.fillStyle = color;
+    for (let i = 0; i < 6; i++) { const x = (r() * 480) | 0, y = 6 + (r() * 30) | 0, w = 30 + (r() * 50) | 0; for (let k = 0; k < 5; k++) { const bw = (w * (0.4 + r() * 0.6)) | 0, bh = 3 + (r() * 5) | 0; g.fillRect(x + ((r() * w) | 0) - bw / 2, y + k * 2 - bh / 2, bw, bh); } }
+    return c;
+  }
   const cracked = sprite([
     'oooooooooooooooo',
     'oLLLLLsLLLLLLLLo',
@@ -677,11 +764,11 @@ const ART = (() => {
   function background(theme) {
     if (bgCache[theme]) return bgCache[theme];
     const p = THEMES[theme];
-    return bgCache[theme] = { sky: skyLayer(p), far: treeLayer(480, 120, p.far, 11, 1.2, 40), mid: treeLayer(640, 150, p.mid, 23, 1.4, 70), reeds: reedLayer(320, p.reeds, 31), fog: p.fog, ground: p.ground, theme: p };
+    return bgCache[theme] = { clouds: theme === 'cave' ? null : cloudLayer(p.cloud || 'rgba(255,240,220,.10)', 41), sky: skyLayer(p), far: treeLayer(480, 120, p.far, 11, 1.2, 40), mid: treeLayer(640, 150, p.mid, 23, 1.4, 70), reeds: reedLayer(320, p.reeds, 31), fog: p.fog, ground: p.ground, theme: p };
   }
 
   return { sprite, flip, tint, canvas, rng, text, textWidth, wrap, glyph, logo, background, THEMES, GROUND, WATER,
     nila, fish, hand, snail, frogSit, frogJump, mosquito, crab, heronBody, heronFly, wingUp, wingDown, wingMid, egg,
-    crate, rock, pearl, heart, drop, fire, ash, heartEmpty, lantern, sign, boat, mushroom, mushroomSquash, thorns, gate, target, lily, plank, puff, star, cracked,
+    crate, rock, pearl, heart, drop, fire, ash, ring, plate, pinwheel, hard, raft, heartEmpty, lantern, sign, boat, mushroom, mushroomSquash, thorns, gate, target, lily, plank, puff, star, cracked,
     dirt, grassCap, roots, edgeL, edgeR, water, waterDeep, reed, tuft, shroomDeco };
 })();
