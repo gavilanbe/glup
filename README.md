@@ -6,6 +6,23 @@ Plataformas 2D en pixel art para móvil y web. Nila, una niña con chubasquero a
 
 Todo es HTML + JS vanilla sin dependencias: 320×180 nativos escalados a enteros, sprites dibujados a mano como matrices de caracteres, fondos y tierra generados por procedimiento con la misma paleta, y audio sintetizado con WebAudio. Se instala como app (PWA) y funciona sin conexión.
 
+## Bigotes aprende comiendo
+
+Como en Rayman, las habilidades se van consiguiendo, y aquí todas las da el pez: Bigotes es un pez gato joven que aprende un truco cada vez que traga un **bocado** especial. Los bocados brillan en el nivel; al comerlos, Bigotes hace *¡ÑAM!*, hay fanfarria y una tarjeta explica el truco y sus controles. Lo aprendido se guarda.
+
+| Bocado | Truco | Qué permite |
+|---|---|---|
+| Vilano de diente de león | **Soplido** | Toque de BIGOTES con la boca vacía: aparta y aturde bichos, mueve molinillos y balsas |
+| Luciérnaga dorada | **Aleteo** | Salto otra vez en el aire: Bigotes aletea (salto doble) |
+| Lapa del pantano | **Ventosa** | Bigotes se pega a los muros de raíces: resbalar y saltar de pared en pared |
+| Nenúfar azul | **Trago de agua** | Sorber agua, apagar hogueras, chorro para flotar |
+| Anzuelo viejo | **Mordisco** | Morder aros apuntando arriba: Bigotes iza a Nila |
+| Canto de río | **Panzazo** | ↓ y salto en el aire: caída de panza que rompe suelo agrietado |
+| Guindilla del pantano | **Escupitajo picante** | Mantener y soltar con la boca llena: disparo cargado, rompe piedra reforzada |
+| Alga resbaladiza | **Resbalón** | ↓ corriendo: Nila se desliza sobre Bigotes |
+
+El embarcadero da aleteo, ventosa, soplido y mordisco; los juncos, trago de agua y panzazo; la cueva, guindilla y resbalón. De serie Bigotes sólo sabe sorber y escupir, y Nila correr, saltar y agacharse. El menú de pausa lista lo aprendido y el selector cuenta los trucos.
+
 ## Las habilidades de Bigotes
 
 Dos botones y una cruceta. El HUD dice en todo momento qué lleva Bigotes en la boca. El pez tiene **columna vertebral**: se dibuja en rodajas sobre una espina que se dobla hacia lo que va a hacer, con la cola sujeta al brazo. Se curva hacia arriba al apuntar, hacia abajo en el chorro y hacia el aro al izar; ondula al correr; tiembla y alarga la cabeza al sorber; se arquea, se comprime y vibra al cargar; da un latigazo de cola y se lanza al escupir; el trago le recorre el cuerpo como un bulto, y con agua dentro se le ve chapotear en la barriga.
@@ -34,7 +51,7 @@ Bigotes nunca está quieto: su cola tiene inercia (un muelle que reacciona a fre
 
 Además: las **dianas** abren su compuerta para siempre, las **setas** rojas te lanzan muy alto, los **faroles** son puntos de control, las **perlas** cuentan por nivel y los **corazones** curan. Los **cangrejos** no se dejan sorber hasta que los volteas con una pedrada. El agua del pantano te traga; las espinas y las hogueras hieren.
 
-Cada nivel está construido sobre esos puzles y alturas: tres celdas se saltan, cuatro piden el aleteo, cinco piden caja y aleteo, y más arriba sólo llegan los aros o los muros de raíces. El embarcadero enseña a sorber, escupir, planchar, agacharse, aletear, trepar muros, soplar, apilar e izarse; los juncos combinan dianas, agua y fuego, chorro, placa y balsa; la cueva de barro, a oscuras salvo por faroles, hogueras y perlas, pide el escupitajo cargado, el molinillo, un pozo de tres aros y disparos hacia arriba; y en el nido espera la Garza, que deja caer piedras, planea y se lanza en picado.
+Cada nivel está construido sobre esos puzles y alturas: tres celdas se saltan, cuatro piden el aleteo, seis piden caja y aleteo, y más arriba sólo llegan los aros o los muros de raíces. Trepar salientes es sólo una ayuda de cinco píxeles, para que ningún muro se suba sin el truco que toca. El embarcadero enseña a sorber, escupir, planchar, agacharse, aletear, trepar muros, soplar, apilar e izarse; los juncos combinan dianas, agua y fuego, chorro, placa y balsa; la cueva de barro, a oscuras salvo por faroles, hogueras y perlas, pide el escupitajo cargado, el molinillo, un pozo de tres aros y disparos hacia arriba; y en el nido espera la Garza, que deja caer piedras, planea y se lanza en picado.
 
 ## Juice
 

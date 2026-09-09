@@ -588,6 +588,16 @@ const ART = (() => {
     'dDgdvDgdDdDvDdgd',
     'DDdDvdDDdDdvdDdD',
     'dgDdDdgDdgDDDdgd'], { d: '#4a3222', D: '#5a3d28', g: '#5e8a2e', v: '#3f7a2a' }, 'mosswall');
+  // Bocados: what Bigotes eats to learn each trick.
+  const morsels = {
+    soplido: sprite(['...W....', '.W.W.W..', '..WWW...', 'WWWgWWW.', '..WWW...', '.W.g.W..', '...g....', '...g....'], { W: '#f4f6f8', g: '#9ab06a' }, 'vilano'),
+    aleteo: sprite(['..oo....', '.oYYo...', 'oYWWYo..', 'oYWYYo..', '.oYYo.o.', '..oo.o..', '..k.k...', '...k....'], { o: '#6a5a1a', Y: '#ffe36a', W: '#fffbd0', k: '#3a2a14' }, 'luciernaga'),
+    ventosa: sprite(['...oo...', '..oSLo..', '.oSSSLo.', 'oSsSSSLo', 'oSsssSSo', 'oPPPPPPo', '.oPpPpo.', '..oooo..'], { o: '#3a2a22', S: '#c8a06a', s: '#94714a', L: '#f0d8a0', P: '#d98a8a', p: '#b06060' }, 'lapa'),
+    chorro: sprite(['...oo...', '..oBBo..', '.oBLLBo.', 'oBLWWLBo', 'oBBLLBBo', '.oGGGGo.', '..oGGo..', '...oo...'], { o: '#1f3a5a', B: '#4a7fd0', L: '#8ab8ff', W: '#e8f4ff', G: '#5fae5a' }, 'nenufar'),
+    mordisco: sprite(['...oo...', '..oMo...', '..oMo...', '..oMo...', '..oMo.o.', '..oMooMo', '...oMMo.', '....oo..'], { o: '#2a2418', M: '#b8b0a0' }, 'anzuelo'),
+    panzazo: sprite(['..oooo..', '.oLLSSo.', 'oLLSSSSo', 'oLSSSSso', 'oSSSSsso', 'oSSsssso', '.osssso.', '..oooo..'], { o: '#2e2f3a', S: '#7d8290', s: '#565a68', L: '#a6abb8' }, 'canto'),
+    guindilla: sprite(['.....gg.', '....og..', '...oRo..', '..oRRo..', '..oRRo..', '.oRRo...', '.oRo....', '.oo.....'], { o: '#4a1a1a', R: '#e0402a', g: '#5fae5a' }, 'guindilla'),
+    resbalon: sprite(['.G......', 'G.G..G..', '.GG.G.G.', '..GGG...', '.GgGgG..', 'GgGGGgG.', '.GGgGG..', '..GGG...'], { G: '#5fae5a', g: '#2f7f88' }, 'alga') };
   const cracked = sprite([
     'oooooooooooooooo',
     'oLLLLLsLLLLLLLLo',
@@ -793,6 +803,6 @@ const ART = (() => {
 
   return { sprite, flip, tint, canvas, rng, text, textWidth, wrap, glyph, logo, background, THEMES, GROUND, WATER,
     nila, fish, hand, snail, frogSit, frogJump, mosquito, crab, heronBody, heronFly, wingUp, wingDown, wingMid, egg,
-    crate, rock, pearl, heart, drop, fire, ash, ring, plate, pinwheel, hard, raft, mossWall, heartEmpty, lantern, sign, boat, mushroom, mushroomSquash, thorns, gate, target, lily, plank, puff, star, cracked,
+    crate, rock, pearl, heart, drop, fire, ash, ring, plate, pinwheel, hard, raft, mossWall, morsels, heartEmpty, lantern, sign, boat, mushroom, mushroomSquash, thorns, gate, target, lily, plank, puff, star, cracked,
     dirt, grassCap, roots, edgeL, edgeR, water, waterDeep, reed, tuft, shroomDeco };
 })();

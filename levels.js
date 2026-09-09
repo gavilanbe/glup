@@ -7,11 +7,12 @@
 //   G  compuerta   T  diana (la abre para siempre)   P  placa (la abre mientras algo pese)   V  molinillo (la abre mientras gira con el soplido)
 //   O  aro: sorbe apuntando arriba y Bigotes iza a Nila hasta él      R  balsa: sopla hacia atrás para impulsarla
 //   M  muro de raíces: Nila resbala por él y puede saltar de pared en pared
+//   !  bocado: Bigotes lo traga y aprende un truco (los trucos van en `powers`, por orden)
 //   %  seta saltarina      c  caja               r  piedra
 //   s  caracol   f  rana   m  mosquito   K  cangrejo   B  la Garza
 //   *  perla     H  corazón   L  farol (punto de control)   E  barca (salida)   @  Nila
 //   ?  cartel (los textos van en `signs`, por orden)   , ' "  decoración (mata, junco, seta)
-// Nila salta tres celdas; con el aleteo de Bigotes, cuatro. Los muros que piden caja o compuerta tienen cinco; los aros llevan más arriba.
+// Nila salta tres celdas; con el aleteo de Bigotes, cuatro. Los muros que piden caja o compuerta tienen seis; los aros llevan más arriba.
 // Las dianas, placas y molinillos se emparejan con las compuertas por orden de izquierda a derecha.
 'use strict';
 const LEVELS = (() => {
@@ -42,14 +43,14 @@ const LEVELS = (() => {
     screen(
       '....................',
       '.............*......',
-      '............===.....',
+      '............===..x..',
       '.................x..',
       '.................x..',
       '.................x..',
       '.................x..',
-      '..r....?..?......x..',
-      '##########xxx#######',
-      '##########.*.#######',
+      '..r....?..,......x..',
+      '####################',
+      '####################',
       '####################'),
     screen(
       '....................',
@@ -64,7 +65,7 @@ const LEVELS = (() => {
       '............########',
       '............########',
       '............########',
-      '..?.........########',
+      '....!.......########',
       '####################',
       '####################',
       '####################'),
@@ -77,7 +78,7 @@ const LEVELS = (() => {
       '....M....M..........',
       '....M....M..........',
       '....................',
-      '..?.................',
+      '..!.................',
       '####################',
       '####################',
       '####################'),
@@ -97,13 +98,14 @@ const LEVELS = (() => {
       '...===........===...',
       '....................',
       '....................',
-      '..?..f........f.....',
+      '..!..f........f.....',
       '####################',
       '####################',
       '####################'),
     screen(
       '....................',
       '..............*.....',
+      '............########',
       '............########',
       '............########',
       '............########',
@@ -123,7 +125,7 @@ const LEVELS = (() => {
       '....................',
       '....................',
       '....................',
-      '..?......,..........',
+      '..!......,..........',
       '####################',
       '####################',
       '####################'),
@@ -150,16 +152,12 @@ const LEVELS = (() => {
       '############~~~~~~~~',
       '####################'));
   const embarcaderoSigns = [
-    'Nila y Bigotes. {move} para moverte y {jump} para saltar.',
+    'Nila y Bigotes. {move} para moverte y {jump} para saltar. Bigotes aprende trucos comiendo: busca los bocados que brillan.',
     'Mantén {fish} y Bigotes sorbe lo que tenga delante. Suéltalo cuando trague.',
     'Con la boca llena, pulsa {fish} para escupir. Apunta al muro agrietado.',
-    'En el aire, {down} y {jump}: planchazo. Rompe el suelo agrietado y aturde a los bichos. Corriendo, {down} te desliza.',
     'Agáchate con {down} para pasar por los huecos bajos.',
-    'Salta otra vez en el aire y Bigotes aletea: salto doble.',
-    'En los muros de raíces Nila resbala. Salta de pared en pared para subir.',
-    'Con la boca vacía, un toque de {fish} es un soplido: aparta y aturde a los bichos.',
-    'Las cajas se quedan donde caen. Escúpela contra el saliente y súbete. Con {down} y {fish} la sueltas a tus pies.',
-    'Mantén {up} y {fish} para que Bigotes mire arriba. Si sorbe un aro, te iza hasta él; salta para soltarte.'];
+    'Las cajas se quedan donde caen. Escúpela contra el saliente y súbete. Con {down} y {fish} la sueltas a tus pies.'];
+  const embarcaderoPowers = ['aleteo', 'ventosa', 'soplido', 'mordisco'];
 
   const juncos = join(
     screen(
@@ -187,6 +185,7 @@ const LEVELS = (() => {
       '####............G...',
       '####............G...',
       '####............G...',
+      '####............G...',
       '####.?r..T..s...G...',
       '####################',
       '####################',
@@ -206,7 +205,7 @@ const LEVELS = (() => {
       '....................',
       '....................',
       '....................',
-      '..?........,..FFF.*.',
+      '..!........,..FFF.*.',
       '#####~~#############',
       '#####~~#############',
       '####################'),
@@ -214,13 +213,14 @@ const LEVELS = (() => {
       '....................',
       '.......*...*...*....',
       '....................',
-      '..?..............L..',
+      '.................L..',
       '####~~~~~~~~~~######',
       '####~~~~~~~~~~######',
       '####################'),
     screen(
       '....................',
       '....................',
+      '..............G.....',
       '..............G.....',
       '..............G.....',
       '.........PP...G.....',
@@ -269,6 +269,13 @@ const LEVELS = (() => {
     screen(
       '....................',
       '....................',
+      '..!.......*.........',
+      '########xxx#########',
+      '########.*.#########',
+      '####################'),
+    screen(
+      '....................',
+      '....................',
       '....................',
       '####...s.....L....E.',
       '################~~~~',
@@ -276,11 +283,10 @@ const LEVELS = (() => {
       '####################'));
   const juncosSigns = [
     'Golpea la diana con algo escupido y la compuerta se abrirá para siempre.',
-    'Bigotes también sorbe agua de la charca. Escúpela sobre la hoguera para apagarla.',
-    'Con agua en la boca, mantén {fish} en el aire: el chorro te sostiene mientras dure.',
     'Esta compuerta sólo se abre mientras algo pese sobre la placa. Sube la caja y suéltala allí con {down} y {fish}.',
     'Súbete a la balsa y sopla hacia atrás: Bigotes la impulsa.',
     'Mantén {up} mientras escupes para lanzar hacia arriba.'];
+  const juncosPowers = ['chorro', 'panzazo'];
 
   const cueva = join(
     screen(
@@ -288,7 +294,8 @@ const LEVELS = (() => {
       '.................X..',
       '.................X..',
       '.................X..',
-      '..@..?...r.......X..',
+      '.................X..',
+      '..@.!....r.......X..',
       '####################',
       '####################',
       '####################'),
@@ -319,6 +326,7 @@ const LEVELS = (() => {
       '..............######',
       '..............######',
       '..............######',
+      '..............######',
       '..c...K.......######',
       '####################',
       '####################',
@@ -342,6 +350,7 @@ const LEVELS = (() => {
       '####################'),
     screen(
       '....................',
+      '..............G.....',
       '..............G.....',
       '..............G.....',
       '..............G.....',
@@ -388,6 +397,7 @@ const LEVELS = (() => {
       '..............G.....',
       '..............G.....',
       '..............G.....',
+      '..............G.....',
       '..r..?........G..H..',
       '####################',
       '####################',
@@ -399,7 +409,16 @@ const LEVELS = (() => {
       '..............######',
       '..............######',
       '..............######',
+      '..............######',
       '..r.K..K...c..######',
+      '####################',
+      '####################',
+      '####################'),
+    screen(
+      '....................',
+      '....##########......',
+      '....##########......',
+      '.!..........*.......',
       '####################',
       '####################',
       '####################'),
@@ -411,11 +430,11 @@ const LEVELS = (() => {
       '############~~~~~~~~',
       '####################'));
   const cuevaSigns = [
-    'Mantén {fish} con la boca llena y suelta: el escupitajo cargado sale recto y rompe la piedra reforzada.',
     'Esa charca da para apagar la hoguera. El cangrejo de detrás no se deja sorber: voltéalo con una pedrada.',
     'Sopla al molinillo: la compuerta se abre mientras gira. Date prisa.',
     'Tres aros hacia arriba. Sorbe apuntando con {up}, y desde cada aro busca el siguiente.',
     'Esa diana está muy alta. Bigotes también escupe hacia arriba.'];
+  const cuevaPowers = ['guindilla', 'resbalon'];
 
   const nido = join(
     screen(
@@ -446,8 +465,8 @@ const LEVELS = (() => {
       '####################'));
 
   return [
-    { name: 'El embarcadero', theme: 'dusk', music: 'marsh', rows: embarcadero, signs: embarcaderoSigns },
-    { name: 'Los juncos', theme: 'night', music: 'marsh', rows: juncos, signs: juncosSigns },
-    { name: 'La cueva de barro', theme: 'cave', music: 'cave', rows: cueva, signs: cuevaSigns },
+    { name: 'El embarcadero', theme: 'dusk', music: 'marsh', rows: embarcadero, signs: embarcaderoSigns, powers: embarcaderoPowers },
+    { name: 'Los juncos', theme: 'night', music: 'marsh', rows: juncos, signs: juncosSigns, powers: juncosPowers },
+    { name: 'La cueva de barro', theme: 'cave', music: 'cave', rows: cueva, signs: cuevaSigns, powers: cuevaPowers },
     { name: 'El nido de la Garza', theme: 'nest', music: 'heron', rows: nido, signs: [], boss: true }];
 })();

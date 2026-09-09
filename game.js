@@ -109,7 +109,8 @@ const Screen = {
 
 // ---------------------------------------------------------------- Guardado
 const Save = {
-  data: { unlocked: 0, pearls: {}, totals: {}, best: {}, mute: false, finished: false },
+  data: { unlocked: 0, pearls: {}, totals: {}, best: {}, mute: false, finished: false, powers: {} },
+  has(p) { return !!Save.data.powers[p]; },
   load() { try { const s = localStorage.getItem('glup.v1'); if (s) Object.assign(Save.data, JSON.parse(s)); } catch (e) { } },
   write() { try { localStorage.setItem('glup.v1', JSON.stringify(Save.data)); } catch (e) { } }
 };
@@ -173,7 +174,7 @@ function loadLevel(index) {
   for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) {
     const ch = L.t[y][x];
     if (ch === '@') { L.start = { x: x * TS + 3, y: y * TS - 4 }; L.t[y][x] = '.'; }
-    else if ('sfmKcr*HL?EBOR'.includes(ch)) { L.spawn.push({ ch, x, y }); L.t[y][x] = '.'; if (ch === '*') L.pearlsTotal++; }
+    else if ('sfmKcr*HL?EBOR!'.includes(ch)) { L.spawn.push({ ch, x, y }); L.t[y][x] = '.'; if (ch === '*') L.pearlsTotal++; }
     else if (ch === 'T') targets.push({ x, y, ch });
     else if (ch === 'P' || ch === 'V') { targets.push({ x, y, ch }); L.spawn.push({ ch, x, y }); L.t[y][x] = '.'; }
     else if (ch === 'G') gateTiles.push({ x, y });
@@ -193,7 +194,7 @@ function loadLevel(index) {
   Cam.snap();
 }
 function spawnEntities() {
-  L.ents = []; L.projs = []; L.parts = []; L.solids = []; L.signs = []; L.boss = null; let signIdx = 0;
+  L.ents = []; L.projs = []; L.parts = []; L.solids = []; L.signs = []; L.boss = null; let signIdx = 0, morselIdx = 0;
   for (const s of L.spawn) {
     const px = s.x * TS, py = s.y * TS;
     switch (s.ch) {
@@ -213,6 +214,7 @@ function spawnEntities() {
       case 'P': L.ents.push(Item.plate(px, py + 11, L.triggerIdx.get(key(s.x, s.y)))); break;
       case 'V': L.ents.push(Item.pinwheel(px, py, L.triggerIdx.get(key(s.x, s.y)))); break;
       case 'R': L.ents.push(Item.raft(px, py + 12)); break;
+      case '!': { const pw = (L.def.powers || [])[morselIdx++]; if (pw && !Save.has(pw)) L.ents.push(Item.morsel(px + 4, py + 4, pw)); break; }
     }
   }
 }
@@ -236,6 +238,18 @@ function updateParts() {
   }
 }
 
+// ---------------------------------------------------------------- Lo que Bigotes aprende
+const POWERS = {
+  soplido: { name: 'Soplido', food: 'un vilano de diente de león', text: 'Con la boca vacía, un toque de {fish} es un soplido: aparta y aturde a los bichos, mueve molinillos y balsas.' },
+  aleteo: { name: 'Aleteo', food: 'una luciérnaga dorada', text: 'Pulsa {jump} otra vez en el aire y Bigotes aletea: salto doble.' },
+  ventosa: { name: 'Ventosa', food: 'una lapa del pantano', text: 'Bigotes se pega a los muros de raíces: empuja contra ellos, resbala y salta de pared en pared.' },
+  chorro: { name: 'Trago de agua', food: 'un nenúfar azul', text: 'Bigotes traga agua: sórbela de una charca, escúpela sobre el fuego, o mantén {fish} en el aire para flotar con el chorro.' },
+  mordisco: { name: 'Mordisco', food: 'un anzuelo viejo', text: 'Bigotes muerde los aros: sorbe apuntando arriba con {up} y te izará. Salta para soltarte.' },
+  panzazo: { name: 'Panzazo', food: 'un canto de río', text: 'En el aire, {down} y {jump}: Bigotes cae de panza. Rompe suelo agrietado, aturde y rebota en las setas.' },
+  guindilla: { name: 'Escupitajo picante', food: 'una guindilla del pantano', text: 'Mantén {fish} con la boca llena y suelta: el escupitajo cargado sale recto, atraviesa bichos y rompe piedra reforzada.' },
+  resbalon: { name: 'Resbalón', food: 'un alga resbaladiza', text: 'Corriendo, {down}: Nila se desliza sobre Bigotes. Pasa huecos bajos a toda velocidad.' } };
+const POWER_ORDER = ['soplido', 'aleteo', 'ventosa', 'chorro', 'mordisco', 'panzazo', 'guindilla', 'resbalon'];
+
 // ---------------------------------------------------------------- Nila
 const CHARGE_FULL = 40, AMMO_NAMES = { rock: 'Piedra', crate: 'Caja', snail: 'Caracol', frog: 'Rana', mosquito: 'Mosquito', crab: 'Cangrejo', agua: 'Agua' };
 const Player = {
@@ -254,7 +268,7 @@ const Player = {
     // Crouch: shorter hitbox; stand back up only with headroom.
     if (p.mantleT > 0) { p.mantleT--; p.vx = 0; p.vy = 0; Player.fish(); p.animT++; return; }
     // Running + down = a slide; standing + down = a crouch. Both shorten the hitbox; standing up needs headroom.
-    if (Input.pressed.down && p.onGround && Math.abs(p.vx) > 1.2 && !p.slide && !p.crouch && !p.hover && !p.grapple) { p.slide = 20; p.vx = p.dir * 2.8; Sound.play('step'); Cam.shake(1, 3); spawnParts(6, p.x + 5 - p.dir * 4, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2 - p.dir * .9, spread: .5, speed: [.5, 1.5], life: [10, 18], g: .03 }); }
+    if (Input.pressed.down && p.onGround && Math.abs(p.vx) > 1.2 && !p.slide && !p.crouch && !p.hover && !p.grapple && Game.has('resbalon')) { p.slide = 20; p.vx = p.dir * 2.8; Sound.play('step'); Cam.shake(1, 3); spawnParts(6, p.x + 5 - p.dir * 4, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2 - p.dir * .9, spread: .5, speed: [.5, 1.5], life: [10, 18], g: .03 }); }
     if (p.slide > 0) { p.slide--; if (!p.onGround) p.slide = 0; }
     const wantCrouch = (Input.held.down || p.slide > 0) && p.onGround && !p.hover && !p.grapple;
     if (wantCrouch && !p.crouch) { p.crouch = true; p.y += 6; p.h = 12; p.sx = 1.15; }
@@ -279,14 +293,14 @@ const Player = {
         p.vy = -5.4; p.jumpCut = true; p.jumpBuf = 0; p.coyote = 0; p.onGround = false; p.sx = .8; p.sy = 1.25; Sound.play('jump');
         if (p.grapple) { Player.letGo(); p.vx = Input.held.left ? -1.7 : Input.held.right ? 1.7 : 0; Game.word('¡HOP!', p.x + 5, p.y - 6, '#fff6d6', false); }
         else spawnParts(5, p.x + 5, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.2, speed: [.5, 1.5], life: [10, 20], g: .05 });
-      } else if (p.onWall) {
+      } else if (p.onWall && Game.has('ventosa')) {
         // Wall kick off the roots.
         p.vy = -5.3; p.vx = -p.onWall * 2.7; p.dir = -p.onWall; p.wallJumpT = 11; p.jumpCut = true; p.jumpBuf = 0; p.sx = .8; p.sy = 1.25; Sound.play('jump'); Cam.shake(1, 3);
         spawnParts(6, p.x + (p.onWall > 0 ? p.w : 0), p.y + 8, { color: ['#5e8a2e', '#c9b08a'], angle: p.onWall > 0 ? Math.PI : 0, spread: .8, speed: [.5, 2], life: [10, 18], g: .05 }); p.onWall = 0;
-      } else if (!p.hover && !p.grapple && !p.pound && Input.held.down) {
+      } else if (!p.hover && !p.grapple && !p.pound && Input.held.down && Game.has('panzazo')) {
         // Belly flop: hang a beat, then slam down.
         p.pound = true; p.poundT = 9; p.vx = 0; p.vy = -1.2; p.jumpBuf = 0; p.airJumps = 0; Sound.play('charge'); p.sx = 1.2; p.sy = .8;
-      } else if (!p.hover && !p.grapple && !p.pound && p.airJumps > 0) {
+      } else if (!p.hover && !p.grapple && !p.pound && p.airJumps > 0 && Game.has('aleteo')) {
         // Bigotes flaps: a second jump in the air.
         p.airJumps--; p.vy = -4.9; p.jumpCut = true; p.jumpBuf = 0; p.flap = 14; p.sx = .85; p.sy = 1.2; Sound.play('flap'); Input.rumble(50, .2, .3);
         L.parts.push({ x: p.x - 3, y: p.y + p.h - 2, vx: 0, vy: 0, life: 8, color: '#cfe0e8', size: 1, g: 0, kind: 'ring' });
@@ -318,7 +332,7 @@ const Player = {
     p.onWall = 0;
     if (!p.onGround && !p.grapple && !p.hover && !p.pound && p.vy > 0 && p.wallJumpT === 0) {
       const d = Input.held.left ? -1 : Input.held.right ? 1 : 0;
-      if (d && Player.wallAt(d)) { p.onWall = d; p.dir = -d; p.vy = Math.min(p.vy, .75); p.airJumps = 1; if (p.animT % 5 === 0) spawnParts(1, p.x + (d > 0 ? p.w : 0), p.y + 4, { color: ['#5e8a2e', '#c9b08a'], speed: [.2, .6], life: [8, 14], g: .05 }); }
+      if (d && Game.has('ventosa') && Player.wallAt(d)) { p.onWall = d; p.dir = -d; p.vy = Math.min(p.vy, .75); p.airJumps = 1; if (p.animT % 5 === 0) spawnParts(1, p.x + (d > 0 ? p.w : 0), p.y + 4, { color: ['#5e8a2e', '#c9b08a'], speed: [.2, .6], life: [8, 14], g: .05 }); }
     }
     p.airT = p.onGround || p.hanging ? 0 : p.airT + 1;
     if (p.onGround && p.vy === 0 && !groundBelow(p)) p.onGround = false;
@@ -344,8 +358,9 @@ const Player = {
   // Reaching a ledge with the hands: Nila hauls herself up.
   mantle() {
     const p = Player; if (p.onGround || p.vy < 0 || p.grapple || p.hover || p.pound || p.crouch) return false;
-    const d = Math.sign(p.vx) || p.dir; const fx = d > 0 ? p.x + p.w + 1 : p.x - 1, tx = fx >> 4, ty = Math.floor((p.y + 5) / TS);
-    if (!solidChar(tileAt(tx, ty)) || solidChar(tileAt(tx, ty - 1)) || solidChar(tileAt(tx, ty - 2)) || (p.y + 5) - ty * TS > 9) return false;
+    const d = Math.sign(p.vx) || p.dir; const fx = d > 0 ? p.x + p.w + 1 : p.x - 1, tx = fx >> 4, ty = Math.floor((p.y + p.h - 1) / TS);
+    // Only a hand's breadth: the feet must already be within five pixels of the ledge top, so no wall becomes climbable by itself.
+    if (!solidChar(tileAt(tx, ty)) || solidChar(tileAt(tx, ty - 1)) || solidChar(tileAt(tx, ty - 2)) || (p.y + p.h) - ty * TS > 5) return false;
     const nx = tx * TS + (d > 0 ? 2 : TS - 2 - p.w), ny = ty * TS - p.h;
     if (rectSolid(nx, ny, p.w, p.h, p)) return false;
     p.x = nx; p.y = ny; p.vx = 0; p.vy = 0; p.mantleT = 8; p.onGround = true; p.airJumps = 1; p.sx = 1.15; p.sy = .85; Sound.play('step');
@@ -373,6 +388,7 @@ const Player = {
       if (Input.pressed.fish && Input.held.down && p.onGround && p.held.kind !== 'agua') { Player.drop(); p.fishDown = false; return; }
       if (down && p.fishDown && p.fishT > 4) {
         if (p.held.kind === 'agua' && !p.onGround) { p.hover = true; p.charge = 0; Player.jet(); }
+        else if (!Game.has('guindilla')) { /* no charge yet: the spit waits for the release */ }
         else {
           const was = p.charge; p.charge = Math.min(p.charge + 1, CHARGE_FULL + 30);
           if (p.charge > 10 && p.charge % 3 === 0) { const m = p.mouth(); spawnParts(1, m.x + rnd(-14, 14) * p.dir, m.y + rnd(-10, 10), { color: p.charge >= CHARGE_FULL ? ['#fff6d6', '#e79b3f'] : ['#cfe0e8', '#e79b3f'], speed: [0, .3], life: [8, 14], g: 0, kind: 'suck' }); }
@@ -385,7 +401,7 @@ const Player = {
     } else {
       p.charge = 0;
       if (down && p.fishDown && !p.sucking && p.fishT > 4) { p.sucking = true; p.suckT = 0; p.waterT = 0; Sound.suck(true); }
-      if (!down && p.fishDown) { p.fishDown = false; if (p.sucking) { p.sucking = false; Sound.suck(false); Player.letGo(); } else if (p.fishT <= 4 && p.puffCd === 0) Player.puff(); }
+      if (!down && p.fishDown) { p.fishDown = false; if (p.sucking) { p.sucking = false; Sound.suck(false); Player.letGo(); } else if (p.fishT <= 4 && p.puffCd === 0 && Game.has('soplido')) Player.puff(); }
       if (p.sucking) Player.suck();
     }
     if (wasHover && !p.hover) Sound.jet(false);
@@ -398,7 +414,7 @@ const Player = {
     if (p.suckT % 20 === 10 && p.onGround) spawnParts(2, p.x + 5 + p.dir * 4, p.y + p.h, { color: '#c9b08a', angle: -Math.PI / 2 + p.dir * .8, spread: .4, speed: [.3, .9], life: [8, 14], g: .03 });
     if (p.grapple && !p.hanging) return;
     let water = null;
-    if (!p.aimUp) for (let k = 1; k <= 5 && !water; k++) for (const dy of [-6, 4, 14, 24]) { const wx = m.x + p.dir * k * 10, wy = m.y + dy; if (waterAt(wx, wy)) { water = { x: wx, y: wy }; break; } }
+    if (!p.aimUp && Game.has('chorro')) for (let k = 1; k <= 5 && !water; k++) for (const dy of [-6, 4, 14, 24]) { const wx = m.x + p.dir * k * 10, wy = m.y + dy; if (waterAt(wx, wy)) { water = { x: wx, y: wy }; break; } }
     p.waterSrc = water ? { x: water.x, y: Math.floor(water.y / TS) * TS } : null;
     if (water) {
       p.waterT++;
@@ -409,6 +425,7 @@ const Player = {
     for (const e of L.ents) {
       if (e.dead || e.held || e === p.grapple) continue;
       if (!e.suckable && e.kind !== 'anchor') continue;
+      if (e.kind === 'anchor' && !Game.has('mordisco')) continue;
       if (p.grapple && e.kind !== 'anchor') continue;
       const cx = e.x + e.w / 2, cy = e.y + e.h / 2, ox = cx - m.x, oy = cy - m.y;
       const along = ox * a.x + oy * a.y, across = Math.abs(ox * a.y - oy * a.x);
@@ -640,6 +657,10 @@ const Item = {
   lantern(x, y, id) { return { kind: 'lantern', x, y, w: 10, h: 18, id, t: 0, update(e) { e.t++; if (!L.lit.has(e.id) && overlap({ x: e.x - 4, y: e.y, w: 18, h: 18 }, Player.rect()) && !Player.dead) { L.lit.add(e.id); L.checkpoint = { x: e.x - 1, y: e.y }; Sound.play('lantern'); spawnParts(16, e.x + 5, e.y + 5, { color: ['#ffcf5a', '#fff2b8', '#ffffff'], speed: [.3, 1.8], life: [20, 40], g: -.03 }); Game.toast('Farol encendido', 90); Game.word('¡FAROL!', e.x + 5, e.y - 8, '#ffcf5a', true); Cam.punch(1.03); } if (L.lit.has(e.id) && e.t % 5 === 0) spawnParts(1, e.x + 5, e.y + 5, { color: ['#ffcf5a', '#fff2b8'], speed: [.1, .5], life: [16, 30], g: -.02 }); },
     draw(e, g) { const lit = L.lit.has(e.id); if (lit) { g.globalAlpha = .18 + Math.sin(e.t / 9) * .04; g.fillStyle = '#ffcf5a'; const r = 18; g.beginPath(); g.arc(Math.round(e.x - Cam.x) + 5, Math.round(e.y - Cam.y) + 5, r, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; } g.drawImage(lit ? ART.lantern.on : ART.lantern.off, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y)); } }; },
   sign(x, y, idx) { return { kind: 'sign', x, y, w: 14, h: 12, idx, update() { }, draw(e, g) { g.drawImage(ART.sign, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y)); } }; },
+  morsel(x, y, power) { return { kind: 'morsel', x, y, w: 8, h: 8, power, t: Math.random() * 100, update(e) {
+      e.t++; if (e.t % 6 === 0) spawnParts(1, e.x + rnd(0, 8), e.y + rnd(0, 8), { color: ['#fff6d6', '#ffe36a', '#e8fbff'], speed: [.1, .4], life: [14, 26], g: -.02 });
+      if (!Player.dead && !Game.learning && overlap({ x: e.x - 6, y: e.y - 6, w: 20, h: 20 }, Player.rect())) { e.dead = true; Game.learn(e.power); }
+    }, draw(e, g) { const bob = Math.round(Math.sin(e.t / 16) * 2); const sx = Math.round(e.x - Cam.x), sy = Math.round(e.y - Cam.y + bob); g.globalAlpha = .25 + Math.sin(e.t / 8) * .1; g.fillStyle = '#ffe36a'; g.beginPath(); g.arc(sx + 4, sy + 4, 9, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; g.drawImage(ART.morsels[e.power], sx, sy); if ((e.t >> 3) % 4 === 0) g.drawImage(ART.star, sx + 7, sy - 3); } }; },
   anchor(x, y) { return { kind: 'anchor', x, y, w: 10, h: 10, t: 0, update(e) { e.t++; }, draw(e, g) { const sx = Math.round(e.x - Cam.x), sy = Math.round(e.y - Cam.y); g.fillStyle = '#2a2418'; for (let yy = sy - 1; yy >= sy - 10; yy -= 2) g.fillRect(sx + 4, yy, 2, 1); g.fillStyle = '#4a3a24'; g.fillRect(sx - 4, sy - 13, 18, 3); g.fillStyle = '#5e8a2e'; g.fillRect(sx - 2, sy - 14, 3, 1); g.fillRect(sx + 9, sy - 14, 4, 1); g.drawImage(ART.ring, sx, sy + (Player.grapple === e ? 1 : Math.round(Math.sin(e.t / 30) * 1))); if (Player.grapple === e && (e.t >> 2) % 2) g.drawImage(ART.tint(ART.ring, '#fff6d6'), sx, sy + 1); } }; },
   plate(x, y, idx) { return { kind: 'plate', x, y, w: 16, h: 5, idx, pressed: false, t: 0, update(e) {
       e.t++; let on = false; const top = { x: e.x + 1, y: e.y, w: 14, h: 7 };
@@ -931,6 +952,7 @@ const Game = {
     document.addEventListener('visibilitychange', () => { if (document.hidden && Game.state === 'play') Game.pause(); });
     Game.updateSoundButton();
     if (params.has('escena')) Game.capture = { scene: params.get('escena'), t: parseInt(params.get('t') || '0'), n: parseInt(params.get('n') || '0'), x: parseInt(params.get('x') || '-1'), guion: (params.get('guion') || '').split(';').filter(Boolean).map(s => { const [a, r] = s.split('@'); const [f0, f1] = (r || '0').split('-').map(Number); return { a, f0, f1: f1 === undefined ? f0 : f1 }; }) };
+    if (params.has('trucos')) for (const k of params.get('trucos').split(',')) if (k === 'todos') POWER_ORDER.forEach(q => Save.data.powers[q] = true); else Save.data.powers[k] = true;
     if (Game.capture) Game.runCapture(); else Game.title();
     Game.last = performance.now(); Game.acc = 0; requestAnimationFrame(Game.frame);
   },
@@ -1005,6 +1027,7 @@ const Game = {
   },
   updatePlay() {
     if (Input.pressed.pause) { Game.pause(); return; }
+    if (Game.learning) { Game.updateLearning(); return; }
     if (Game.hitStop > 0) { Game.hitStop--; return; }
     L.time++;
     if (Game.banner > 0) Game.banner--;
@@ -1096,6 +1119,36 @@ const Game = {
   updateSoundButton() { const b = $('touch-sound'); b.setAttribute('aria-pressed', String(Sound.isMuted())); b.textContent = Sound.isMuted() ? '♪ off' : '♪'; b.classList.toggle('off', Sound.isMuted()); },
   fullscreen() { const el = document.documentElement; if (document.fullscreenElement || document.webkitFullscreenElement) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } else { (el.requestFullscreen || el.webkitRequestFullscreen).call(el).catch(() => { }); } },
   toast(text, t) { Game.toastText = text; Game.toastT = t; },
+  has(p) { return Save.has(p); },
+  // Bigotes eats a morsel and learns a trick: a beat of celebration, then a card that waits for a press.
+  learn(power) {
+    const p = Player; Game.learning = { power, t: 0 }; Save.data.powers[power] = true; Save.write();
+    p.vx = 0; p.sucking = false; Sound.suck(false); Sound.jet(false); p.hover = false; p.charge = 0; p.swallowT = 10; Player.letGo();
+    Sound.play('lantern'); Sound.duck(true); Cam.punch(1.05); Input.rumble(200, .6, .6);
+    const m = p.mouth(); Game.word('¡ÑAM!', m.x, m.y - 14, '#ffe36a', true);
+    spawnParts(24, p.x + 5 + p.dir * 12, p.y + 10, { color: ['#ffe36a', '#fff6d6', '#e8fbff', '#e79b3f'], speed: [.5, 3], life: [20, 50], g: -.02 });
+  },
+  updateLearning() {
+    const l = Game.learning; l.t++;
+    Player.animT++; Player.sx += (1 - Player.sx) * .18; Player.sy += (1 - Player.sy) * .18; if (Player.swallowT > 0) Player.swallowT--;
+    if (l.t % 5 === 0) spawnParts(2, Player.x + 5 + Player.dir * 12 + rnd(-8, 8), Player.y + 8 + rnd(-6, 6), { color: ['#ffe36a', '#fff6d6'], speed: [.2, .8], life: [16, 30], g: -.03 });
+    updateParts(); for (let i = L.words.length - 1; i >= 0; i--) { const w = L.words[i]; w.t++; if (w.t > w.life) L.words.splice(i, 1); }
+    if (l.t === 40) Sound.play('win');
+    if (l.t > 70 && (Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Game.tapped)) { Game.tapped = false; Game.learning = null; Sound.duck(false); Sound.play('confirm'); Input.release(); }
+  },
+  drawLearning(g) {
+    const l = Game.learning, pw = POWERS[l.power]; if (l.t < 40) return;
+    const a = Math.min(1, (l.t - 40) / 12); g.globalAlpha = a * .75; g.fillStyle = '#08101a'; g.fillRect(0, 0, W, H); g.globalAlpha = a;
+    const y = 34; g.fillStyle = '#1b2430'; g.fillRect(30, y, W - 60, 112); g.fillStyle = '#e79b3f'; g.fillRect(30, y, W - 60, 1); g.fillRect(30, y + 111, W - 60, 1);
+    ART.text(g, '¡Bigotes ha aprendido!', W / 2, y + 8, '#f2c46a', 'center');
+    const icon = ART.morsels[l.power]; g.save(); g.translate(W / 2, y + 30); g.scale(2, 2); g.drawImage(icon, -4, -4); g.restore();
+    g.drawImage(ART.fish.full, W / 2 - 40, y + 22); g.drawImage(ART.flip(ART.fish.full), W / 2 + 18, y + 22);
+    ART.text(g, pw.name, W / 2, y + 44, '#fff6d6', 'center', '#08101a');
+    ART.text(g, 'Se ha tragado ' + pw.food + '.', W / 2, y + 56, '#9fc0cc', 'center');
+    const lines = ART.wrap(Game.signText(-1, pw.text), W - 84); lines.forEach((ln, i) => ART.text(g, ln, W / 2, y + 70 + i * 10, '#e8fbff', 'center'));
+    if (l.t > 70 && (l.t >> 4) % 2) ART.text(g, Touch.enabled ? 'Toca para seguir' : 'Z para seguir', W / 2, y + 100, '#fff6d6', 'center');
+    g.globalAlpha = 1;
+  },
   word(text, x, y, color = '#fff6d6', big = false) { L.words.push({ text, x, y, t: 0, life: big ? 46 : 34, color, big, wob: Math.random() * 6 }); if (L.words.length > 12) L.words.shift(); },
   douse(tx, ty) {
     const seen = new Set(), stack = [[tx, ty]]; Sound.play('hiss'); Game.word('SSSH', tx * TS + 8, ty * TS - 4, '#cfe0e8', false);
@@ -1104,11 +1157,12 @@ const Game = {
   tap(pt) {
     if (Game.state === 'title') { Game.tapped = true; return; }
     if (Game.state === 'select') { const cards = Game.selectCards(); for (let i = 0; i < cards.length; i++) { const c = cards[i]; if (pt.x >= c.x && pt.x < c.x + c.w && pt.y >= c.y && pt.y < c.y + c.h) { Game.tapSel = i; return; } } return; }
+    if (Game.state === 'play' && Game.learning) { Game.tapped = true; return; }
     if (Game.state === 'play' && Game.paused) { const rows = Game.pauseRows(); for (let i = 0; i < rows.length; i++) if (pt.y >= rows[i] - 6 && pt.y < rows[i] + 12) { Game.tapSel = i; return; } return; }
     if (Game.state === 'clear' || Game.state === 'ending') Game.tapped = true;
   },
-  signText(idx) {
-    const def = L.def; const raw = def.signs[idx] || ''; const m = Input.mode;
+  signText(idx, rawText) {
+    const def = L.def; const raw = rawText !== undefined ? rawText : (def.signs[idx] || ''); const m = Input.mode;
     const map = m === 'touch' ? { move: 'La cruceta', jump: 'SALTO', fish: 'BIGOTES', up: '▲', down: '▼' } : m === 'pad' ? { move: 'El stick', jump: 'A', fish: 'X', up: 'arriba', down: 'abajo' } : { move: 'Flechas', jump: 'Z o espacio', fish: 'X', up: '↑', down: '↓' };
     return raw.replace(/\{(\w+)\}/g, (_, k) => map[k] || k).replace('▲', '↑').replace('▼', '↓');
   },
@@ -1118,7 +1172,7 @@ const Game = {
     switch (Game.state) {
       case 'title': Game.drawTitle(g); break;
       case 'select': Game.drawSelect(g); break;
-      case 'play': Game.drawPlay(g); if (Game.paused) Game.drawPause(g); break;
+      case 'play': Game.drawPlay(g); if (Game.learning) Game.drawLearning(g); if (Game.paused) Game.drawPause(g); break;
       case 'clear': Game.drawClear(g); break;
       case 'ending': Game.drawEnding(g); break;
       case 'sprites': Game.drawSprites(g); break;
@@ -1203,6 +1257,7 @@ const Game = {
       else if (e.kind === 'pearl') hole(e.x + 3, e.y + 3, 12);
       else if (e.kind === 'boat') hole(e.x + 14, e.y - 4, 34 * fl);
       else if (e.kind === 'anchor') hole(e.x + 5, e.y + 5, 10);
+      else if (e.kind === 'morsel') hole(e.x + 4, e.y + 4, 22 * fl);
       else if (e.kind === 'pinwheel' && e.spin > 0) hole(e.x + 8, e.y + 8, 18);
     }
     for (const p of L.projs) if (p.kind === 'agua') hole(p.x + 4, p.y + 4, 10);
@@ -1286,7 +1341,8 @@ const Game = {
     ART.text(g, 'Pausa', W / 2, 40, '#e79b3f', 'center', '#1b2430');
     const items = ['Seguir', 'Sonido: ' + (Sound.isMuted() ? 'no' : 'sí'), 'Salir al mapa'], rows = Game.pauseRows();
     items.forEach((it, i) => { const sel = i === Game.pauseSel; ART.text(g, (sel ? '► ' : '') + it, W / 2, rows[i], sel ? '#fff6d6' : '#9fc0cc', 'center'); });
-    ART.text(g, Touch.enabled ? 'Toca una opción' : 'Flechas y Z', W / 2, 140, '#5f7899', 'center');
+    const known = POWER_ORDER.filter(Game.has); ART.wrap(known.length ? 'Bigotes sabe: ' + known.map(k => POWERS[k].name).join(', ') : 'Bigotes aún no sabe trucos', W - 40).slice(0, 2).forEach((ln, i) => ART.text(g, ln, W / 2, 122 + i * 9, '#9fc0cc', 'center'));
+    ART.text(g, Touch.enabled ? 'Toca una opción' : 'Flechas y Z', W / 2, 150, '#5f7899', 'center');
   },
   // ---- title & menus
   drawScene(g, t, theme) {
@@ -1344,6 +1400,7 @@ const Game = {
       else ART.text(g, lv.boss ? 'jefa' : 'cerrado', c.x + c.w / 2, y + 62, '#5f7899', 'center');
     });
     ART.text(g, Touch.enabled ? 'Toca un nivel para jugar' : '← → elegir · Z jugar · Esc volver', W / 2, 150, '#9fc0cc', 'center');
+    const known = POWER_ORDER.filter(Game.has).length; ART.text(g, 'Bigotes sabe ' + known + '/' + POWER_ORDER.length + ' trucos', W / 2, 40, '#e8fbff', 'center');
     if (d.finished) ART.text(g, '★ Pantano completado ★', W / 2, 162, '#f2c46a', 'center');
   },
   fmtTime(s) { return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); },
