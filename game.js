@@ -1331,11 +1331,11 @@ const Game = {
     if (c.scene === 'selector') { Save.data.unlocked = c.n; Save.data.pearls = { 0: 6, 1: 10 }; Save.data.totals = { 0: 11, 1: 10 }; Save.data.best = { 0: 245, 1: 312 }; Game.select(); Game.sel = Math.min(c.n, 1); Mapa.place(Game.sel); for (let i = 0; i < c.t; i++) Game.t++; return; }
     if (c.scene === 'aprende') { Game.startLevel(0); Game.banner = 0; for (let i = 0; i < 40; i++) Game.updatePlay(); Aprende.start(POWER_ORDER[c.n]); for (let i = 0; i < c.t; i++) { Input.pressed = {}; Aprende.update(); } Game.frozen = true; return; }
     if (c.scene === 'cine') { Cine.start(() => { }); Cine.state.t = c.t; Game.frozen = true; return; }
-    if (c.scene === 'titulo') { Game.title(); Game.titleT = c.t; for (let i = 0; i < c.t; i++) Game.updateTitle(); return; }
+    if (c.scene === 'titulo') { Game.title(); for (let i = 0; i < c.t; i++) Game.updateTitle(); Game.frozen = true; return; }
     if (c.scene === 'icono') { Game.state = 'icon'; return; }
     if (c.scene === 'nivel') { Game.startLevel(c.n); if (c.x >= 0) { Player.x = c.x; Player.y = 0; for (let i = 0; i < 60; i++) { Player.vy = Math.min(Player.vy + .28, 5.5); if (moveY(Player, Player.vy)) { Player.vy = 0; Player.onGround = true; break; } } Cam.snap(); } Game.banner = 0; for (let i = 0; i < c.t; i++) { Input.held = {}; Input.pressed = {}; for (const g of c.guion) if (i >= g.f0 && i <= g.f1) { Input.held[g.a] = true; if (i === g.f0) Input.pressed[g.a] = true; } Game.updatePlay(); } Input.held = {}; Input.pressed = {}; Game.frozen = true; if (params_debug()) console.log('ENTS', JSON.stringify(L.ents.map(e => [e.kind, Math.round(e.x), Math.round(e.y), e.dead ? 'dead' : ''])), 'PLAYER', Math.round(Player.x), Math.round(Player.y), Player.held ? Player.held.kind : '-', 'SUCK', Player.sucking, Player.waterT, Player.charge, Player.hover, Player.fishT, 'GRAP', !!Player.grapple, Player.hanging, Player.crouch, 'MOVE', Player.onWall, Player.airJumps, Player.pound, Player.slide, Player.mantleT, 'PEARLS', L.pearls, 'PROJS', JSON.stringify(L.projs.map(p => [p.kind, Math.round(p.x), Math.round(p.y)])), 'GATES', L.gates.map(g => g.map(t => tileAt(t.x, t.y)).join('')).join('|'), 'TARGETS', [...L.hitTargets].join(';')); return; }
   },
-  title() { Game.state = 'title'; Game.titleT = 0; Game.titleParts = []; Sound.playMusic('dock'); },
+  title() { Game.state = 'title'; Game.titleT = 0; Game.titleParts = []; Sound.playMusic('march'); },
   frame(now) {
     const dt = Math.min(100, now - Game.last); Game.last = now; Game.acc += dt;
     let steps = 0;
@@ -1352,7 +1352,7 @@ const Game = {
     if (Game.fadeTo) { Game.fade = Math.min(1, Game.fade + .06); if (Game.fade >= 1) { const f = Game.fadeTo; Game.fadeTo = null; f(); } return; }
     if (Game.fade > 0) Game.fade = Math.max(0, Game.fade - .06);
     switch (Game.state) {
-      case 'title': Game.updateTitle(); break;
+      case 'title': if (!Game.frozen) Game.updateTitle(); break;
       case 'select': Game.updateSelect(); break;
       case 'play': if (Game.frozen) break; if (Game.paused) Game.updatePause(); else Game.updatePlay(); break;
       case 'clear': Game.updateClear(); break;

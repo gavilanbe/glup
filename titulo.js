@@ -1,10 +1,11 @@
 // GLUP — pantalla de título. El logotipo está dibujado a trazos gordos con la piel de
 // Bigotes (oliva moteado, relieve y brillo) y la G es su cabeza: la abertura es la boca,
-// con ojo y bigotes. Al entrar, Bigotes salta del agua y escupe las letras una a una.
+// con ojo y bigotes. Sigue a la cinemática: Nila llega corriendo a un otero sobre el pantano,
+// la cámara sube al cielo y Bigotes, en alto, escupe las letras una a una.
 'use strict';
 const Title = (() => {
   const INTRO = 170;                 // frames until everything is in place
-  const LEAP = 30, APEX = 58, SPIT0 = 64, SPIT_GAP = 9, FLY = 22, DROP = 104, CATCH = 128;
+  const ARRIVE = 46, RAISE = 70, SPIT0 = 80, SPIT_GAP = 9, FLY = 22, LOWER = 126;
   const TOP = 12, M = 4, EXT = 4;    // logo top, canvas margin, extrusion depth
 
   // ---------------------------------------------------------------- Letras
@@ -67,28 +68,24 @@ const Title = (() => {
   function build() {
     if (letters) return letters;
     const total = LETTERS.reduce((a, l) => a + l.w, 0) + 1 * (LETTERS.length - 1);
-    let x = Math.round((W - total) / 2);
+    let x = Math.round((W - total) / 2) - 16;   // a little left, so the moon shows beside the P
     letters = LETTERS.map((L, i) => { const b = buildLetter(L, 97 + i * 31); b.slotX = x - M; b.slotY = TOP - M; x += L.w + 1; b.i = i; return b; });
     return letters;
   }
 
+
   // ---------------------------------------------------------------- Coreografía
-  // Bigotes' path: up out of the water, a hang at the top while he spits, then down into Nila's arms.
-  const NILA = { x: 150, y: 108 };
-  function fishAt(t) {
-    const x0 = 188, y0 = 146, ax = 188, ay = 80, cx = NILA.x + 10, cy = NILA.y + 7;
-    if (t < LEAP) return null;
-    if (t < APEX) { const k = (t - LEAP) / (APEX - LEAP), e = 1 - (1 - k) * (1 - k); return { x: x0, y: y0 + (ay - y0) * e, a: -Math.PI / 2, mouth: 'closed' }; }
-    if (t < DROP) { const k = t - APEX, sp = (t - SPIT0) % SPIT_GAP, spitting = t >= SPIT0 && t < SPIT0 + SPIT_GAP * 4 && sp < 4; return { x: ax + Math.sin(k / 6) * 1.5, y: ay + Math.sin(k / 9) * 2 + (spitting ? 2 - sp * .5 : 0), a: -Math.PI / 2 + Math.sin(k / 7) * .12, mouth: spitting ? 'spit' : 'open' }; }
-    if (t < CATCH) { const k = (t - DROP) / (CATCH - DROP); return { x: ax + (cx - ax) * k, y: ay + (cy - ay) * k - Math.sin(k * Math.PI) * 22, a: -Math.PI / 2 + k * (Math.PI / 2 + Math.PI * 2), mouth: 'closed' }; }
-    return null;
-  }
+  // Nila runs in from the left, skids at the edge of the knoll and holds Bigotes up to spit the letters.
+  const NILA = { x: 120, y: 118 }, GROUND = 136;
+  function nilaAt(t) { if (t >= ARRIVE) return NILA.x; const k = t / ARRIVE; return -30 + (NILA.x + 30) * (1 - (1 - k) * (1 - k)); }
+  function mouth() { return { x: NILA.x + 14, y: NILA.y - 12 }; }
+  function camY(t) { return 34 * (1 - Math.min(1, Math.max(0, (t - 30) / 50)) ** 2 * (3 - 2 * Math.min(1, Math.max(0, (t - 30) / 50)))); }
   function letterAt(b, t) {
     const t0 = SPIT0 + b.i * SPIT_GAP, k = (t - t0) / FLY;
     if (t < t0) return null;
     if (k < 1) {
-      const mx = 188 - b.w / 2, my = 70 - b.h / 2, e = k * (2 - k);
-      return { x: mx + (b.slotX - mx) * e, y: my + (b.slotY - my) * e - Math.sin(k * Math.PI) * 26, s: .35 + .65 * k, rot: (1 - k) * (b.i % 2 ? 1 : -1) * 2.4, sx: 1, sy: 1 };
+      const m = mouth(), mx = m.x - b.w / 2, my = m.y - b.h / 2, e = k * (2 - k);
+      return { x: mx + (b.slotX - mx) * e, y: my + (b.slotY - my) * e - Math.sin(k * Math.PI) * 30, s: .3 + .7 * k, rot: (1 - k) * (b.i % 2 ? 1 : -1) * 2.4, sx: 1, sy: 1 };
     }
     const land = t - t0 - FLY, sq = land < 16 ? Math.exp(-land / 5) * Math.cos(land / 1.6) : 0;
     const bob = t > INTRO ? Math.round(Math.sin((t + b.i * 23) / 28) * 1.2) : 0;
@@ -96,19 +93,48 @@ const Title = (() => {
   }
 
   // ---------------------------------------------------------------- Partículas y sonido
-  const S = { parts: [], drops: [], lastT: -1 };
+  const S = { parts: [], drops: [], lastT: -1, whiteIn: false };
   function burst(x, y, n, col, spd, up) { for (let i = 0; i < n; i++) { const a = up ? -Math.PI / 2 + (Math.random() - .5) * 1.6 : Math.random() * Math.PI * 2, v = spd * (.4 + Math.random() * .8); S.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 16 + Math.random() * 16, col: col[(Math.random() * col.length) | 0], g: .12 }); } }
   function update(t) {
     if (t === 1 || t < S.lastT) { S.parts = []; S.drops = []; }
     S.lastT = t; const L = build();
-    if (t < LEAP && t % 5 === 0) S.parts.push({ x: 186 + Math.random() * 5, y: 150, vx: 0, vy: -.5, life: 30, col: '#c8f2ea', g: -.01, bubble: true });
-    if (t === LEAP) { burst(188, 132, 18, ['#c8f2ea', '#8fd9d0', '#ffffff'], 2.4, true); Sound.play('splash'); }
-    for (let i = 0; i < 4; i++) { const t0 = SPIT0 + i * SPIT_GAP; if (t === t0) { Sound.play('spit', .5 + i * .2); burst(188, 72, 5, ['#fff3b8', '#dccd68'], 1.2, false); } if (t === t0 + FLY) { Sound.play('land', .8); const b = L[i]; burst(b.slotX + b.w / 2, b.slotY + b.h - 4, 10, ['#fff3b8', '#9ca044', '#ffffff'], 1.6, true); } }
-    if (t === CATCH) { Sound.play('glup', 1); burst(NILA.x + 14, NILA.y + 10, 12, ['#fff6d6', '#f2c46a', '#ffffff'], 1.8, false); }
+    if (t < ARRIVE && t % 5 === 0) Sound.play('step');
+    if (t === ARRIVE) { Sound.play('land', .8); burst(NILA.x + 4, GROUND, 10, ['#c9b08a', '#a08a6a', '#e0c8a0'], 1.6, true); }
+    if (t === RAISE) Sound.play('charge');
+    for (let i = 0; i < 4; i++) { const t0 = SPIT0 + i * SPIT_GAP; if (t === t0) { Sound.play('spit', .5 + i * .2); const m = mouth(); burst(m.x, m.y, 6, ['#fff3b8', '#dccd68'], 1.4, false); } if (t === t0 + FLY) { Sound.play('land', .8); const b = L[i]; burst(b.slotX + b.w / 2, b.slotY + b.h - 4, 10, ['#fff3b8', '#9ca044', '#ffffff'], 1.6, true); } }
+    if (t === LOWER) Sound.play('glup', 1);
     // After the intro, now and then a drop of swamp slides off a letter and falls.
     if (t > INTRO && Math.random() < .02) { const b = L[(Math.random() * 4) | 0]; if (b.drips.length) { const d = b.drips[(Math.random() * b.drips.length) | 0]; S.drops.push({ x: b.slotX + d.x, y: b.slotY + d.y, vy: 0, grow: 0 }); } }
-    for (let i = S.drops.length - 1; i >= 0; i--) { const d = S.drops[i]; if (d.grow < 24) d.grow++; else { d.vy += .12; d.y += d.vy; } if (d.y > 128) { if (d.x > 96 && d.x < 224) burst(d.x, 129, 4, ['#c8f2ea', '#8fd9d0'], 1, true); S.drops.splice(i, 1); } }
-    for (let i = S.parts.length - 1; i >= 0; i--) { const p = S.parts[i]; p.vy += p.g; p.x += p.vx; p.y += p.vy; if (p.bubble) p.x += Math.sin(p.life / 3) * .3; if (--p.life <= 0 || (p.bubble && p.y < 131)) S.parts.splice(i, 1); }
+    for (let i = S.drops.length - 1; i >= 0; i--) { const d = S.drops[i]; if (d.grow < 24) d.grow++; else { d.vy += .12; d.y += d.vy; } if (d.y > 170) S.drops.splice(i, 1); }
+    for (let i = S.parts.length - 1; i >= 0; i--) { const p = S.parts[i]; p.vy += p.g; p.x += p.vx; p.y += p.vy; if (--p.life <= 0) S.parts.splice(i, 1); }
+  }
+
+  // ---------------------------------------------------------------- El otero
+  // The vista: the swamp at dusk, the river winding off to the dead cypress where the Heron nests.
+  function vista(g, t, cy) {
+    const bg = ART.background('dusk'), W2 = W;
+    const L = (c, k, y, drift = 0) => { if (!c) return; const w = c.width, ox = -Math.floor(((200 * k + drift) % w + w) % w); for (let x = ox; x < W2; x += w) g.drawImage(c, x, Math.round(y + cy * k)); if (ox > 0) g.drawImage(c, ox - w, Math.round(y + cy * k)); };
+    g.drawImage(bg.sky, 0, Math.round(cy * .05));
+    if (bg.stars) for (const s of bg.stars) { const a = Math.sin(t * s.sp + s.ph); if (a > .55) { g.globalAlpha = (a - .55) * 2.2; g.fillStyle = s.c; g.fillRect(s.x, s.y + Math.round(cy * .05), 1, 1); g.globalAlpha = 1; } }
+    L(bg.clouds, .08, 6, t * .05); L(bg.hills, .15, 84);
+    // The dead cypress on the horizon, with the nest and the Heron circling it.
+    const nest = ART.background('nest').snag;
+    if (nest) { const sx = 222, sy = 118 + cy * .2; g.save(); g.globalAlpha = .9; g.drawImage(ART.tint(nest, '#4a3050'), sx, Math.round(sy - nest.height * .45), Math.round(nest.width * .45), Math.round(nest.height * .45)); g.restore(); const a = t / 70; g.save(); g.translate(Math.round(sx + nest.width * .22 + Math.cos(a) * 22), Math.round(sy - nest.height * .45 - 6 + Math.sin(a) * 5)); g.scale(Math.cos(a) > 0 ? .22 : -.22, .22); g.drawImage(ART.tint(ART.heronFly, '#2a1830'), -16, -14); g.restore(); }
+    L(bg.far, .22, 128 - bg.far.gy);
+    // Below the far shore, the dark water that fills the gap as the camera rises.
+    g.fillStyle = '#2a2038'; g.fillRect(0, Math.round(146 + cy * .3), W, H);
+    L(bg.mistA, .3, 104, t * .1);
+    L(bg.mid, .5, 150 - bg.mid.gy);
+    // The knoll under Nila: a dark hump with a lit rim of grass.
+    const ky = GROUND + Math.round(cy);
+    for (let x = 0; x < W; x++) {
+      const top = ky + Math.round(Math.max(0, (x - 190) * .35) + Math.max(0, (40 - x) * .15) + Math.sin(x / 13) * 1.5);
+      g.fillStyle = '#281b25'; g.fillRect(x, top, 1, H - top); g.fillStyle = '#35222a'; g.fillRect(x, top + 2, 1, 4);
+      const blade = 2 + ((x * 7) % 5), sway = Math.round(Math.sin(t / 25 + x * .3) * (blade > 4 ? 1 : 0));
+      g.fillStyle = (x * 13) % 7 < 3 ? '#e2a05c' : '#7fb040'; g.fillRect(x + sway, top - blade, 1, blade); g.fillStyle = '#5e8a2e'; g.fillRect(x, top - 1, 1, 2);
+    }
+    // Cattails framing the right edge, swaying.
+    for (let i = 0; i < 4; i++) { const x = 286 + i * 9, h = 40 + (i % 2) * 14, sw = Math.sin(t / 30 + i) * 2; g.fillStyle = '#120c18'; for (let k = 0; k < h; k++) g.fillRect(Math.round(x + sw * k / h), ky + 14 - k, 2, 1); g.fillRect(Math.round(x + sw) - 1, ky + 14 - h - 8, 4, 9); }
   }
 
   // ---------------------------------------------------------------- Dibujo
@@ -137,10 +163,12 @@ const Title = (() => {
     };
     whisk(ox + M + 33, oy + M + 12, 22, 0, -.15); whisk(ox + M + 37, oy + M + 30, 16, 1.7, .45);
   }
-  function drawFish(g, f, t) {
-    if (!f) return;
-    const spr = f.mouth === 'spit' ? ART.fish.spit : f.mouth === 'open' ? ART.fish.open : ART.fish.closed;
-    g.save(); g.translate(Math.round(f.x), Math.round(f.y)); g.rotate(f.a); g.drawImage(spr, -spr.width / 2, -spr.height / 2); Player.fishOverlay(g, spr, -spr.width / 2, -spr.height / 2, t, { mood: f.mouth === 'open' ? 'mad' : null }); g.restore();
+  // Nila holds Bigotes up high, head to the sky: the sprite drawn rotated with his life on top.
+  function raised(g, t, x, y) {
+    const spitting = t >= SPIT0 && t < SPIT0 + SPIT_GAP * 4 && (t - SPIT0) % SPIT_GAP < 4, spr = spitting ? ART.fish.spit : ART.fish.open;
+    g.drawImage(ART.nila.win, x - 3, y + 18 - ART.nila.win.height);
+    g.save(); g.translate(x + 9, y - 2 + (spitting ? 1 : 0)); g.rotate(-1.05 + (spitting ? .08 : 0)); g.drawImage(spr, -spr.width / 2, -spr.height / 2); Player.fishOverlay(g, spr, -spr.width / 2, -spr.height / 2, t, { mood: 'mad', lx: 1, ly: -1 }); g.restore();
+    g.drawImage(ART.hand, x + 2, y - 2); g.drawImage(ART.hand, x + 7, y - 1);
   }
   function drawSign(g, t, y) {
     const text = 'Nila y el pez gato', tw = ART.textWidth(text), w = tw + 16, x = Math.round((W - w) / 2), sway = Math.round(Math.sin(t / 50) * 1);
@@ -152,22 +180,23 @@ const Title = (() => {
     g.restore();
   }
   function draw(g, t) {
-    const L = build();
-    Game.drawScene(g, t, 'dusk');
-    // Nila waits on the dock looking at the water until Bigotes lands in her arms.
-    const blink = (t % 200) < 6, caught = t >= CATCH;
-    if (caught) { const k = t - CATCH, sq = k < 14 ? Math.exp(-k / 4) * Math.cos(k / 1.4) : 0; g.save(); g.translate(NILA.x + 5, NILA.y + 18); g.scale(1 + sq * .2, 1 - sq * .2); g.translate(-(NILA.x + 5), -(NILA.y + 18)); Player.drawCarry(g, NILA.x, NILA.y, ART.nila.idle[blink ? 1 : 0], (t % 240) < 18 ? ART.fish.open : ART.fish.closed, (t >> 5) % 2); g.restore(); }
-    else { const spr = t > LEAP ? (ART.nila.brace || ART.nila.idle[0]) : ART.nila.idle[blink ? 1 : 0]; g.drawImage(spr, NILA.x - 3, NILA.y + 18 - spr.height); if (t > LEAP && t < CATCH) ART.text(g, '!', NILA.x + 5, NILA.y - 12 - ((t >> 3) % 2), '#f2c46a', 'center', '#1b2430'); }
+    const L = build(), cy = camY(t);
+    vista(g, t, cy);
+    // Nila: running in, skidding, holding Bigotes up to spit, then hugging him again.
+    const nx = nilaAt(t), ny = NILA.y + Math.round(cy), blink = (t % 200) < 6;
+    if (t < ARRIVE) { const run = ART.nila.run[Math.floor(t / 3) % 6]; Player.drawCarry(g, Math.round(nx), ny + ((t >> 2) % 2 ? -1 : 0), run, ART.fish.closed, 0); }
+    else if (t < RAISE) { const k = t - ARRIVE, sq = k < 12 ? Math.exp(-k / 4) * Math.cos(k / 1.3) : 0; g.save(); g.translate(nx + 5, ny + 18); g.scale(1 + sq * .15, 1 - sq * .15); g.translate(-(nx + 5), -(ny + 18)); Player.carryLook = { lx: 1, ly: -1 }; Player.drawCarry(g, nx, ny, k < 10 ? ART.nila.skid : ART.nila.idle[blink ? 1 : 0], ART.fish.closed, 0); Player.carryLook = null; g.restore(); }
+    else if (t < LOWER) raised(g, t, nx, ny);
+    else { const k = t - LOWER, sq = k < 14 ? Math.exp(-k / 4) * Math.cos(k / 1.4) : 0; g.save(); g.translate(nx + 5, ny + 18); g.scale(1 + sq * .2, 1 - sq * .2); g.translate(-(nx + 5), -(ny + 18)); Player.carryLook = { mood: k < 60 ? 'happy' : null, lx: 1, ly: -1 }; Player.drawCarry(g, nx, ny, ART.nila.idle[blink ? 1 : 0], ART.fish.closed, (t >> 5) % 2); Player.carryLook = null; g.restore(); }
     // Fireflies.
-    for (const f of Game.titleParts || []) { const a = Math.max(0, Math.sin(f.t / 8)), x = Math.round(f.x), y = Math.round(f.y); g.fillStyle = '#f2f5a0'; g.globalAlpha = a * .3; g.fillRect(x - 1, y - 1, 3, 3); g.globalAlpha = .3 + a * .7; g.fillStyle = '#ffffe0'; g.fillRect(x, y, 1, 1); } g.globalAlpha = 1;
-    // Letter shadows on the sky, then the letters, then the drops.
+    for (const f of Game.titleParts || []) { const a = Math.max(0, Math.sin(f.t / 8)), x = Math.round(f.x), y = Math.round(f.y + cy * .5); g.fillStyle = '#f2f5a0'; g.globalAlpha = a * .3; g.fillRect(x - 1, y - 1, 3, 3); g.globalAlpha = .3 + a * .7; g.fillStyle = '#ffffe0'; g.fillRect(x, y, 1, 1); } g.globalAlpha = 1;
+    // Letters, the G's face, drops and sparks.
     for (const b of L) { const st = letterAt(b, t); if (st) drawLetter(g, b, st, t); }
     { const st = letterAt(L[0], t); if (st) drawFace(g, L[0], st, t); }
     for (const d of S.drops) { const r = d.grow < 24 ? d.grow / 12 : 2; g.fillStyle = '#7c883a'; g.fillRect(Math.round(d.x), Math.round(d.y), 1, Math.max(1, Math.round(r))); g.fillStyle = '#dccd68'; g.fillRect(Math.round(d.x), Math.round(d.y), 1, 1); }
-    drawFish(g, fishAt(t), t);
-    for (const p of S.parts) { g.fillStyle = p.col; if (p.bubble) { g.globalAlpha = .8; g.fillRect(Math.round(p.x) - 1, Math.round(p.y), 3, 1); g.fillRect(Math.round(p.x), Math.round(p.y) - 1, 1, 3); g.globalAlpha = 1; } else g.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
+    for (const p of S.parts) { g.fillStyle = p.col; g.fillRect(Math.round(p.x), Math.round(p.y + (p.col === '#c9b08a' || p.col === '#a08a6a' || p.col === '#e0c8a0' ? cy : 0)), 1, 1); }
     // The sign drops in on its ropes once the letters are home.
-    if (t > INTRO - 30) { const k = Math.min(1, (t - INTRO + 30) / 20), y = Math.round(66 - (1 - k * k) * 30 + (k >= 1 ? 0 : 0)); g.globalAlpha = Math.min(1, k * 2); drawSign(g, t, y); g.globalAlpha = 1; }
+    if (t > INTRO - 30) { const k = Math.min(1, (t - INTRO + 30) / 20), y = Math.round(66 - (1 - k * k) * 30); g.globalAlpha = Math.min(1, k * 2); drawSign(g, t, y); g.globalAlpha = 1; }
     if (t > INTRO) {
       const msg = Touch.enabled ? 'Toca para empezar' : 'Pulsa Z o espacio', a = .55 + Math.sin(t / 14) * .45;
       const mw = ART.textWidth(msg) + 24, mx = Math.round((W - mw) / 2);
@@ -176,6 +205,8 @@ const Title = (() => {
       const bx = mx + 6 + Math.round(Math.sin(t / 8) * 1.5); g.fillStyle = '#f2c46a'; g.fillRect(bx, 160, 1, 5); g.fillRect(bx + 1, 161, 1, 3); g.fillRect(bx + 2, 162, 1, 1);
     }
     ART.text(g, 'gavilanbe · 2026', W - 4, H - 9, '#6a5a78', 'right');
+    // Coming straight from the cinematic: the white flash fades into the vista.
+    if (S.whiteIn && t < 30) { g.globalAlpha = 1 - t / 30; g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
   }
-  return { INTRO, update, draw, build };
+  return { INTRO, update, draw, build, fromCine() { S.whiteIn = true; } };
 })();

@@ -267,13 +267,14 @@ const Cine = (() => {
   function locate(t) { let a = 0; for (let i = 0; i < SHOTS.length; i++) { if (t < a + SHOTS[i].len) return { i, lt: t - a }; a += SHOTS[i].len; } return { i: SHOTS.length - 1, lt: SHOTS[SHOTS.length - 1].len - 1 }; }
 
   function start(done) { S.t = 0; S.done = done; S.lastShot = -1; Game.state = 'cine'; Sound.stopMusic(); }
-  function finish() { const f = S.done; S.done = null; Save.data.seen = Object.assign(Save.data.seen || {}, { intro: true }); Save.write(); if (f) Game.transition(f); }
+  // At its natural end the film is already white, so it cuts straight into the title's white fade.
+  function finish(natural) { const f = S.done; S.done = null; Save.data.seen = Object.assign(Save.data.seen || {}, { intro: true }); Save.write(); if (f) { if (natural) f(); else Game.transition(f); } }
   function update() {
     const go = Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Input.pressed.pause || Game.tapped; Game.tapped = false;
     if (go && S.t > 20) { finish(); return; }
     const { i } = locate(S.t);
     if (i !== S.lastShot) { S.lastShot = i; if (SHOTS[i].music) Sound.playMusic(SHOTS[i].music); }
-    if (++S.t >= TOTAL) finish();
+    if (++S.t >= TOTAL) finish(true);
   }
   function draw(g) {
     const { i, lt } = locate(S.t), sh = SHOTS[i];
@@ -290,7 +291,7 @@ const Cine = (() => {
   }
   // A tiny gate so the browser lets the music play: the cinematic starts on the first press.
   const Gate = { t: 0 };
-  function gateUpdate() { Gate.t++; if (Gate.t > 10 && (Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Input.anyKey || Game.tapped)) { Game.tapped = false; Input.anyKey = false; start(() => Game.title()); } }
+  function gateUpdate() { Gate.t++; if (Gate.t > 10 && (Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Input.anyKey || Game.tapped)) { Game.tapped = false; Input.anyKey = false; start(() => { Game.title(); Title.fromCine(); }); } }
   function gateDraw(g) {
     g.fillStyle = '#05050b'; g.fillRect(0, 0, W, H);
     const t = Gate.t, x = 160 + Math.sin(t / 50) * 60, y = 90 + Math.sin(t / 33) * 20;
