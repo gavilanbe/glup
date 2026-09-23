@@ -194,6 +194,38 @@ const Sound = (() => {
         . . . . . . . . . . . . . . x .   . . . . . . x . . . . . . . . .`) },
       { inst: 'kick', vol: .38, steps: P(`
         x . . . . . x . x . . . . . . .   x . . . . . x . x . . . x . . .`) } ] },
+    omen: { bpm: 56, swing: 0, tracks: [
+      { inst: 'bass', vol: .55, steps: P(`
+        A1 - - - - - - - - - - - - - - -   Bb1 - - - - - - - - - - - - - - -`) },
+      { inst: 'lead', vol: .1, steps: P(`
+        . . . . . . . . E4 - - - F4 - - -   . . . . . . . . E4 - - - - - - -
+        . . . . . . . . D4 - - - Eb4 - - -  . . . . . . . . D4 - - - - - - -`) },
+      { inst: 'drip', vol: .1, steps: P(`
+        . . . . . . . . . . . . x . . .   . . . . x . . . . . . . . . . .`) } ] },
+    sad: { bpm: 68, swing: .15, tracks: [
+      { inst: 'pluck', vol: .24, steps: P(`
+        A2 . E3 . A3 . C4 . E4 . C4 . A3 . E3 .   F2 . C3 . F3 . A3 . C4 . A3 . F3 . C3 .
+        C3 . G3 . C4 . E4 . G4 . E4 . C4 . G3 .   E2 . B2 . E3 . G#3 . B3 . G#3 . E3 . B2 .`) },
+      { inst: 'bass', vol: .35, steps: P(`
+        A1 - - - - - - - - - - - - - - -   F1 - - - - - - - - - - - - - - -
+        C2 - - - - - - - - - - - - - - -   E1 - - - - - - - - - - - - - - -`) },
+      { inst: 'lead', vol: .13, steps: P(`
+        . . . . E4 - - - D4 - C4 - B3 - - -   . . . . C4 - - - A3 - - - - - - -
+        . . . . G4 - - - F4 - E4 - D4 - - -   . . . . E4 - - - - - - - - - - -`) } ] },
+    march: { bpm: 126, swing: 0, tracks: [
+      { inst: 'bass', vol: .5, steps: P(`
+        D2 . D2 . A1 . D2 . D2 . D2 . A1 . D2 .   G1 . G1 . D2 . G1 . G1 . G1 . D2 . G1 .
+        Bb1 . Bb1 . F2 . Bb1 . C2 . C2 . G2 . C2 .   D2 . D2 . A1 . D2 . A1 . A1 . C#2 . A1 .`) },
+      { inst: 'lead', vol: .17, steps: P(`
+        D4 - - A3 D4 - F4 - A4 - - - G4 - F4 -   G4 - - - D4 - - - Bb3 - - - D4 - - -
+        F4 - - - Bb4 - - - C5 - - - E4 - G4 -   A4 - - - - - - - A4 . G4 . E4 . C#4 .`) },
+      { inst: 'pluck', vol: .2, steps: P(`
+        D3 F3 A3 F3 D3 F3 A3 F3 D3 F3 A3 F3 D3 F3 A3 F3   G2 Bb2 D3 Bb2 G2 Bb2 D3 Bb2 G2 Bb2 D3 Bb2 G2 Bb2 D3 Bb2
+        Bb2 D3 F3 D3 Bb2 D3 F3 D3 C3 E3 G3 E3 C3 E3 G3 E3   A2 C#3 E3 C#3 A2 C#3 E3 C#3 A2 C#3 E3 C#3 A2 C#3 E3 C#3`) },
+      { inst: 'hat', vol: .12, steps: P(`
+        x . x . x . x . x . x . x . x x   x . x . x . x . x . x . x x x x`) },
+      { inst: 'kick', vol: .42, steps: P(`
+        x . . . x . . . x . . . x . x .   x . . . x . . . x . . . x . x x`) } ] },
     dock: { bpm: 72, swing: .25, tracks: [
       { inst: 'pluck', vol: .28, steps: P(`
         D3 . . . A3 . . . F3 . . . A3 . . .   Bb2 . . . F3 . . . D3 . . . F3 . . .

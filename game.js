@@ -1138,13 +1138,13 @@ const Game = {
     Game.updateSoundButton();
     if (params.has('escena')) Game.capture = { scene: params.get('escena'), t: parseInt(params.get('t') || '0'), n: parseInt(params.get('n') || '0'), x: parseInt(params.get('x') || '-1'), guion: (params.get('guion') || '').split(';').filter(Boolean).map(s => { const [a, r] = s.split('@'); const [f0, f1] = (r || '0').split('-').map(Number); return { a, f0, f1: f1 === undefined ? f0 : f1 }; }) };
     if (params.has('trucos')) for (const k of params.get('trucos').split(',')) if (k === 'todos') POWER_ORDER.forEach(q => Save.data.powers[q] = true); else Save.data.powers[k] = true;
-    if (Game.capture) Game.runCapture(); else Game.title();
+    if (Game.capture) Game.runCapture(); else Game.state = 'gate';
     Game.last = performance.now(); Game.acc = 0; requestAnimationFrame(Game.frame);
   },
   runCapture() {
     const c = Game.capture;
     if (c.scene === 'sprites' || c.scene === 'zoom') { Game.state = 'sprites'; return; }
-    if (c.scene === 'historia') { Story.start(() => { }); Story.state.i = c.n; for (let i = 0; i < c.t; i++) { Input.pressed = {}; Story.update(); } Game.frozen = true; return; }
+    if (c.scene === 'cine') { Cine.start(() => { }); Cine.state.t = c.t; Game.frozen = true; return; }
     if (c.scene === 'titulo') { Game.title(); Game.titleT = c.t; for (let i = 0; i < c.t; i++) Game.updateTitle(); return; }
     if (c.scene === 'icono') { Game.state = 'icon'; return; }
     if (c.scene === 'nivel') { Game.startLevel(c.n); if (c.x >= 0) { Player.x = c.x; Player.y = 0; for (let i = 0; i < 60; i++) { Player.vy = Math.min(Player.vy + .28, 5.5); if (moveY(Player, Player.vy)) { Player.vy = 0; Player.onGround = true; break; } } Cam.snap(); } Game.banner = 0; for (let i = 0; i < c.t; i++) { Input.held = {}; Input.pressed = {}; for (const g of c.guion) if (i >= g.f0 && i <= g.f1) { Input.held[g.a] = true; if (i === g.f0) Input.pressed[g.a] = true; } Game.updatePlay(); } Input.held = {}; Input.pressed = {}; Game.frozen = true; if (params_debug()) console.log('ENTS', JSON.stringify(L.ents.map(e => [e.kind, Math.round(e.x), Math.round(e.y), e.dead ? 'dead' : ''])), 'PLAYER', Math.round(Player.x), Math.round(Player.y), Player.held ? Player.held.kind : '-', 'SUCK', Player.sucking, Player.waterT, Player.charge, Player.hover, Player.fishT, 'GRAP', !!Player.grapple, Player.hanging, Player.crouch, 'MOVE', Player.onWall, Player.airJumps, Player.pound, Player.slide, Player.mantleT, 'PEARLS', L.pearls, 'PROJS', JSON.stringify(L.projs.map(p => [p.kind, Math.round(p.x), Math.round(p.y)])), 'GATES', L.gates.map(g => g.map(t => tileAt(t.x, t.y)).join('')).join('|'), 'TARGETS', [...L.hitTargets].join(';')); return; }
@@ -1171,7 +1171,8 @@ const Game = {
       case 'play': if (Game.frozen) break; if (Game.paused) Game.updatePause(); else Game.updatePlay(); break;
       case 'clear': Game.updateClear(); break;
       case 'ending': Game.updateEnding(); break;
-      case 'story': if (!Game.frozen) Story.update(); break;
+      case 'gate': Cine.gateUpdate(); break;
+      case 'cine': if (!Game.frozen) Cine.update(); break;
     }
     Touch.updateButtons && Touch.updateButtons();
     Game.updateShell();
@@ -1204,7 +1205,7 @@ const Game = {
     if (Game.tapSel !== undefined) { const s = Game.tapSel; Game.tapSel = undefined; if (s === Game.sel) Game.tapped = true; else { Game.sel = s; Sound.play('select'); } }
     if (Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Game.tapped) {
       Game.tapped = false;
-      if (Game.sel <= Save.data.unlocked) { Sound.play('confirm'); const i = Game.sel; Game.transition(() => i === 0 && !(Save.data.seen || {}).prologue ? Story.start(() => Game.startLevel(0)) : Game.startLevel(i)); } else Sound.play('hurt');
+      if (Game.sel <= Save.data.unlocked) { Sound.play('confirm'); const i = Game.sel; Game.transition(() => Game.startLevel(i)); } else Sound.play('hurt');
     }
     if (Input.pressed.pause) { Sound.play('select'); Game.transition(() => Game.title()); }
   },
@@ -1379,7 +1380,8 @@ const Game = {
     switch (Game.state) {
       case 'title': Game.drawTitle(g); break;
       case 'select': Game.drawSelect(g); break;
-      case 'story': Story.draw(g); break;
+      case 'gate': Cine.gateDraw(g); break;
+      case 'cine': Cine.draw(g); break;
       case 'play': Game.drawPlay(g); if (Game.learning) Game.drawLearning(g); if (Game.paused) Game.drawPause(g); break;
       case 'clear': Game.drawClear(g); break;
       case 'ending': Game.drawEnding(g); break;
