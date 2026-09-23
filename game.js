@@ -1380,7 +1380,7 @@ const Game = {
       Game.tapped = false;
       // The first press during the intro only hurries it along; the next one starts.
       if (Game.titleT < Title.INTRO) { Game.titleT = Title.INTRO; Sound.play('select'); }
-      else { Sound.play('confirm'); Game.transition(() => Game.select()); }
+      else { Sound.play('confirm'); Title.press(Game.titleT); Game.transition(() => Game.select()); }
     }
   },
   select() { Game.state = 'select'; Game.sel = Math.min(Save.data.unlocked, LEVELS.length - 1); Mapa.place(Game.sel); Sound.playMusic('dock'); },

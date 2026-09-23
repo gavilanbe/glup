@@ -89,19 +89,41 @@ const Title = (() => {
     }
     const land = t - t0 - FLY, sq = land < 16 ? Math.exp(-land / 5) * Math.cos(land / 1.6) : 0;
     const bob = t > INTRO ? Math.round(Math.sin((t + b.i * 23) / 28) * 1.2) : 0;
-    return { x: b.slotX, y: b.slotY + bob, s: 1, rot: 0, sx: 1 + sq * .28, sy: 1 - sq * .28 };
+    const j = S.jig[b.i] * Math.exp(-(t - S.jigT[b.i]) / 8) * Math.cos((t - S.jigT[b.i]) / 1.5);
+    // A hop: stretched on the way up, squashed when it lands.
+    const hk = (t - S.hop[b.i]) / 16; let hy = 0, hs = 0; if (hk >= 0 && hk < 1) { hy = -Math.sin(hk * Math.PI) * 9; hs = hk < .5 ? .14 : .08; } else if (hk >= 1 && hk < 1.5) hs = -.22 * Math.sin((hk - 1) * 2 * Math.PI);
+    const breath = t > INTRO ? Math.sin(t / 40 + b.i * 1.3) * .025 : 0;
+    return { x: b.slotX, y: b.slotY + bob + hy, s: 1, rot: hk >= 0 && hk < 1 ? Math.sin(hk * Math.PI * 2) * .06 * (b.i % 2 ? 1 : -1) : 0, sx: 1 + sq * .28 + j * .22 - hs * .7 - breath, sy: 1 - sq * .28 - j * .22 + hs + breath };
   }
 
   // ---------------------------------------------------------------- Partículas y sonido
-  const S = { parts: [], drops: [], lastT: -1, whiteIn: false };
+  const S = { parts: [], drops: [], lastT: -1, whiteIn: false, jig: [0, 0, 0, 0], jigT: [0, 0, 0, 0], hop: [-99, -99, -99, -99], shake: 0, flash: 0, rings: [], sparks: [], bubbles: [], sign: null };
+  // A letter jiggles like jelly after a hit, and hops when a wave runs along the word.
+  function jiggle(i, amp, t) { S.jig[i] = Math.max(S.jig[i] * Math.exp(-(t - S.jigT[i]) / 8), amp); S.jigT[i] = t; }
+  function hop(i, t) { S.hop[i] = t; }
   function burst(x, y, n, col, spd, up) { for (let i = 0; i < n; i++) { const a = up ? -Math.PI / 2 + (Math.random() - .5) * 1.6 : Math.random() * Math.PI * 2, v = spd * (.4 + Math.random() * .8); S.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 16 + Math.random() * 16, col: col[(Math.random() * col.length) | 0], g: .12 }); } }
   function update(t) {
-    if (t === 1 || t < S.lastT) { S.parts = []; S.drops = []; }
+    if (t === 1 || t < S.lastT) { S.parts = []; S.drops = []; S.rings = []; S.sparks = []; S.bubbles = []; S.sign = null; S.hop = [-99, -99, -99, -99]; S.jig = [0, 0, 0, 0]; }
     S.lastT = t; const L = build();
     if (t < ARRIVE && t % 5 === 0) Sound.play('step');
     if (t === ARRIVE) { Sound.play('land', .8); burst(NILA.x + 4, GROUND, 10, ['#c9b08a', '#a08a6a', '#e0c8a0'], 1.6, true); }
     if (t === RAISE) Sound.play('charge');
-    for (let i = 0; i < 4; i++) { const t0 = SPIT0 + i * SPIT_GAP; if (t === t0) { Sound.play('spit', .5 + i * .2); const m = mouth(); burst(m.x, m.y, 6, ['#fff3b8', '#dccd68'], 1.4, false); } if (t === t0 + FLY) { Sound.play('land', .8); const b = L[i]; burst(b.slotX + b.w / 2, b.slotY + b.h - 4, 10, ['#fff3b8', '#9ca044', '#ffffff'], 1.6, true); } }
+    for (let i = 0; i < 4; i++) { const t0 = SPIT0 + i * SPIT_GAP; if (t === t0) { Sound.play('spit', .5 + i * .2); const m = mouth(); burst(m.x, m.y, 6, ['#fff3b8', '#dccd68'], 1.4, false); } if (t === t0 + FLY) { Sound.play('thud'); const b = L[i]; burst(b.slotX + b.w / 2, b.slotY + b.h - 4, 14, ['#fff3b8', '#9ca044', '#ffffff'], 1.9, true); S.shake = 5; S.rings.push({ x: b.slotX + b.w / 2, y: b.slotY + b.h - 3, t: 0 }); jiggle(i, 1, t); if (i > 0) jiggle(i - 1, .55, t); if (i < 3 && t >= SPIT0 + (i + 1) * SPIT_GAP + FLY) jiggle(i + 1, .55, t); } }
+    // The last letter home: the whole word jumps for joy with a flash.
+    if (t === SPIT0 + 3 * SPIT_GAP + FLY + 6) { Sound.play('glup', 1.2); S.flash = 6; S.shake = 7; for (let i = 0; i < 4; i++) hop(i, t + i * 3); }
+    if (t > INTRO) {
+      const k = (t - INTRO) % 320; if (k === 200) for (let i = 0; i < 4; i++) hop(i, t + i * 5);
+      if ((t - INTRO) % 230 === 90) S.bubbles.push({ t: 0 });
+      if (t % 22 === 0) { const b = L[(Math.random() * 4) | 0]; for (let n = 0; n < 20; n++) { const x = (Math.random() * b.w) | 0, y = (Math.random() * b.h * .5) | 0; if (b.at(x, y) && !b.at(x, y - 2)) { S.sparks.push({ b, x, y, t: 0 }); break; } } }
+    }
+    for (let i = S.hop.length - 1; i >= 0; i--) if (t - S.hop[i] === 16) { const b = L[i]; burst(b.slotX + b.w / 2, b.slotY + b.h - 2, 5, ['#fff3b8', '#dccd68'], 1, true); }
+    for (const r of S.rings) r.t++; S.rings = S.rings.filter(r => r.t < 18);
+    for (const sp of S.sparks) sp.t++; S.sparks = S.sparks.filter(sp => sp.t < 18);
+    for (const bu of S.bubbles) bu.t++; S.bubbles = S.bubbles.filter(bu => bu.t < 110);
+    if (S.shake > 0) S.shake--; if (S.flash > 0) S.flash--;
+    // The sign: dropped on springy ropes, then a pendulum in the breeze.
+    if (t === INTRO - 30) S.sign = { y: 30, vy: 0, a: .22, va: 0 };
+    if (S.sign) { const q = S.sign; q.vy += (66 - q.y) * .09; q.vy *= .84; q.y += q.vy; q.va += -q.a * .03 - q.va * .06 + Math.sin(t / 70) * .0009; q.a += q.va; }
     if (t === LOWER) Sound.play('glup', 1);
     // After the intro, now and then a drop of swamp slides off a letter and falls.
     if (t > INTRO && Math.random() < .02) { const b = L[(Math.random() * 4) | 0]; if (b.drips.length) { const d = b.drips[(Math.random() * b.drips.length) | 0]; S.drops.push({ x: b.slotX + d.x, y: b.slotY + d.y, vy: 0, grow: 0 }); } }
@@ -150,7 +172,7 @@ const Title = (() => {
   }
   // The G is Bigotes' head: an eye over the mouth and two whiskers hanging from its corners.
   function drawFace(g, b, st, t) {
-    if (st.s < 1 || st.rot) return;
+    if (st.s < 1 || Math.abs(st.rot) > .1) return;
     const ox = Math.round(st.x), oy = Math.round(st.y), ex = ox + M + 24, ey = oy + M + 10, blink = (t % 210) < 6;
     g.fillStyle = '#1a1420'; g.fillRect(ex - 3, ey - 3, 7, 7); g.fillRect(ex - 2, ey - 4, 5, 9); g.fillRect(ex - 4, ey - 2, 9, 5);
     if (blink) { g.fillStyle = '#9ca044'; g.fillRect(ex - 3, ey - 2, 7, 5); g.fillStyle = '#1a1420'; g.fillRect(ex - 3, ey, 7, 1); }
@@ -170,15 +192,26 @@ const Title = (() => {
     g.save(); g.translate(x + 9, y - 2 + (spitting ? 1 : 0)); g.rotate(-1.05 + (spitting ? .08 : 0)); g.drawImage(spr, -spr.width / 2, -spr.height / 2); Player.fishOverlay(g, spr, -spr.width / 2, -spr.height / 2, t, { mood: 'mad', lx: 1, ly: -1 }); g.restore();
     g.drawImage(ART.hand, x + 2, y - 2); g.drawImage(ART.hand, x + 7, y - 1);
   }
-  function drawSign(g, t, y) {
-    const text = 'Nila y el pez gato', tw = ART.textWidth(text), w = tw + 16, x = Math.round((W - w) / 2), sway = Math.round(Math.sin(t / 50) * 1);
-    g.fillStyle = '#6b4a30'; g.fillRect(x + 6, y - 8, 1, 8); g.fillRect(x + w - 7, y - 8, 1, 8);
-    g.save(); g.translate(sway, 0);
-    g.fillStyle = '#1a1420'; g.fillRect(x - 1, y - 1, w + 2, 15); g.fillStyle = '#8a5a34'; g.fillRect(x, y, w, 13); g.fillStyle = '#a56f38'; g.fillRect(x, y, w, 2); g.fillRect(x, y + 6, w, 1); g.fillStyle = '#6b4a30'; g.fillRect(x, y + 11, w, 2);
-    g.fillStyle = '#4a2e1a'; g.fillRect(x + 2, y + 2, 1, 1); g.fillRect(x + w - 3, y + 2, 1, 1);
-    ART.text(g, text, W / 2, y + 3, '#fff3b8', 'center', '#4a2e1a');
+  // The sign hangs from two ropes tied under the L and the U; it springs, sways and settles.
+  function drawSign(g, t, q) {
+    const L = build(), text = 'Nila y el pez gato', tw = ART.textWidth(text), w = tw + 16, h = 13, pivY = TOP + LH - 4;
+    const a1 = { x: L[1].slotX + M + 10, y: pivY }, a2 = { x: L[2].slotX + M + 30, y: pivY }, cx = (a1.x + a2.x) / 2;
+    const y = q.y, ang = q.a, ca = Math.cos(ang), sa = Math.sin(ang);
+    const corner = dx => ({ x: cx + dx * ca, y: y + dx * sa });
+    const c1 = corner(-w / 2 + 6), c2 = corner(w / 2 - 7);
+    // Ropes with a little sag.
+    for (const [a, c] of [[a1, c1], [a2, c2]]) { const n = 14; for (let i = 0; i <= n; i++) { const k = i / n, x = a.x + (c.x - a.x) * k, yy = a.y + (c.y - a.y) * k + Math.sin(k * Math.PI) * 2; g.fillStyle = i % 3 ? '#8a6a4a' : '#6b4a30'; g.fillRect(Math.round(x), Math.round(yy), 1, 1); } }
+    g.save(); g.translate(Math.round(cx), Math.round(y)); g.rotate(ang);
+    const x = -Math.round(w / 2);
+    g.fillStyle = '#1a1420'; g.fillRect(x - 1, -1, w + 2, h + 2); g.fillStyle = '#8a5a34'; g.fillRect(x, 0, w, h); g.fillStyle = '#a56f38'; g.fillRect(x, 0, w, 2); g.fillRect(x, 6, w, 1); g.fillStyle = '#6b4a30'; g.fillRect(x, h - 2, w, 2);
+    g.fillStyle = '#5e8a2e'; for (let i = 0; i < w; i += 5) g.fillRect(x + i + ((i * 7) % 3), -1, 2 + (i % 2), 1);
+    g.fillStyle = '#4a2e1a'; g.fillRect(x + 2, 2, 1, 1); g.fillRect(x + w - 3, 2, 1, 1);
+    ART.text(g, text, 0, 3, '#fff3b8', 'center', '#4a2e1a');
+    const sh = (t % 200) / 40; if (sh < 1) { g.globalAlpha = .6; g.fillStyle = '#fff6d6'; g.fillRect(Math.round(x + sh * w), 1, 3, h - 2); g.globalAlpha = 1; }
     g.restore();
   }
+  // A press on the title: the letters hop and the sign swings before the fade.
+  function press(t) { for (let i = 0; i < 4; i++) hop(i, t + i * 2); if (S.sign) S.sign.va += .05; S.flash = 4; }
   function draw(g, t) {
     const L = build(), cy = camY(t);
     vista(g, t, cy);
@@ -191,12 +224,21 @@ const Title = (() => {
     // Fireflies.
     for (const f of Game.titleParts || []) { const a = Math.max(0, Math.sin(f.t / 8)), x = Math.round(f.x), y = Math.round(f.y + cy * .5); g.fillStyle = '#f2f5a0'; g.globalAlpha = a * .3; g.fillRect(x - 1, y - 1, 3, 3); g.globalAlpha = .3 + a * .7; g.fillStyle = '#ffffe0'; g.fillRect(x, y, 1, 1); } g.globalAlpha = 1;
     // Letters, the G's face, drops and sparks.
+    g.save(); if (S.shake) g.translate(Math.round((Math.random() - .5) * S.shake), Math.round((Math.random() - .5) * S.shake * .6));
+    // Soft shadows on the sky first, then the letters.
+    for (const b of L) { const st = letterAt(b, t); if (st && st.s >= 1) { g.save(); g.globalAlpha = .28; g.translate(Math.round(st.x + b.w / 2) + 3, Math.round(st.y + b.h) + 4); g.scale(st.sx, st.sy); g.drawImage(ART.tint(b.face, '#140c1c'), -b.w / 2, -b.h); g.restore(); } }
     for (const b of L) { const st = letterAt(b, t); if (st) drawLetter(g, b, st, t); }
-    { const st = letterAt(L[0], t); if (st) drawFace(g, L[0], st, t); }
+    for (const r of S.rings) { const k = r.t / 18, rad = 4 + k * 26; g.globalAlpha = (1 - k) * .8; g.fillStyle = '#fff3b8'; for (let a = 0; a < 40; a++) { const an = a / 40 * Math.PI * 2; g.fillRect(Math.round(r.x + Math.cos(an) * rad), Math.round(r.y + Math.sin(an) * rad * .3), 1, 1); } g.globalAlpha = 1; }
+    for (const sp of S.sparks) { const st = letterAt(sp.b, t); if (!st) continue; const k = sp.t / 18, r = Math.round(Math.sin(k * Math.PI) * 3), x = Math.round(st.x + sp.x), y = Math.round(st.y + sp.y); g.fillStyle = '#ffffff'; g.fillRect(x - r, y, r * 2 + 1, 1); g.fillRect(x, y - r, 1, r * 2 + 1); if (r > 1) { g.fillStyle = '#fff3b8'; g.fillRect(x - 1, y - 1, 3, 3); g.fillStyle = '#ffffff'; g.fillRect(x, y, 1, 1); } }
+    // The G blows a bubble that drifts up and pops.
+    for (const bu of S.bubbles) { const st = letterAt(L[0], t); if (!st) continue; const bx = st.x + M + 38 + Math.sin(bu.t / 9) * 3, by = st.y + M + 20 - Math.max(0, bu.t - 30) * .6, r = Math.min(4, bu.t / 8); if (bu.t < 100) { g.strokeStyle = '#cfeef8'; g.globalAlpha = .9; g.beginPath(); g.arc(bx, by, r, 0, 7); g.stroke(); g.globalAlpha = 1; g.fillStyle = '#ffffff'; g.fillRect(Math.round(bx - r * .5), Math.round(by - r * .5), 1, 1); } else { g.fillStyle = '#cfeef8'; for (let a = 0; a < 6; a++) g.fillRect(Math.round(bx + Math.cos(a) * (bu.t - 98)), Math.round(by + Math.sin(a) * (bu.t - 98)), 1, 1); } }
+    g.restore();
+    { const st = letterAt(L[0], t); if (st) { g.save(); if (S.shake) g.translate(0, 0); drawFace(g, L[0], st, t); g.restore(); } }
+    if (S.flash) { g.globalAlpha = S.flash / 6 * .5; g.fillStyle = '#fff6d6'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
     for (const d of S.drops) { const r = d.grow < 24 ? d.grow / 12 : 2; g.fillStyle = '#7c883a'; g.fillRect(Math.round(d.x), Math.round(d.y), 1, Math.max(1, Math.round(r))); g.fillStyle = '#dccd68'; g.fillRect(Math.round(d.x), Math.round(d.y), 1, 1); }
     for (const p of S.parts) { g.fillStyle = p.col; g.fillRect(Math.round(p.x), Math.round(p.y + (p.col === '#c9b08a' || p.col === '#a08a6a' || p.col === '#e0c8a0' ? cy : 0)), 1, 1); }
     // The sign drops in on its ropes once the letters are home.
-    if (t > INTRO - 30) { const k = Math.min(1, (t - INTRO + 30) / 20), y = Math.round(66 - (1 - k * k) * 30); g.globalAlpha = Math.min(1, k * 2); drawSign(g, t, y); g.globalAlpha = 1; }
+    if (S.sign) drawSign(g, t, S.sign);
     if (t > INTRO) {
       const msg = Touch.enabled ? 'Toca para empezar' : 'Pulsa Z o espacio', a = .55 + Math.sin(t / 14) * .45;
       const mw = ART.textWidth(msg) + 24, mx = Math.round((W - mw) / 2);
@@ -208,5 +250,5 @@ const Title = (() => {
     // Coming straight from the cinematic: the white flash fades into the vista.
     if (S.whiteIn && t < 30) { g.globalAlpha = 1 - t / 30; g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
   }
-  return { INTRO, update, draw, build, fromCine() { S.whiteIn = true; } };
+  return { INTRO, update, draw, build, press, fromCine() { S.whiteIn = true; } };
 })();
