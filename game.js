@@ -633,6 +633,7 @@ const Player = {
   draw(g) {
     const p = Player, cam = Cam, N = ART.nila;
     if (Aprende.posing()) return;
+    if (Victoria.active()) { Victoria.drawWorld(g); return; }
     if (p.inv > 0 && (p.inv >> 2) % 2 === 0 && !p.dead) return;
     const fx = Math.round(p.x - cam.x), fy = Math.round(p.y - cam.y);
     // Every pose is 16×22 with the boots on its last row: anchor it to the bottom of the hitbox.
@@ -1416,6 +1417,7 @@ const Game = {
     if (c.scene === 'cine') { Cine.start(() => { }); Cine.state.t = c.t; Game.frozen = true; return; }
     if (c.scene === 'titulo') { Game.title(); for (let i = 0; i < c.t; i++) Game.updateTitle(); Game.frozen = true; return; }
     if (c.scene === 'icono') { Game.state = 'icon'; return; }
+    if (c.scene === 'victoria') { Victoria.capture(c); return; }
     if (c.scene === 'nivel') { Game.startLevel(c.n); if (c.x >= 0) { Player.x = c.x; Player.y = 0; for (let i = 0; i < 60; i++) { Player.vy = Math.min(Player.vy + .28, 5.5); if (moveY(Player, Player.vy)) { Player.vy = 0; Player.onGround = true; break; } } Cam.snap(); } Game.banner = 0; for (let i = 0; i < c.t; i++) { Input.held = {}; Input.pressed = {}; for (const g of c.guion) if (i >= g.f0 && i <= g.f1) { Input.held[g.a] = true; if (i === g.f0) Input.pressed[g.a] = true; } Game.updatePlay(); } Input.held = {}; Input.pressed = {}; Game.frozen = true; if (params_debug()) console.log('ENTS', JSON.stringify(L.ents.map(e => [e.kind, Math.round(e.x), Math.round(e.y), e.dead ? 'dead' : ''])), 'PLAYER', Math.round(Player.x), Math.round(Player.y), Player.held ? Player.held.kind : '-', 'SUCK', Player.sucking, Player.waterT, Player.charge, Player.hover, Player.fishT, 'GRAP', !!Player.grapple, Player.hanging, Player.crouch, 'MOVE', Player.onWall, Player.airJumps, Player.pound, Player.slide, Player.mantleT, 'PEARLS', L.pearls, 'PROJS', JSON.stringify(L.projs.map(p => [p.kind, Math.round(p.x), Math.round(p.y)])), 'GATES', L.gates.map(g => g.map(t => tileAt(t.x, t.y)).join('')).join('|'), 'TARGETS', [...L.hitTargets].join(';')); return; }
   },
   title() { Game.state = 'title'; Game.titleT = 0; Game.titleParts = []; Sound.playMusic('march'); },
@@ -1521,7 +1523,7 @@ const Game = {
     if (Game.hurtFlash > 0) Game.hurtFlash--;
     Game.ambient();
     Cam.update();
-    if (Player.win) { Game.winT++; if (Game.winT > 70) Game.finishLevel(); }
+    if (Player.win) Victoria.update();
   },
   ambient() {
     const th = L.def.theme, x = Cam.x + rnd(0, W), y = Cam.y + rnd(0, H);
@@ -1563,27 +1565,22 @@ const Game = {
     Game.setGate(L.targets.get(k), true);
   },
   levelClear(boat) {
-    Player.win = true; Player.vx = 0; Player.vy = 0; Player.sucking = false; Sound.suck(false); Player.x = boat.x + 10; Player.y = boat.y - Player.h; Game.winT = 0;
-    Sound.play('clear'); Sound.duck(true);
+    // The celebration (leap into the boat, crías, sailing off) lives in victoria.js.
+    Player.win = true; Player.vx = 0; Player.vy = 0; Player.sucking = false; Player.hover = false; Player.charge = 0; Sound.suck(false); Sound.jet(false); Game.winT = 0;
     spawnParts(20, Player.x + 5, Player.y, { color: ['#ffffff', '#cfe8f0', '#ffcf5a'], speed: [.5, 2.5], life: [20, 50], g: -.02 });
+    Victoria.start(boat);
   },
   finishLevel() {
     const i = Game.level; const d = Save.data;
     d.pearls[i] = Math.max(d.pearls[i] || 0, L.pearls); d.totals[i] = L.pearlsTotal;
-    const secs = Math.floor(L.time / 60); if (!d.best[i] || secs < d.best[i]) d.best[i] = secs;
+    const secs = Math.floor(L.time / 60), prevBest = d.best[i]; if (!d.best[i] || secs < d.best[i]) d.best[i] = secs;
     if (i + 1 < LEVELS.length) d.unlocked = Math.max(d.unlocked, i + 1); else d.finished = true;
     Save.write(); Sound.duck(false);
-    Game.clearStats = { name: L.def.name, pearls: L.pearls, total: L.pearlsTotal, secs, last: i + 1 >= LEVELS.length };
-    Game.transition(() => { Game.state = 'clear'; Game.clearT = 0; Sound.playMusic('dock'); });
+    Game.clearStats = { name: L.def.name, pearls: L.pearls, total: L.pearlsTotal, secs, last: i + 1 >= LEVELS.length, prevBest, boss: !!L.def.boss, tricksAll: L.def.powers || [], tricks: (L.def.powers || []).filter(Save.has) };
+    Game.transition(() => { Game.state = 'clear'; Game.clearT = 0; Cam.fx = null; Victoria.startClear(); Sound.playMusic('victoria'); });
   },
-  updateClear() {
-    Game.clearT++;
-    if (Game.clearT > 40 && (Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Game.tapped)) {
-      Game.tapped = false; Sound.play('confirm');
-      if (Game.clearStats.last) Game.transition(() => { Game.state = 'ending'; Game.endT = 0; Sound.playMusic('dock'); });
-      else Game.transition(() => Game.startLevel(Game.level + 1));
-    }
-  },
+  // The tally (letters, counts, medal) and the move on to the next level or the ending: victoria.js.
+  updateClear() { Victoria.updateClear(); },
   updateEnding() { Game.endT++; if (Game.endT > 120 && (Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Game.tapped)) { Game.tapped = false; Sound.play('confirm'); Game.transition(() => Game.select()); } },
   pause() { if (Game.state !== 'play' || Game.paused) return; Game.paused = true; Game.pauseSel = 0; Sound.suck(false); Sound.jet(false); Sound.duck(true); Input.release(); },
   resume() { Game.paused = false; Sound.duck(false); Sound.resume(); },
@@ -1663,7 +1660,7 @@ const Game = {
     const camX = Math.round(Cam.x) + Cam.ox, camY = Math.round(Cam.y) + Cam.oy;
     const zoom = Cam.zoom > 1 ? Cam.zoom : 1;
     if (Game.capZoom) { g.save(); g.translate(W / 2, H / 2); g.scale(Game.capZoom, Game.capZoom); g.translate(-(Player.x - Cam.x + 12), -(Player.y - Cam.y + 10)); }
-    else if (zoom > 1) { g.save(); g.translate(W / 2, H / 2); g.scale(zoom, zoom); g.translate(-W / 2, -H / 2); }
+    else if (zoom > 1) { const f = Player.win && Cam.fx != null; g.save(); g.translate(W / 2, H / 2); g.scale(zoom, zoom); g.translate(-(f ? Cam.fx : W / 2), -(f ? Cam.fy : H / 2)); }
     Game.drawBackground(g, camX, camY, L.bg);
     Game.drawTiles(g, camX, camY, 'back');
     // Depth: signs and lanterns behind, then items, enemies, player, projectiles.
@@ -1841,19 +1838,7 @@ const Game = {
   drawTitle(g) { Title.draw(g, Game.titleT); },
   drawSelect(g) { Mapa.draw(g, Game.t, Game.sel); },
   fmtTime(s) { return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); },
-  drawClear(g) {
-    const s = Game.clearStats; Game.drawScene(g, Game.t, L.def.theme);
-    g.fillStyle = 'rgba(8,10,16,.6)'; g.fillRect(0, 0, W, H);
-    const t = Game.clearT;
-    g.fillStyle = '#1b2430'; g.fillRect(50, 40, W - 100, 100); g.fillStyle = '#e79b3f'; g.fillRect(50, 40, W - 100, 1); g.fillRect(50, 139, W - 100, 1);
-    ART.text(g, '¡A la barca!', W / 2, 48, '#f2c46a', 'center');
-    ART.text(g, s.name, W / 2, 62, '#fff6d6', 'center');
-    if (t > 20) { g.drawImage(ART.pearl[(t >> 4) % 3], W / 2 - 30, 82); ART.text(g, 'Crías ' + s.pearls + '/' + s.total, W / 2 - 18, 83, '#e8fbff'); }
-    if (t > 40) ART.text(g, 'Tiempo ' + Game.fmtTime(s.secs), W / 2, 96, '#9fc0cc', 'center');
-    if (t > 60 && s.pearls === s.total) ART.text(g, '★ Todas las crías a salvo ★', W / 2, 110, '#f2c46a', 'center');
-    if (t > 40 && (t >> 5) % 2) ART.text(g, s.last ? 'Continuar' : 'Siguiente nivel', W / 2, 126, '#fff6d6', 'center');
-    Player.carryLook = { mood: 'happy' }; Player.drawCarry(g, 62, 102, ART.nila.win, ART.fish.full); Player.carryLook = null;
-  },
+  drawClear(g) { Victoria.drawClear(g); },
   drawEnding(g) {
     const t = Game.endT; Game.drawScene(g, t, 'dusk');
     // The boat crosses the water with the two aboard; the credits float above.
