@@ -1313,6 +1313,7 @@ const Game = {
     if (Game.banner > 0) Game.banner--;
     Player.update();
     for (const e of L.ents) if (!e.dead) e.update(e);
+    Hud.update();
     for (const p of L.projs) if (!p.dead) Proj.update(p);
     L.ents = L.ents.filter(e => !e.dead); L.projs = L.projs.filter(p => !p.dead); L.solids = L.solids.filter(s => !s.dead);
     updateParts();
@@ -1582,19 +1583,7 @@ const Game = {
     }
   },
   drawHud(g) {
-    for (let i = 0; i < 3; i++) g.drawImage(i < Player.hp ? ART.heart : ART.heartEmpty, 5 + i * 11, 5);
-    const pop = Game.pearlPop > 0 ? 1 : 0;
-    const px = Touch.enabled && !Touch.portrait ? W - 108 : W - 44;
-    g.drawImage(ART.pearl[(Game.t >> 4) % 3], px - pop, 5 - pop);
-    ART.text(g, L.pearls + '/' + L.pearlsTotal, px + 10, 5, '#e8fbff', 'left', '#1b2430');
-    if (L.boss && !L.boss.dead && L.boss.state !== 'enter' && L.boss.state !== 'leave') { const bw = 60; g.fillStyle = '#1b2430'; g.fillRect(W / 2 - bw / 2 - 1, 5, bw + 2, 6); g.fillStyle = '#d9503a'; g.fillRect(W / 2 - bw / 2, 6, Math.round(bw * L.boss.hp / L.boss.maxHp), 4); ART.text(g, 'La Garza', W / 2, 12, '#f2c46a', 'center', '#1b2430'); }
-    // Bigotes' mouth: what is inside, the water left, or the charge building up.
-    const hx = 5, hy = 16; g.drawImage(Player.held ? ART.fish.full : ART.fish.closed, hx, hy);
-    if (Player.held) {
-      const nm = AMMO_NAMES[Player.held.kind] || Player.held.kind; ART.text(g, nm, hx + 25, hy + 2, Player.charge >= CHARGE_FULL ? '#fff6d6' : '#e8fbff', 'left', '#1b2430');
-      if (Player.held.kind === 'agua') { g.fillStyle = '#1b2430'; g.fillRect(hx + 25, hy + 10, 32, 3); g.fillStyle = '#8fd9d0'; g.fillRect(hx + 26, hy + 11, Math.round(30 * Math.max(0, Player.held.amount)), 1); }
-      if (Player.charge > 4) { const full = Player.charge >= CHARGE_FULL; g.fillStyle = '#1b2430'; g.fillRect(hx + 25, hy + 10, 32, 3); g.fillStyle = full && (Game.t >> 2) % 2 ? '#fff6d6' : '#e79b3f'; g.fillRect(hx + 26, hy + 11, Math.round(30 * Math.min(1, Player.charge / CHARGE_FULL)), 1); }
-    } else if (Player.sucking) ART.text(g, '...', hx + 25, hy + 2, '#9fc0cc');
+    Hud.draw(g);
     if (Game.hurtFlash > 0) { g.fillStyle = 'rgba(220,60,60,' + (Game.hurtFlash / 14 * .28) + ')'; g.fillRect(0, 0, W, H); }
     if (Game.banner > 0 && !Game.capture) {
       const t = Game.banner; const a = t > 170 ? (190 - t) / 20 : t < 30 ? t / 30 : 1;
