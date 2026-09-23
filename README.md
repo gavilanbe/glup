@@ -12,6 +12,12 @@ Cada verano, las crías de pez gato nacen bajo el embarcadero de Nila. Un anoche
 
 Por el camino, la Garza ha ido dejando crías dormidas en **burbujas**: al tocarlas, la burbuja revienta (*¡PLOP!*) y la cría salta y vuelve nadando a casa. En la pelea final, cada golpe le hace escupir una de las que aún lleva en el buche. **Ruca**, una tortuga vieja que siempre llega antes por sus atajos, espera en cada nivel con consejos y noticias de la Garza; habla letra a letra y lleva un bocadillo mientras no has hablado con ella.
 
+## Nueve lugares y volver atrás
+
+El pantano tiene nueve lugares: el embarcadero, los juncos, el bosque de raíces, el molino anegado, el muelle del pescador, la turbera, la cueva de barro, el río subterráneo y el nido de la Garza. En cada uno vive un maestro que enseña un truco a mitad del camino (algunos piden antes un encargo: encender faroles, subirle una caja, apagar un fogón, acertar una diana), y la segunda mitad del nivel lo exprime.
+
+Cada nivel esconde rincones con crías a los que sólo se llega con trucos que se aprenden **más adelante**: un muro de raíces antes de la ventosa, piedra reforzada antes de la guindilla, un anzuelo antes del mordisco, un túnel bajo contra el reloj antes del resbalón… El ciprés de la Garza está rodeado por un **muro de zarzas** que sólo se abre cuando cantan juntas suficientes crías rescatadas (88 de las 109 de los ocho niveles; en una sola pasada se alcanzan unas 81), así que hay que volver con los trucos nuevos. El mapa es el centro del viaje: se puede volver a cualquier lugar, y cada uno dice cuántas crías faltan y qué truco piden las que aún no se alcanzan.
+
 ## Bigotes aprende comiendo
 
 Como en Rayman, las habilidades se van consiguiendo, y aquí todas las da el pez: Bigotes es un pez gato joven que aprende un truco cada vez que traga un **bocado** especial. Ningún bocado se coge del suelo: cada uno lo da un **maestro** del pantano, uno por nivel, con su dibujo, su animación y su carácter. Se habla con él con ↑ (▲ en el móvil); habla letra a letra en un cuadro con su retrato y, al acabar, el bocado vuela en arco hasta la boca de Bigotes, que hace *¡ÑAM!*: fanfarria y una tarjeta explica el truco y sus controles («Lumi le ha dado una luciérnaga dorada»). Algunos piden antes un encargo: Don Anselmo quiere su caja de aparejos, Canto que enciendas los faroles, Don Pinzas que le apagues el fogón. Lo aprendido se guarda.

@@ -154,8 +154,9 @@ const key = (x, y) => x + ',' + y;
 // ---------------------------------------------------------------- Nivel
 const L = { rows: null, t: null, w: 0, h: 0, def: null, index: 0, ents: [], projs: [], parts: [], solids: [], signs: [], broken: new Set(), targets: new Map(), gates: [], gateOpen: new Set(), lit: new Set(), taken: new Set(), start: null, checkpoint: null, pearlsTotal: 0, pearls: 0, time: 0, bg: null, boss: null, breakQueue: [], gateQueue: [], mush: new Map(), hitTargets: new Set(), boatSpawned: false, exit: null, words: [], ghosts: [], lily: new Map(), triggerIdx: new Map() };
 const SOLID = { '#': 1, 'x': 1, 'G': 1, 'X': 1, 'M': 1 };
-// Above the level, a solid top row carries on upward, so no one walks along the top of a closed level.
-function tileAt(tx, ty) { if (tx < 0 || tx >= L.w) return '#'; if (ty < 0) return L.t[0][tx] === '#' ? '#' : '.'; if (ty >= L.h) return '.'; return L.t[ty][tx]; }
+// Above the level, a solid top row carries on upward (a head may poke 16 px above it, but no one can
+// stand and walk along the top of a closed level).
+function tileAt(tx, ty) { if (tx < 0 || tx >= L.w) return '#'; if (ty < 0) return ty < -1 && L.t[0][tx] === '#' ? '#' : '.'; if (ty >= L.h) return '.'; return L.t[ty][tx]; }
 function setTile(tx, ty, ch) { if (tx >= 0 && tx < L.w && ty >= 0 && ty < L.h) L.t[ty][tx] = ch; }
 function solidChar(ch) { return SOLID[ch] === 1; }
 function rectSolid(x, y, w, h, self) {
@@ -169,7 +170,7 @@ function oneWayBelow(x, w, b0, b1, self) {
   const x0 = Math.floor(x) >> 4, x1 = Math.floor(x + w - .001) >> 4;
   for (let ty = Math.floor(b0 / TS) - 1; ty <= Math.floor((b1 - .001) / TS); ty++) for (let tx = x0; tx <= x1; tx++) {
     const ch = tileAt(tx, ty); if (ch !== '=' && ch !== 'w' && ch !== '%') continue;
-    const top = ty * TS + (ch === '%' ? 6 : 0); if (b0 <= top && b1 > top) return { top, ch, tx, ty };
+    const top = ty * TS + (ch === '%' ? 6 : 0); if (b0 <= top + 1e-6 && b1 > top) return { top, ch, tx, ty };   // .01: rounding must not drop her through
   }
   for (const s of L.solids) if (s !== self && !s.dead && s.platform && x < s.x + s.w && x + w > s.x && b0 <= s.y + 3 + Math.abs(s.vx || 0) && b1 > s.y) return { top: s.y, ch: s.kind, ent: s };   // a little slack: a bobbing raft must not drop her
   return null;
@@ -662,7 +663,7 @@ const Player = {
   },
   hurt(fromDir) {
     const p = Player; if (p.inv > 0 || p.dead || p.win) return;
-    p.hp--; p.inv = 90; p.hurtT = 20; p.dizzyT = 80; p.vx = Player.safeSide(-fromDir) ? -fromDir * 2.4 : 0; p.vy = -3.2; p.onGround = false; p.charge = 0; p.hover = false; Player.letGo(); Sound.jet(false); Sound.play('hurt'); Cam.shake(3, 10); Game.stop(5); Game.hurtFlash = 14; Input.rumble(200, 1, .6);
+    p.hp--; p.inv = 90; p.hurtT = 20; p.dizzyT = 80; p.vx = Player.safeSide(-fromDir) ? -fromDir * 2.4 : (p.carrier ? p.carrier.vx || 0 : 0);   // on a moving raft she keeps its speed, so she lands back on it p.vy = -3.2; p.onGround = false; p.charge = 0; p.hover = false; Player.letGo(); Sound.jet(false); Sound.play('hurt'); Cam.shake(3, 10); Game.stop(5); Game.hurtFlash = 14; Input.rumble(200, 1, .6);
     if (p.held) { const h = p.held; p.held = null; if (h.kind !== 'agua') { const e = Item.fromHeld(h, p.x + 5 - h.w / 2, p.y - h.h - 2); if (e) { e.vy = -2; e.vx = -fromDir * 1.5; L.ents.push(e); } } else spawnParts(8, p.x + 5, p.y + 8, { color: ['#8fd9d0', '#c8f2ea'], speed: [1, 2.5], life: [10, 18], g: .08 }); }
     if (p.hp <= 0) { p.dead = true; p.deadT = 0; p.vy = -4.5; p.vx = -fromDir * 1; }
   },

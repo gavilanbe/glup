@@ -29,7 +29,7 @@
 //   boss: true                     la pelea de garza.js
 'use strict';
 // Crías que tienen que cantar juntas para abrir el muro de zarzas del nido. Un único número para afinar.
-const CRIAS_PARA_EL_NIDO = 40;
+const CRIAS_PARA_EL_NIDO = 88;   // first pass reaches ~81 of 109: going back is a must
 const LEVELS = [];
 const NIVEL = (() => {
   const H = 14;

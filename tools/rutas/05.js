@@ -149,7 +149,7 @@ const pasarela = [
     for (let n = 0; n < 200 && !(g.P.vy < -9); n++) g.frame({ down: 1 });  // the big bounce
     for (let n = 0; n < 200 && !g.P.onGround; n++) g.frame(g.P.vy > -2 ? { right: 1 } : {});
     return g.P.onGround && g.P.y < 20 || 'no subió a la pasarela (y ' + g.P.y.toFixed(0) + ')';
-  }), R(76, 1), GOT(76, 0), R(70, 1), R(72, 11)];
+  }), R(76, 1), GOT(76, 0), R(66, 1), R(60, 11, { tol: 1 }), R(72, 11)];
 // Behind the reinforced stone at the foot of the stilts: a charged crate breaks it (and lands in the doorway:
 // Bigotes sucks it back up and takes it to Don Anselmo).
 const bajoCaseta = [near('crate', 2), D('face', -1), D('suck', 40), R(107, 11), D('charge', 1), { wait: 40 }, R(110, 11), R(111, 11), GOT(111, 9),
