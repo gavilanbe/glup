@@ -171,7 +171,7 @@ function oneWayBelow(x, w, b0, b1, self) {
     const ch = tileAt(tx, ty); if (ch !== '=' && ch !== 'w' && ch !== '%') continue;
     const top = ty * TS + (ch === '%' ? 6 : 0); if (b0 <= top && b1 > top) return { top, ch, tx, ty };
   }
-  for (const s of L.solids) if (s !== self && !s.dead && s.platform && x < s.x + s.w && x + w > s.x && b0 <= s.y + (s.vx ? Math.abs(s.vx) + 1 : 0) && b1 > s.y) return { top: s.y, ch: s.kind, ent: s };
+  for (const s of L.solids) if (s !== self && !s.dead && s.platform && x < s.x + s.w && x + w > s.x && b0 <= s.y + 3 + Math.abs(s.vx || 0) && b1 > s.y) return { top: s.y, ch: s.kind, ent: s };   // a little slack: a bobbing raft must not drop her
   return null;
 }
 function moveX(e, dx) {
