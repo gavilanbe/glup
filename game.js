@@ -450,6 +450,9 @@ const Player = {
     const p = Player, m = p.mouth(), a = p.aim(); p.suckT++;
     // Wind streaks converge on the mouth from along the aim.
     if (p.suckT % 2 === 0) { const d = rnd(30, 62), ang = rnd(-.55, .55); const c = Math.cos(ang), sn = Math.sin(ang); L.parts.push({ x: m.x + (a.x * c - a.y * sn) * d, y: m.y + (a.y * c + a.x * sn) * d, vx: 0, vy: 0, life: 40, color: ['#cfe0e8', '#9fc0cc', '#e8f2f6'][(Math.random() * 3) | 0], size: 1, g: 0, kind: 'suck' }); }
+    // The ground under the cone gives up grass, dust and leaves; whatever is being pulled leaves a trail.
+    if (p.suckT % 3 === 0 && !p.aimUp) { const d = rnd(14, 60), gx = m.x + a.x * d; for (let dy = -8; dy < 34; dy += 3) if (rectSolid(gx, m.y + dy, 1, 1)) { const th = L.def.theme, cols = th === 'cave' ? ['#6b4a60', '#8a6a7a'] : th === 'storm' ? ['#6a7a5a', '#8a9a6a'] : ['#7fb040', '#a3cf52', '#c9b08a']; L.parts.push({ x: gx, y: m.y + dy - 1, vx: 0, vy: 0, life: 40, color: cols[(Math.random() * cols.length) | 0], size: 1, g: 0, kind: 'suck' }); break; } }
+    if (p.suckT % 2 === 0) for (const e of L.ents) if (e.sucked > 0 && !e.dead) L.parts.push({ x: e.x + e.w / 2 + rnd(-2, 2), y: e.y + e.h / 2 + rnd(-2, 2), vx: -(e.vx || 0) * .2, vy: -(e.vy || 0) * .2, life: 10, max: 10, color: '#e8f6ff', size: 1, g: 0, kind: 'mist' });
     if (p.suckT % 20 === 10 && p.onGround) spawnParts(2, p.x + 5 + p.dir * 4, p.y + p.h, { color: '#c9b08a', angle: -Math.PI / 2 + p.dir * .8, spread: .4, speed: [.3, .9], life: [8, 14], g: .03 });
     if (p.grapple && !p.hanging) return;
     let water = null;
@@ -1678,11 +1681,37 @@ const Game = {
       g.globalAlpha = 1;
     }
   },
+  // The suction: a vortex along the aim. Rings of pull travel to the mouth and narrow, streaks spiral
+  // round the axis (bright in front, dim behind) speeding up as they arrive, and a small whirl turns
+  // at Bigotes' lips. It grows in over the first frames; drinking, it turns sea-green.
   drawSuction(g) {
-    const m = Player.mouth(), a = Player.aim(); const mx = Math.round(m.x - Cam.x), my = Math.round(m.y - Cam.y); const len = Player.grapple ? 0 : 64;
-    if (!len) return;
-    g.globalAlpha = .12; g.fillStyle = '#cfe0e8';
-    g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + a.x * len - a.y * 36, my + a.y * len + a.x * 36); g.lineTo(mx + a.x * len + a.y * 36, my + a.y * len - a.x * 36); g.closePath(); g.fill(); g.globalAlpha = 1;
+    const p = Player, m = p.mouth(), a = p.aim(); if (p.grapple) return;
+    const mx = m.x - Cam.x, my = m.y - Cam.y, nx = -a.y, ny = a.x, len = 64, t = Game.t, ramp = Math.min(1, (p.suckT || 0) / 10);
+    const wet = !!p.waterSrc, C1 = wet ? '#8fe0d0' : '#dff2fb', C2 = wet ? '#4ab0a8' : '#a8d0e4', C3 = wet ? '#e8fff8' : '#ffffff';
+    const half = d => 4 + d * .5;
+    // A faint body of moving air.
+    g.globalAlpha = .08 * ramp; g.fillStyle = C1; g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + a.x * len + nx * half(len), my + a.y * len + ny * half(len)); g.lineTo(mx + a.x * len - nx * half(len), my + a.y * len - ny * half(len)); g.closePath(); g.fill();
+    // Rings of pull.
+    for (let i = 0; i < 4; i++) {
+      const u = 1 - ((t * .045 + i / 4) % 1), d = u * len, w = half(d), cx = mx + a.x * d, cy = my + a.y * d;
+      g.globalAlpha = ramp * (.25 + (1 - u) * .65); g.fillStyle = C1;
+      for (let k = 0; k < 28; k++) { const an = k / 28 * Math.PI * 2, lat = Math.cos(an) * w, dep = Math.sin(an) * w * .22; if (Math.sin(an) < -.2 && (k & 1)) continue; g.fillRect(Math.round(cx + nx * lat + a.x * dep), Math.round(cy + ny * lat + a.y * dep), 1, 1); }
+    }
+    // Spiral streaks.
+    for (let i = 0; i < 9; i++) {
+      const ph = i * 2.3, head = (t * .03 * (1 + (i % 3) * .15) + i / 9) % 1;
+      for (let j = 0; j < 12; j++) {
+        const q = head - j * .012 * (1 + head * 1.5); if (q < 0) break;
+        const d = (1 - q) * len, spin = q * 10 + ph + t * .12, lat = Math.sin(spin) * half(d) * .85, front = Math.cos(spin);
+        g.globalAlpha = ramp * (1 - j / 12) * (front > 0 ? .9 : .35) * Math.min(1, q * 4);
+        g.fillStyle = j === 0 ? C3 : front > 0 ? C1 : C2;
+        const sz = j === 0 && front > 0 ? 2 : 1; g.fillRect(Math.round(mx + a.x * d + nx * lat), Math.round(my + a.y * d + ny * lat), sz, sz);
+      }
+    }
+    // The whirl at the lips and a pulsing core.
+    for (let k = 0; k < 3; k++) for (let s2 = 1; s2 < 8; s2++) { const r = s2 * .75, an = -t * .45 + k * 2.09 + s2 * .55; g.globalAlpha = ramp * (1 - s2 / 9); g.fillStyle = s2 < 3 ? C3 : C1; g.fillRect(Math.round(mx + a.x * 3 + Math.cos(an) * r), Math.round(my + a.y * 3 + Math.sin(an) * r * .8), 1, 1); }
+    g.globalAlpha = ramp * (.5 + Math.sin(t * .6) * .3); g.fillStyle = C3; g.fillRect(Math.round(mx + a.x * 2) - 1, Math.round(my + a.y * 2) - 1, 2, 2);
+    g.globalAlpha = 1;
   },
   // The gust: curling streaks that fan out and a pale front, ending in little spirals.
   drawGusts(g) {
@@ -1708,7 +1737,7 @@ const Game = {
     for (const p of L.parts) {
       const x = Math.round(p.x - Cam.x), y = Math.round(p.y - Cam.y);
       if (p.kind === 'puff') { g.drawImage(ART.puff[p.life > 6 ? 1 : 0], x, y); continue; }
-      if (p.kind === 'suck') { g.fillStyle = p.color; const m = Player.mouth(); const dx = m.x - p.x, dy = m.y - p.y, dd = Math.hypot(dx, dy) || 1; g.fillRect(x, y, 1, 1); g.fillRect(Math.round(x - dx / dd * 2), Math.round(y - dy / dd * 2), 1, 1); continue; }
+      if (p.kind === 'suck') { const m = Player.mouth(), dx = m.x - p.x, dy = m.y - p.y, dd = Math.hypot(dx, dy) || 1, tl = Math.min(5, 2 + (60 - dd) / 12); g.fillStyle = p.color; g.fillRect(x, y, 1, 1); g.globalAlpha = .6; for (let k = 1; k < tl; k++) g.fillRect(Math.round(x - dx / dd * k), Math.round(y - dy / dd * k), 1, 1); g.globalAlpha = 1; continue; }
       if (p.kind === 'rain') { g.fillStyle = p.color; g.fillRect(x, y, 1, 2); g.fillRect(x + 1, y - 2, 1, 2); continue; }
       if (p.kind === 'cria') { const sp = ART.criaFree[(p.life >> 2) % 2]; g.globalAlpha = Math.min(1, p.life / 14); g.drawImage(p.vx < 0 ? ART.flip(sp) : sp, x, y); g.globalAlpha = 1; continue; }
       if (p.kind === 'feather') { g.fillStyle = p.color; g.fillRect(x + Math.round(Math.sin(p.life / 5) * 2), y, 2, 1); continue; }
