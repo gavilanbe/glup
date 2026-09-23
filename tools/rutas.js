@@ -3,7 +3,7 @@
 'use strict';
 const R = (x, y, o) => Object.assign({ reach: [x, y] }, o || {});
 const D = (name, ...args) => ({ do: name, args });
-// Spit straight up: the spit happens when {fish} is released, so {up} must still be held then.
+// Spit straight up: hold {up} with {fish}; the aim latches for a few frames after {up} is let go.
 const UP = [{ hold: { fish: 1, up: 1 }, n: 2 }, { hold: { up: 1 }, n: 1 }, { wait: 10 }];
 // Jump, flap and keep {fish} held: with water in the mouth the jet holds Nila up while she drifts `dir`.
 const HOVER = (dir, n = 150, run = 0) => { const d = dir < 0 ? { left: 1 } : { right: 1 }; return [...(run ? [{ hold: d, n: run }] : []), { hold: Object.assign({ jump: 1 }, d), n: 16 }, { hold: d, n: 1 }, { hold: Object.assign({ jump: 1 }, d), n: 12 }, { hold: Object.assign({ fish: 1 }, d), n }]; };
@@ -68,7 +68,7 @@ const HERON = DO('pelea con la Garza', g => {
     if (g.L.boatSpawned) return true;
     if (P.dead) return 'Nila murió';
     if (!b || g.Game.hitStop > 0 || ['dying', 'leave'].includes(b.state)) { g.frame({}); continue; }
-    const px = P.x + 5, bc = b.x + b.w / 2, mx = P.dir > 0 ? P.x + 27 : P.x - 17;
+    const px = P.x + 5, bc = b.x + b.w / 2, mx = P.x + 5 + P.dir * 2; // aiming up, the shot leaves from over her head
     const threat = b.state === 'dive' || (b.state === 'aim' && b.st > 25);
     if (threat) { let away = px < bc ? -1 : 1; if (px < 40) away = 1; if (px > g.L.w * 16 - 40) away = -1; g.frame(side(away)); continue; }
     if (P.held) {

@@ -42,10 +42,13 @@ const Sound = (() => {
   }
   const sfx = {
     jump() { const t = ctx.currentTime; osc('square', 300, t, .12, .12, sfxBus, 620); osc('triangle', 150, t, .08, .1, sfxBus, 300); },
-    land() { const t = ctx.currentTime; noise(t, .08, .18, 'lowpass', 400, 120); osc('sine', 90, t, .07, .15, sfxBus, 40); },
+    land(k = 1) { const t = ctx.currentTime; noise(t, .06 + k * .05, .08 + k * .16, 'lowpass', 300 + k * 200, 120); osc('sine', 110 - k * 30, t, .07, .06 + k * .14, sfxBus, 40); },
     step() { const t = ctx.currentTime; noise(t, .04, .05, 'bandpass', 900, 500, 2); },
-    glup() { const t = ctx.currentTime; osc('sine', 520, t, .16, .25, sfxBus, 150, .005, .08); osc('triangle', 260, t + .04, .12, .15, sfxBus, 90); noise(t, .1, .1, 'lowpass', 900, 200); },
-    spit() { const t = ctx.currentTime; noise(t, .16, .3, 'bandpass', 700, 2400, 1.5); osc('square', 180, t, .08, .12, sfxBus, 900); },
+    // Weighted sounds: `w` is how heavy the load is (a mosquito .35, a rock 1, a crate 1.5); heavier is lower and longer.
+    glup(w = 1) { const t = ctx.currentTime, f = 1.25 - w * .3; osc('sine', 520 * f, t, .14 + w * .03, .25, sfxBus, 150 * f, .005, .08); osc('triangle', 260 * f, t + .04, .12, .15, sfxBus, 90 * f); noise(t, .1, .1, 'lowpass', 900, 200); if (w >= 1) osc('sine', 90, t + .06, .1, .18 * w, sfxBus, 45); },
+    spit(w = 1) { const t = ctx.currentTime, f = 1.3 - w * .35; noise(t, .12 + w * .05, .22 + w * .08, 'bandpass', 700 * f, 2400 * f, 1.5); osc('square', 180 * f, t, .08, .12, sfxBus, 900 * f); if (w >= 1) osc('sine', 80, t, .1, .12 * w, sfxBus, 40); },
+    blub() { const t = ctx.currentTime; osc('sine', 300, t, .08, .12, sfxBus, 620, .005, .04); osc('sine', 420, t + .07, .06, .08, sfxBus, 800, .005, .03); },
+    sputter() { const t = ctx.currentTime; noise(t, .06, .14, 'bandpass', 1800, 700, 2); osc('sine', 240, t, .05, .06, sfxBus, 120); },
     puff() { const t = ctx.currentTime; noise(t, .1, .15, 'highpass', 1500, 4000); },
     hit() { const t = ctx.currentTime; noise(t, .12, .3, 'lowpass', 1500, 200); osc('square', 220, t, .1, .15, sfxBus, 60); },
     pop() { const t = ctx.currentTime; osc('sine', 800, t, .06, .2, sfxBus, 300); noise(t, .05, .12, 'highpass', 2000); },
@@ -80,7 +83,7 @@ const Sound = (() => {
     clang() { const t = ctx.currentTime; osc('square', 1800, t, .08, .1, sfxBus, 900, .002, .1); osc('triangle', 2400, t, .12, .06, sfxBus, 1200, .002, .1); noise(t, .06, .1, 'highpass', 4000); },
     flap() { const t = ctx.currentTime; noise(t, .12, .2, 'bandpass', 900, 300, 1.5); osc('sine', 420, t, .1, .12, sfxBus, 180, .005, .06); },
     win() { const t = ctx.currentTime; ['D4', 'F4', 'A4', 'D5', 'C5', 'D5', 'F5', 'A5'].forEach((n, i) => osc('triangle', freq(n), t + i * .12, .3, .16, sfxBus, null, .005, .2)); } };
-  function play(name) { if (!ctx || muted) return; try { sfx[name] && sfx[name](); } catch (e) { /* audio is never fatal */ } }
+  function play(name, arg) { if (!ctx || muted) return; try { sfx[name] && sfx[name](arg); } catch (e) { /* audio is never fatal */ } }
   // The suction is a looping wind: a noise through a bandpass that rises while the mouth is open.
   function suck(on) {
     if (!ctx) return;
