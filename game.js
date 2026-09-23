@@ -271,7 +271,13 @@ const Player = {
   x: 0, y: 0, w: 10, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, coyote: 0, jumpBuf: 0, held: null, sucking: false, suckT: 0, hp: 3, inv: 0, animT: 0, sx: 1, sy: 1,
   dead: false, deadT: 0, spitT: 0, swallowT: 0, blink: 0, hurtT: 0, stepT: 0, dropping: false, win: false, nearSign: null, airT: 0, puffCd: 0, jumpCut: false,
   charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, prevVx: 0, prevVy: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0,
-  reset(x, y, full) { Object.assign(Player, { x, y, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, held: null, sucking: false, inv: 0, dead: false, deadT: 0, spitT: 0, swallowT: 0, sx: 1, sy: 1, win: false, airT: 0, charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0 }); if (full) Player.hp = 3; Sound.suck(false); Sound.jet(false); },
+  reset(x, y, full) { Object.assign(Player, { x, y, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, held: null, sucking: false, inv: 0, dead: false, deadT: 0, spitT: 0, swallowT: 0, sx: 1, sy: 1, win: false, airT: 0, charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0, lastSafe: null }); if (full) Player.hp = 3; Sound.suck(false); Sound.jet(false); },
+  // Is there firm ground a knock-back could land on, that way? Water or a drop within reach says no.
+  safeSide(dir) {
+    const p = Player, fy = p.y + p.h;
+    for (let k = 8; k <= 36; k += 7) { const x = p.x + 5 + dir * k; let ok = false; for (let dy = 0; dy < 40; dy += 4) { const t = tileAt(x >> 4, (fy + dy) >> 4); if (t === '~') break; if ('#=wMxXG'.includes(t) || rectSolid(x, fy + dy, 1, 1)) { ok = true; break; } } if (!ok) return false; }
+    return true;
+  },
   // Where Bigotes' mouth is: in front of the arm, or above the head when aiming up.
   mouth() { const p = Player; if (p.aimUp) return { x: p.x + 5 + p.dir * 2, y: p.y - 12 }; return { x: p.dir > 0 ? p.x + 27 : p.x - 17, y: p.y + (p.crouch ? 6 : 12) }; },
   aim() { const p = Player; if (p.grapple && !p.hanging) { const m = p.mouth(); const dx = p.grapple.x + 5 - m.x, dy = p.grapple.y + 5 - m.y, d = Math.hypot(dx, dy) || 1; return { x: dx / d, y: dy / d }; } return p.aimUp ? { x: 0, y: -1 } : { x: p.dir, y: 0 }; },
@@ -360,6 +366,9 @@ const Player = {
     p.airT = p.onGround || p.hanging ? 0 : p.airT + 1;
     if (p.onGround && p.vy === 0 && !groundBelow(p)) p.onGround = false;
     const feetY = p.y + p.h - 2;
+    // Remember the last firm footing (both feet on solid ground or planks, nothing moving under her): a fall into
+    // the water puts her back there, not at a far lantern.
+    if (p.onGround && !p.carrier && !p.dead && p.inv === 0) { const fy = (p.y + p.h + 1) >> 4, l = tileAt((p.x + 1) >> 4, fy), r = tileAt((p.x + p.w - 1) >> 4, fy); if ('#=MxX'.includes(l) && '#=MxX'.includes(r)) p.lastSafe = { x: p.x, y: p.y }; }
     if (waterAt(p.x + 5, feetY - 4) && waterAt(p.x + 5, feetY)) { Game.drown(); return; }
     if (p.y > L.h * TS + 20) { Game.drown(true); return; }
     for (let ty = Math.floor(p.y) >> 4; ty <= Math.floor(p.y + p.h - 1) >> 4; ty++) for (let tx = Math.floor(p.x) >> 4; tx <= Math.floor(p.x + p.w - 1) >> 4; tx++) { const ch = tileAt(tx, ty); if ((ch === '^' && p.y + p.h > ty * TS + 6) || (ch === 'F' && p.y + p.h > ty * TS + 3)) Player.hurt(p.x < tx * TS + 8 ? -1 : 1); }
@@ -617,7 +626,7 @@ const Player = {
   },
   hurt(fromDir) {
     const p = Player; if (p.inv > 0 || p.dead || p.win) return;
-    p.hp--; p.inv = 90; p.hurtT = 20; p.dizzyT = 80; p.vx = -fromDir * 2.4; p.vy = -3.2; p.onGround = false; p.charge = 0; p.hover = false; Player.letGo(); Sound.jet(false); Sound.play('hurt'); Cam.shake(3, 10); Game.stop(5); Game.hurtFlash = 14; Input.rumble(200, 1, .6);
+    p.hp--; p.inv = 90; p.hurtT = 20; p.dizzyT = 80; p.vx = Player.safeSide(-fromDir) ? -fromDir * 2.4 : 0; p.vy = -3.2; p.onGround = false; p.charge = 0; p.hover = false; Player.letGo(); Sound.jet(false); Sound.play('hurt'); Cam.shake(3, 10); Game.stop(5); Game.hurtFlash = 14; Input.rumble(200, 1, .6);
     if (p.held) { const h = p.held; p.held = null; if (h.kind !== 'agua') { const e = Item.fromHeld(h, p.x + 5 - h.w / 2, p.y - h.h - 2); if (e) { e.vy = -2; e.vx = -fromDir * 1.5; L.ents.push(e); } } else spawnParts(8, p.x + 5, p.y + 8, { color: ['#8fd9d0', '#c8f2ea'], speed: [1, 2.5], life: [10, 18], g: .08 }); }
     if (p.hp <= 0) { p.dead = true; p.deadT = 0; p.vy = -4.5; p.vx = -fromDir * 1; }
   },
@@ -1445,8 +1454,14 @@ const Game = {
   drown(fell) {
     const p = Player; if (p.dead) return;
     if (!fell) { Sound.play('splash'); spawnParts(14, p.x + 5, p.y + p.h, { color: ['#8fd9d0', '#c8f2ea', '#2f7f88'], angle: -Math.PI / 2, spread: 1.2, speed: [1, 3.5], life: [16, 30] }); for (let i = 0; i < 2; i++) L.parts.push({ x: p.x + 5, y: Math.floor((p.y + p.h) / TS) * TS + 2, vx: 0, vy: 0, life: 16 - i * 5, color: '#c8f2ea', size: 1, g: 0, kind: 'ripple' }); }
+    const carried = p.held && p.held.kind !== 'agua' ? p.held : null, safe = p.lastSafe;
     p.hp--; Sound.suck(false); Sound.jet(false); p.sucking = false; p.held = null; p.hover = false; p.charge = 0;
     if (p.hp <= 0) { p.dead = true; p.deadT = 40; p.vy = 0; p.vx = 0; p.y = L.h * TS + 100; }
+    else if (safe) {
+      // Back on the last firm ground, with the world left as it was; whatever she carried lands beside her.
+      Game.transition(() => { const hp = p.hp; Player.reset(safe.x, safe.y, false); p.hp = hp; p.inv = 60; p.lastSafe = safe; Cam.snap();
+        if (carried) { const e = Item.fromHeld(carried, safe.x + 5 - carried.w / 2, safe.y + 18 - carried.h); if (e) { for (let n = 0; n < 16 && rectSolid(e.x, e.y, e.w, e.h, e); n++) e.y--; L.ents.push(e); } } });
+    }
     else { Game.transition(() => { const hp = p.hp; Player.reset(L.checkpoint.x, L.checkpoint.y, false); p.hp = hp; p.inv = 60; spawnEntities(); Cam.snap(); }); }
   },
   updatePlay() {
