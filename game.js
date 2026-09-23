@@ -171,7 +171,7 @@ function loadLevel(index) {
   L.def = def; L.index = index; L.rows = def.rows; L.h = def.rows.length; L.w = def.rows[0].length;
   L.t = def.rows.map(r => r.split(''));
   L.ents = []; L.projs = []; L.parts = []; L.solids = []; L.signs = []; L.broken = new Set(); L.targets = new Map(); L.gates = []; L.gateOpen = new Set();
-  L.lit = new Set(); L.taken = new Set(); L.pearlsTotal = 0; L.pearls = 0; L.time = 0; L.boss = null; L.breakQueue = []; L.gateQueue = []; L.mush = new Map(); L.hitTargets = new Set(); L.boatSpawned = false; L.exit = null; L.words = []; L.ghosts = []; L.lily = new Map(); L.triggerIdx = new Map();
+  L.lit = new Set(); L.taken = new Set(); L.pearlsTotal = 0; L.pearls = 0; L.time = 0; L.boss = null; L.breakQueue = []; L.gateQueue = []; L.mush = new Map(); L.hitTargets = new Set(); L.boatSpawned = false; L.exit = null; L.words = []; L.ghosts = []; L.lily = new Map(); L.triggerIdx = new Map(); L.gusts = [];
   L.bg = ART.background(def.theme); L.spawn = [];
   // Gates are grouped by adjacency and paired with targets in reading order.
   const targets = [], gateTiles = [], seen = new Set();
@@ -370,7 +370,7 @@ const Player = {
     p.fishLagV += -dvy * .9; p.fishLagHV += dvx * p.dir * 1.3;
     p.fishLagV -= p.fishLag * .22; p.fishLagV *= .8; p.fishLag = clamp(p.fishLag + p.fishLagV, -5, 5);
     p.fishLagHV -= p.fishLagH * .22; p.fishLagHV *= .8; p.fishLagH = clamp(p.fishLagH + p.fishLagHV, -3, 3);
-    if (p.spitT > 0) p.spitT--; if (p.swallowT > 0) p.swallowT--; if (p.inv > 0) p.inv--; if (p.hurtT > 0) p.hurtT--; if (p.puffCd > 0) p.puffCd--; if (p.puffT > 0) p.puffT--; if (p.dropT > 0) p.dropT--;
+    if (p.spitT > 0) p.spitT--; if (p.swallowT > 0) p.swallowT--; if (p.inv > 0) p.inv--; if (p.hurtT > 0) p.hurtT--; if (p.puffCd > 0) p.puffCd--; if (p.puffT > 0) p.puffT--; if (p.puffWind > 0 && --p.puffWind === 0) Player.puff(); if (p.dropT > 0) p.dropT--;
     p.sx += (1 - p.sx) * .18; p.sy += (1 - p.sy) * .18;
     p.animT++;
     if (p.onGround && Math.abs(p.vx) > .5 && !p.carrier) { p.stepT++; if (p.stepT % 12 === 6) { Sound.play('step'); spawnParts(1, p.x + 5 - p.dir * 3, p.y + p.h, { color: '#c9b08a', angle: -Math.PI / 2 - p.dir * .6, spread: .4, speed: [.3, .8], life: [8, 14], g: .03 }); } } else p.stepT = 0;
@@ -429,7 +429,7 @@ const Player = {
     } else {
       p.charge = 0;
       if (down && p.fishDown && !p.sucking && p.fishT > 4) { p.sucking = true; p.suckT = 0; p.waterT = 0; Sound.suck(true); }
-      if (!down && p.fishDown) { p.fishDown = false; if (p.sucking) { p.sucking = false; Sound.suck(false); Player.letGo(); } else if (p.fishT <= 4 && p.puffCd === 0 && Game.has('soplido')) Player.puff(); else if (p.fishT <= 4 && p.puffCd === 0) Player.burp(); }
+      if (!down && p.fishDown) { p.fishDown = false; if (p.sucking) { p.sucking = false; Sound.suck(false); Player.letGo(); } else if (p.fishT <= 4 && p.puffCd === 0 && Game.has('soplido')) Player.inhale(); else if (p.fishT <= 4 && p.puffCd === 0) Player.burp(); }
       if (p.sucking) Player.suck();
     }
     if (wasHover && !p.hover) Sound.jet(false);
@@ -559,23 +559,39 @@ const Player = {
   },
   // Before the puff is learned, a tap with an empty mouth is only a bubble: Bigotes tried, nothing happens.
   burp() { const p = Player, m = p.mouth(); p.puffCd = 18; p.puffT = 4; Sound.play('blub'); spawnParts(2, m.x, m.y, { color: ['#cfe8f0', '#e8fbff'], angle: -Math.PI / 2, spread: .6, speed: [.2, .5], life: [16, 26], g: -.03 }); },
+  // The puff has a beat of anticipation: Bigotes fills his cheeks, then lets the gust go.
+  inhale() { const p = Player, m = p.mouth(); p.puffCd = 22; p.puffWind = 5; Sound.play('inhale'); p.sx = .96; p.sy = 1.05; for (let i = 0; i < 4; i++) L.parts.push({ x: m.x + p.dir * rnd(8, 16), y: m.y + rnd(-6, 6), vx: -p.dir * rnd(.8, 1.4), vy: 0, life: 7, color: '#cfe8f0', size: 1, g: 0, kind: 'dot' }); },
   puff() {
-    const p = Player, m = p.mouth(); p.puffCd = 18; p.puffT = 8; p.spitT = 6; Sound.play('puff'); p.sx = 1.1; p.sy = .92;
-    L.parts.push({ x: m.x - 3, y: m.y - 3, vx: p.dir * 2.2, vy: 0, life: 12, color: '#fff', size: 1, g: 0, kind: 'puff' });
-    spawnParts(6, m.x, m.y, { color: ['#cfe0e8', '#e8f2f6'], angle: p.dir > 0 ? 0 : Math.PI, spread: .5, speed: [1.5, 3], life: [8, 14], g: 0 });
-    Game.word('PFF', m.x + p.dir * 8, m.y - 10, '#cfe0e8', false);
-    const box = { x: p.dir > 0 ? m.x - 2 : m.x - 34, y: m.y - 16, w: 36, h: 32 }; let any = false;
+    const p = Player, m = p.mouth(); p.puffT = 8; p.spitT = 6; Sound.play('gust'); p.sx = 1.14; p.sy = .9; p.vx -= p.dir * .5;
+    Cam.shake(1, 4); Input.rumble(60, .25, .35);
+    // The gust travels: whatever it reaches is pushed as the front goes by.
+    (L.gusts || (L.gusts = [])).push({ x0: m.x, y: m.y, dir: p.dir, t: 0, front: 0, hit: new Set(), seed: Math.random() * 100 });
+    for (let i = 0; i < 6; i++) L.parts.push({ x: m.x, y: m.y + rnd(-3, 3), vx: p.dir * rnd(1.5, 3), vy: rnd(-.6, .6), life: rnd(10, 18) | 0, max: 18, color: '#f2fbff', size: 1, g: -.005, kind: 'mist' });
+    Game.word('¡FUUU!', m.x + p.dir * 14, m.y - 12, '#dff2fb', false); const w = L.words[L.words.length - 1]; if (w) w.drift = p.dir * .8;
     // Standing on a raft, the puff is a jet: the raft goes the other way.
-    if (p.carrier && p.carrier.kind === 'raft') { p.carrier.vx -= p.dir * 1.9; any = true; Game.word('¡ALLÁ VA!', p.carrier.x + 12, p.carrier.y - 10, '#c78d4e', false); }
+    if (p.carrier && p.carrier.kind === 'raft') { p.carrier.vx -= p.dir * 1.9; Game.word('¡ALLÁ VA!', p.carrier.x + 12, p.carrier.y - 10, '#c78d4e', false); }
+  },
+  // A gust moves forward for a few frames; its reach grows like a cone.
+  gustUpdate(q) {
+    q.t++; const sp = Math.max(1.4, 6.4 - q.t * .3); q.front += sp;
+    const reach = q.front, half = 9 + reach * .22, box = { x: q.dir > 0 ? q.x0 - 2 : q.x0 - reach, y: q.y - half, w: reach + 2, h: half * 2 };
+    let any = false;
     for (const e of L.ents) {
-      if (e.dead || !overlap(box, e)) continue;
-      if (e.kind === 'pinwheel') { e.blow(e, p.dir); any = true; continue; }
-      if (e.kind === 'raft') { if (e !== p.carrier) e.vx += p.dir * 2.2; any = true; continue; }
+      if (e.dead || q.hit.has(e) || !overlap(box, e)) continue; q.hit.add(e);
+      if (e.kind === 'pinwheel') { e.blow(e, q.dir); any = true; continue; }
+      if (e.kind === 'raft') { if (e !== Player.carrier) e.vx += q.dir * 2.2; any = true; continue; }
       if (!e.enemy) continue; any = true;
-      if (e.armored && !e.flipped) { e.tug = 10; e.tugDir = p.dir; continue; }
-      e.vx = p.dir * 2.6; e.vy = -1.8; e.stun = 40; e.sucked = 0; if (e.kind === 'frog') e.state = 'sit'; spawnParts(4, e.x + e.w / 2, e.y + e.h / 2, { color: '#ffffff', speed: [.5, 1.5], life: [6, 12], g: 0 });
+      if (e.armored && !e.flipped) { e.tug = 10; e.tugDir = q.dir; Game.word('¡AGARRA!', e.x + e.w / 2, e.y - 6, '#f28b6a', false); continue; }
+      const k = Math.max(.6, 1 - reach / 90); e.vx = q.dir * 2.8 * k; e.vy = -2 * k; e.stun = 40; e.sucked = 0; if (e.kind === 'frog') e.state = 'sit';
+      for (let i = 0; i < 5; i++) L.parts.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, vx: q.dir * rnd(.5, 2), vy: rnd(-1.2, .4), life: rnd(10, 18) | 0, max: 18, color: '#f2fbff', size: 1, g: 0, kind: 'mist' });
+      Game.word('¡FIUU!', e.x + e.w / 2, e.y - 6, '#dff2fb', false);
     }
     if (any) { Sound.play('pop'); Input.rumble(40, .2, .2); }
+    // The wind carries whatever floats: mist, dust, fireflies, rain, leaves.
+    for (const pt of L.parts) if (pt.kind !== 'cria' && pt.kind !== 'puddle' && pt.kind !== 'wetrun' && pt.x > box.x && pt.x < box.x + box.w && pt.y > box.y && pt.y < box.y + box.h) { pt.vx += q.dir * .35; pt.vy -= .05; }
+    // Ground below the gust: leaves and dust whirl up.
+    if (q.t % 2 === 0 && q.t < 12) { const fx = q.x0 + q.dir * reach; for (let dy = 0; dy < 40; dy += 4) if (rectSolid(fx, q.y + dy, 1, 1)) { const th = L.def.theme, cols = th === 'cave' ? ['#6b4a60', '#8a6a7a'] : th === 'storm' ? ['#6a7a5a', '#8a9a6a'] : ['#7fb040', '#a3cf52', '#c9b08a']; for (let i = 0; i < 3; i++) L.parts.push({ x: fx - q.dir * rnd(0, 10), y: q.y + dy - 1, vx: q.dir * rnd(.8, 2.2), vy: -rnd(.6, 1.8), life: rnd(20, 36) | 0, color: cols[i % cols.length], size: 1, g: .04, kind: 'leaf' }); break; } }
+    if (q.t > 20) q.dead = true;
   },
   jet() {
     const p = Player, h = p.held; const hd = Player.fishHead; const jx = hd ? hd.x + Cam.x : p.x + 5, jy = hd ? hd.y + Cam.y + 4 : p.y + 20; const was = h.amount; h.amount -= 1 / 95; Sound.jet(true);
@@ -593,6 +609,7 @@ const Player = {
   },
   draw(g) {
     const p = Player, cam = Cam, N = ART.nila;
+    if (Aprende.posing()) return;
     if (p.inv > 0 && (p.inv >> 2) % 2 === 0 && !p.dead) return;
     const fx = Math.round(p.x - cam.x), fy = Math.round(p.y - cam.y);
     // Every pose is 16×22 with the boots on its last row: anchor it to the bottom of the hitbox.
@@ -629,7 +646,7 @@ const Player = {
   drawFish(g, fx, fy) {
     const p = Player, t = p.animT, ease = u => u * u * (3 - 2 * u);
     let fs = ART.fish.closed;
-    if (p.swallowT > 0) fs = ART.fish.swallow; else if (p.spitT > 6) fs = ART.fish.spit; else if (p.charge >= CHARGE_FULL) fs = ART.fish.squint; else if (p.held) fs = ART.fish.full; else if (p.sucking) fs = ART.fish.open;
+    if (p.puffWind > 0) fs = ART.fish.full; else if (p.swallowT > 0) fs = ART.fish.swallow; else if (p.spitT > 6) fs = ART.fish.spit; else if (p.charge >= CHARGE_FULL) fs = ART.fish.squint; else if (p.held) fs = ART.fish.full; else if (p.sucking) fs = ART.fish.open;
     const n = fs.width, h = fs.height, PIV = 7, MID = 6;
     const bob = p.onGround && Math.abs(p.vx) > .5 ? ((t >> 3) % 2 ? 1 : 0) : 0;
     let hx = fx + 5 + p.dir * 7, hy = fy + (p.crouch ? 7 : 12) + bob;
@@ -643,6 +660,7 @@ const Player = {
     if (p.sucking && !p.grapple) { headStretch = 1.18; jitter = .5; wave = .3; }
     if (p.charge > 8) { const c = Math.min(1, p.charge / CHARGE_FULL); bend += -.45 * c; tailBend = .6 * c; spacing = 1 - .14 * c; jitter = c >= 1 ? 1.1 : .4 * c; wave = .2; }
     if (p.spitT > 0) { const k = (12 - p.spitT) / 12; lunge = p.spitT > 8 ? (12 - p.spitT) * 2.2 : p.spitT * .9; tailBend = Math.sin(k * Math.PI * 2) * 1.1; headStretch = p.spitT > 6 ? 1.35 : 1; wave = 0; }
+    if (p.puffWind > 0) { const k = (5 - p.puffWind) / 5; lunge = -k * 2; headStretch = 1 + k * .12; bend -= k * .15; wave = .2; }
     if (p.puffT > 0) { lunge = -3 + p.puffT * .5; headStretch = 1.15; }
     if (p.hurtT > 0 || p.dead) { bend += .7; wave = 2.5; waveSpeed = .6; }
     if (p.dropT > 0) { bend += .5 * (p.dropT / 10); }
@@ -1227,6 +1245,7 @@ const Game = {
     const c = Game.capture;
     if (c.scene === 'sprites' || c.scene === 'zoom') { Game.state = 'sprites'; return; }
     if (c.scene === 'selector') { Save.data.unlocked = c.n; Save.data.pearls = { 0: 6, 1: 10 }; Save.data.totals = { 0: 11, 1: 10 }; Save.data.best = { 0: 245, 1: 312 }; Game.select(); Game.sel = Math.min(c.n, 1); Mapa.place(Game.sel); for (let i = 0; i < c.t; i++) Game.t++; return; }
+    if (c.scene === 'aprende') { Game.startLevel(0); Game.banner = 0; for (let i = 0; i < 40; i++) Game.updatePlay(); Aprende.start(POWER_ORDER[c.n]); for (let i = 0; i < c.t; i++) { Input.pressed = {}; Aprende.update(); } Game.frozen = true; return; }
     if (c.scene === 'cine') { Cine.start(() => { }); Cine.state.t = c.t; Game.frozen = true; return; }
     if (c.scene === 'titulo') { Game.title(); Game.titleT = c.t; for (let i = 0; i < c.t; i++) Game.updateTitle(); return; }
     if (c.scene === 'icono') { Game.state = 'icon'; return; }
@@ -1305,7 +1324,7 @@ const Game = {
   },
   updatePlay() {
     if (Input.pressed.pause) { Game.pause(); return; }
-    if (Game.learning) { Game.updateLearning(); return; }
+    if (Game.learning) { Aprende.update(); return; }
     // A hit-stop freezes the world, not the hands: presses made during it are kept and land on the first live frame.
     if (Game.hitStop > 0) { Game.hitStop--; for (const k in Input.pressed) if (Input.pressed[k] && k !== 'pause') Game.heldPresses[k] = true; Cam.shakeOnly(); return; }
     for (const k in Game.heldPresses) Input.pressed[k] = true; Game.heldPresses = {};
@@ -1313,6 +1332,7 @@ const Game = {
     if (Game.banner > 0) Game.banner--;
     Player.update();
     for (const e of L.ents) if (!e.dead) e.update(e);
+    if (L.gusts) { for (const q of L.gusts) Player.gustUpdate(q); L.gusts = L.gusts.filter(q => !q.dead); }
     Hud.update();
     for (const p of L.projs) if (!p.dead) Proj.update(p);
     L.ents = L.ents.filter(e => !e.dead); L.projs = L.projs.filter(p => !p.dead); L.solids = L.solids.filter(s => !s.dead);
@@ -1414,32 +1434,11 @@ const Game = {
   has(p) { return Save.has(p); },
   // Bigotes eats a morsel and learns a trick: a beat of celebration, then a card that waits for a press.
   learn(power) {
-    const p = Player; Game.learning = { power, t: 0 }; Save.data.powers[power] = true; Save.write();
+    const p = Player; Aprende.start(power); Save.data.powers[power] = true; Save.write();
     p.vx = 0; p.sucking = false; Sound.suck(false); Sound.jet(false); p.hover = false; p.charge = 0; p.swallowT = 10; Player.letGo();
-    Sound.play('lantern'); Sound.duck(true); Cam.punch(1.05); Input.rumble(200, .6, .6);
+    Sound.duck(true); Cam.punch(1.05); Input.rumble(200, .6, .6);
     const m = p.mouth(); Game.word('¡ÑAM!', m.x, m.y - 14, '#ffe36a', true);
     spawnParts(24, p.x + 5 + p.dir * 12, p.y + 10, { color: ['#ffe36a', '#fff6d6', '#e8fbff', '#e79b3f'], speed: [.5, 3], life: [20, 50], g: -.02 });
-  },
-  updateLearning() {
-    const l = Game.learning; l.t++;
-    Player.animT++; Player.sx += (1 - Player.sx) * .18; Player.sy += (1 - Player.sy) * .18; if (Player.swallowT > 0) Player.swallowT--;
-    if (l.t % 5 === 0) spawnParts(2, Player.x + 5 + Player.dir * 12 + rnd(-8, 8), Player.y + 8 + rnd(-6, 6), { color: ['#ffe36a', '#fff6d6'], speed: [.2, .8], life: [16, 30], g: -.03 });
-    updateParts(); for (let i = L.words.length - 1; i >= 0; i--) { const w = L.words[i]; w.t++; if (w.t > w.life) L.words.splice(i, 1); }
-    if (l.t === 40) Sound.play('win');
-    if (l.t > 70 && (Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Game.tapped)) { Game.tapped = false; Game.learning = null; Sound.duck(false); Sound.play('confirm'); Input.release(); }
-  },
-  drawLearning(g) {
-    const l = Game.learning, pw = POWERS[l.power]; if (l.t < 40) return;
-    const a = Math.min(1, (l.t - 40) / 12); g.globalAlpha = a * .75; g.fillStyle = '#08101a'; g.fillRect(0, 0, W, H); g.globalAlpha = a;
-    const y = 34; g.fillStyle = '#1b2430'; g.fillRect(30, y, W - 60, 112); g.fillStyle = '#e79b3f'; g.fillRect(30, y, W - 60, 1); g.fillRect(30, y + 111, W - 60, 1);
-    ART.text(g, '¡Bigotes ha aprendido!', W / 2, y + 8, '#f2c46a', 'center');
-    const icon = ART.morsels[l.power]; g.save(); g.translate(W / 2, y + 30); g.scale(2, 2); g.drawImage(icon, -4, -4); g.restore();
-    g.drawImage(ART.fish.full, W / 2 - 40, y + 22); g.drawImage(ART.flip(ART.fish.full), W / 2 + 18, y + 22);
-    ART.text(g, pw.name, W / 2, y + 44, '#fff6d6', 'center', '#08101a');
-    ART.text(g, 'Se ha tragado ' + pw.food + '.', W / 2, y + 56, '#9fc0cc', 'center');
-    const lines = ART.wrap(Game.signText(-1, pw.text), W - 84); lines.forEach((ln, i) => ART.text(g, ln, W / 2, y + 70 + i * 10, '#e8fbff', 'center'));
-    if (l.t > 70 && (l.t >> 4) % 2) ART.text(g, Touch.enabled ? 'Toca para seguir' : 'Z para seguir', W / 2, y + 100, '#fff6d6', 'center');
-    g.globalAlpha = 1;
   },
   word(text, x, y, color = '#fff6d6', big = false) { L.words.push({ text, x, y, t: 0, life: big ? 46 : 34, color, big, wob: Math.random() * 6 }); if (L.words.length > 12) L.words.shift(); },
   douse(tx, ty) {
@@ -1467,7 +1466,7 @@ const Game = {
       case 'select': Game.drawSelect(g); break;
       case 'gate': Cine.gateDraw(g); break;
       case 'cine': Cine.draw(g); break;
-      case 'play': Game.drawPlay(g); if (Game.learning) Game.drawLearning(g); if (Game.paused) Game.drawPause(g); break;
+      case 'play': Game.drawPlay(g); if (Game.learning) Aprende.draw(g); if (Game.paused) Game.drawPause(g); break;
       case 'clear': Game.drawClear(g); break;
       case 'ending': Game.drawEnding(g); break;
       case 'sprites': Game.drawSprites(g); break;
@@ -1502,6 +1501,7 @@ const Game = {
     Player.draw(g);
     for (const p of L.projs) if (!p.dead) Proj.draw(p, g);
     Game.drawParts(g);
+    Game.drawGusts(g);
     Game.drawTiles(g, camX, camY, 'front');
     if (Game.weather && Game.weather.bolt > 8 && L.def.theme === 'storm' && !Game.still) { g.globalAlpha = (Game.weather.bolt - 8) / 4 * .35; g.fillStyle = '#e8f0ff'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
     Game.drawLight(g, camX, camY);
@@ -1546,7 +1546,7 @@ const Game = {
   drawWords(g) {
     for (const w of L.words) {
       const t = w.t / w.life; const rise = w.big ? Math.min(6, w.t * .6) : Math.min(8, w.t * .5);
-      const x = Math.round(w.x - Cam.x), y = Math.round(w.y - Cam.y - rise);
+      const x = Math.round(w.x - Cam.x + (w.drift || 0) * w.t), y = Math.round(w.y - Cam.y - rise);
       g.globalAlpha = t > .7 ? (1 - t) / .3 : 1;
       if (w.big) { const s = w.t < 4 ? 1 + (4 - w.t) * .25 : 1; g.save(); g.translate(x, y); g.scale(s, s); g.rotate(Math.sin(w.wob) * .06); ART.text(g, w.text, 0, -4, w.color, 'center', '#1b2430'); g.restore(); }
       else ART.text(g, w.text, x, y - 4, w.color, 'center', '#1b2430');
@@ -1558,6 +1558,26 @@ const Game = {
     if (!len) return;
     g.globalAlpha = .12; g.fillStyle = '#cfe0e8';
     g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + a.x * len - a.y * 36, my + a.y * len + a.x * 36); g.lineTo(mx + a.x * len + a.y * 36, my + a.y * len - a.x * 36); g.closePath(); g.fill(); g.globalAlpha = 1;
+  },
+  // The gust: curling streaks that fan out and a pale front, ending in little spirals.
+  drawGusts(g) {
+    for (const q of L.gusts || []) {
+      const t = q.t, reach = q.front, fade = t < 14 ? 1 : Math.max(0, 1 - (t - 14) / 7), x0 = q.x0 - Cam.x, y0 = q.y - Cam.y, d = q.dir;
+      // A faint cone of moving air behind the streaks.
+      const halfF = 9 + reach * .22; g.globalAlpha = fade * .1; g.fillStyle = '#e8f6ff'; g.beginPath(); g.moveTo(x0, y0 - 3); g.lineTo(x0 + d * reach, y0 - halfF); g.lineTo(x0 + d * (reach + 5), y0); g.lineTo(x0 + d * reach, y0 + halfF); g.lineTo(x0, y0 + 3); g.fill(); g.globalAlpha = 1;
+      for (let s = 0; s < 7; s++) {
+        const lane = (s - 3) / 3, len = reach * (.72 + ((s * 37 + q.seed) % 10) / 34), tail = Math.max(0, len - 34 - (s % 3) * 5);
+        for (let u = tail; u < len; u += 1) {
+          const k = (u - tail) / Math.max(1, len - tail), spread = 3 + u * .2, y = y0 + lane * spread + Math.sin(u * .22 + s * 1.7 - t * .6) * (1.2 + u * .03);
+          g.globalAlpha = fade * (.3 + k * .7); g.fillStyle = k > .75 ? '#ffffff' : s % 2 ? '#dff2fb' : '#a8d4ea'; g.fillRect(Math.round(x0 + d * u), Math.round(y), 1, k > .45 && s % 3 !== 1 ? 2 : 1);
+        }
+        // Curl at the tip of the outer streaks.
+        if (s % 2 === 0 && t > 4) { const cx = x0 + d * len, cy = y0 + lane * (3 + len * .2), r = 2 + Math.min(3, t * .2); for (let a = 0; a < 5.5; a += .35) { g.globalAlpha = fade * (.3 + a / 8); g.fillStyle = '#eef8ff'; g.fillRect(Math.round(cx + d * Math.cos(a + t * .5) * r * (1 - a / 8)), Math.round(cy + Math.sin(a + t * .5) * r * (1 - a / 8)), 1, 1); } }
+      }
+      // The front: a pale crescent that widens as it goes.
+      const half = 9 + reach * .22; for (let yy = -half; yy <= half; yy++) { const k = yy / half, xx = x0 + d * (reach + (1 - k * k) * 4); g.globalAlpha = fade * .8 * (1 - Math.abs(k) * .5); g.fillStyle = '#ffffff'; g.fillRect(Math.round(xx), Math.round(y0 + yy), Math.abs(k) < .6 ? 2 : 1, 1); }
+      g.globalAlpha = 1;
+    }
   },
   drawParts(g) {
     for (const p of L.parts) {
