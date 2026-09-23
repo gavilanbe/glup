@@ -1188,7 +1188,13 @@ const Game = {
     Game.titleT++;
     if (Game.titleT % 6 === 0 && Game.titleParts.length < 40) Game.titleParts.push({ x: rnd(0, W), y: rnd(60, 150), vx: rnd(-.2, .2), vy: rnd(-.15, .05), life: rnd(60, 160), t: rnd(0, 100) });
     for (let i = Game.titleParts.length - 1; i >= 0; i--) { const p = Game.titleParts[i]; p.t++; p.x += p.vx + Math.sin(p.t / 20) * .2; p.y += p.vy; if (--p.life <= 0) Game.titleParts.splice(i, 1); }
-    if (Game.titleT > 20 && (Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Game.tapped)) { Game.tapped = false; Sound.play('confirm'); Game.transition(() => Game.select()); }
+    Title.update(Game.titleT);
+    if (Game.titleT > 20 && (Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Game.tapped)) {
+      Game.tapped = false;
+      // The first press during the intro only hurries it along; the next one starts.
+      if (Game.titleT < Title.INTRO) { Game.titleT = Title.INTRO; Sound.play('select'); }
+      else { Sound.play('confirm'); Game.transition(() => Game.select()); }
+    }
   },
   select() { Game.state = 'select'; Game.sel = Math.min(Save.data.unlocked, LEVELS.length - 1); Sound.playMusic('dock'); },
   updateSelect() {
@@ -1538,21 +1544,7 @@ const Game = {
     const bg = ART.background(theme); Game.drawBackground(g, 40 + t * .15, 44, bg);
     MUNDO.drawScene(g, t, theme, W, H);
   },
-  drawTitle(g) {
-    const t = Game.titleT; Game.drawScene(g, t, 'dusk');
-    // Nila and Bigotes on the dock, breathing.
-    const px = 150, py = 108, blink = (t % 200) < 6;
-    const fishS = (t % 240) < 20 ? ART.fish.open : ART.fish.closed; Player.drawCarry(g, px, py, ART.nila.idle[blink ? 1 : (t % 240) < 40 ? 2 : 0], fishS, (t >> 5) % 2);
-    if ((t % 240) < 20 && t % 3 === 0) { g.fillStyle = '#cfe0e8'; g.fillRect(px + 32 + (t % 20) * 2, py + 10 + Math.round(Math.sin(t) * 4), 2, 1); }
-    // Fireflies.
-    for (const f of Game.titleParts) { const a = Math.max(0, Math.sin(f.t / 8)), x = Math.round(f.x), y = Math.round(f.y); g.fillStyle = '#f2f5a0'; g.globalAlpha = a * .3; g.fillRect(x - 1, y - 1, 3, 3); g.globalAlpha = a * .5; g.fillRect(x - 2, y, 5, 1); g.fillRect(x, y - 2, 1, 5); g.globalAlpha = .3 + a * .7; g.fillStyle = '#ffffe0'; g.fillRect(x, y, 1, 1); } g.globalAlpha = 1;
-    // Logo drops in and settles.
-    const logo = ART.logo(); const ly = Math.round(Math.min(0, -60 + t * 3) + 18 + Math.sin(t / 40) * 1.5);
-    g.drawImage(logo, (W - logo.width) / 2, ly);
-    ART.text(g, 'Nila y el pez gato', W / 2, ly + logo.height + 2, '#f2c46a', 'center', '#1b2430');
-    if (t > 40 && (t >> 5) % 2) ART.text(g, Touch.enabled ? 'Toca para empezar' : 'Pulsa Z o espacio', W / 2, 160, '#fff6d6', 'center', '#1b2430');
-    ART.text(g, 'gavilanbe · 2026', W - 4, H - 9, '#5f7899', 'right');
-  },
+  drawTitle(g) { Title.draw(g, Game.titleT); },
   selectCards() { const n = LEVELS.length, cw = 64, gap = 8, x0 = (W - (n * cw + (n - 1) * gap)) / 2; return LEVELS.map((_, i) => ({ x: x0 + i * (cw + gap), y: 54, w: cw, h: 74 })); },
   drawSelect(g) {
     Game.drawScene(g, Game.t, 'night');

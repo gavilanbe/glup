@@ -4,7 +4,7 @@
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
-const FILES = ['art.js', 'mundo.js', 'audio.js', 'levels.js', 'story.js', 'fx.js', 'game.js'].filter(f => fs.existsSync(path.join(ROOT, f)));
+const FILES = ['art.js', 'mundo.js', 'audio.js', 'levels.js', 'story.js', 'titulo.js', 'fx.js', 'game.js'].filter(f => fs.existsSync(path.join(ROOT, f)));
 
 function stubContext() {
   const noop = () => { };
