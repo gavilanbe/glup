@@ -5,7 +5,7 @@
 //   ~  agua (te hundes)    ^  espinas            F  fuego fatuo (se apaga con agua)
 //   x  piedra agrietada (una pedrada o un panzazo rompe todo el bloque)   X  piedra reforzada (sólo el escupitajo picante)
 //   G  compuerta   T  diana (la abre para siempre)   P  placa (la abre mientras algo pese)   V  molinillo (la abre mientras gira con el soplido)
-//   O  aro: sorbe hacia él (arriba o de frente) y Bigotes iza a Nila      R  balsa: sopla hacia atrás para impulsarla
+//   O  anzuelo con su sedal: sorbe hacia él (arriba o de frente), Bigotes pica y el sedal iza a Nila      R  balsa: sopla hacia atrás para impulsarla
 //   M  muro de raíces: Nila resbala por él y puede saltar de pared en pared
 //   !  bocado: Bigotes lo traga y aprende un truco (los trucos van en `powers`, por orden)
 //   %  seta saltarina      c  caja               r  piedra
@@ -509,7 +509,7 @@ const LEVELS = (() => {
       signs: [
         'Esa charca da para apagar el fuego. O salta con ganas.',
         'Sopla al molinillo con {puff} y corre: el túnel es largo. Corriendo, {down} y Nila se desliza sobre Bigotes.',
-        'Aros hacia arriba: sorbe con {up} y, desde cada aro, busca el siguiente.'] },
+        'Anzuelos hacia arriba: sorbe con {up}, Bigotes pica y el sedal os sube; desde cada uno, busca el siguiente.'] },
     { name: 'El nido de la Garza', theme: 'nest', music: 'heron', rows: nido, boss: true,
       intro: 'En lo alto del ciprés muerto, la Garza espera.',
       ruca: ['Tiene a las últimas crías en el buche. Cuando suelte piedras, sórbelas y devuélveselas. Si se atasca en el barro, ¡es tu momento!'],

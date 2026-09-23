@@ -22,7 +22,7 @@ Como en Rayman, las habilidades se van consiguiendo, y aquí todas las da el pez
 | Luciérnaga dorada | **Aleteo** | Salto otra vez en el aire: Bigotes aletea (salto doble) |
 | Lapa del pantano | **Ventosa** | Bigotes se pega a los muros de raíces: resbalar y saltar de pared en pared |
 | Nenúfar azul | **Trago de agua** | Sorber agua, apagar hogueras, chorro para flotar |
-| Anzuelo viejo | **Mordisco** | Morder aros apuntando arriba: Bigotes iza a Nila |
+| Anzuelo viejo | **Mordisco** | Picar anzuelos: Bigotes muerde el anzuelo como un pez y el sedal iza a Nila |
 | Canto de río | **Panzazo** | ↓ y salto en el aire: caída de panza que rompe suelo agrietado |
 | Guindilla del pantano | **Escupitajo picante** | Mantener y soltar con la boca llena: disparo cargado, rompe piedra reforzada |
 | Alga resbaladiza | **Resbalón** | ↓ corriendo: Nila se desliza sobre Bigotes |
@@ -36,7 +36,7 @@ Dos botones y una cruceta. El HUD dice en todo momento qué lleva Bigotes en la 
 El agua es agua: el escupitajo es una columna gruesa y continua atada a la boca de Bigotes, con cuerpo translúcido, núcleo brillante y reflejos que corren por ella, cabeza estirada con espuma, rocío que se desprende, anillo de presión al salir y, al chocar, corona de salpicadura, onda y chorretones que escurren por las paredes (cargado, el doble de gordo y con espuma); el chorro de flotar es una columna ondulante que salpica y hace ondas donde toca; al sorber de una charca sube un hilo de agua con ondas en la superficie; cada impacto deja salpicaduras, ondas y un charco que se seca; apagar una hoguera levanta vapor.
 
 - **Sorber** (mantén BIGOTES con la boca vacía): lo que entra en el cono se acerca hasta que hace *glup*. Caracoles, ranas, mosquitos, cajas, piedras… y **agua** de cualquier charca o río. Con ↑ apunta hacia arriba.
-- **Izarse** (sorbe un **aro** apuntando arriba): Bigotes se agarra y tira de Nila hasta dejarla colgando bajo el aro. Desde ahí, salta para soltarte o sigue sorbiendo hacia el siguiente aro. Así se suben pozos y salientes.
+- **Izarse** (sorbe hacia un **anzuelo**): cuelgan de sedales con boya y lombriz; Bigotes pica (¡PICA!, la boya se hunde), se come el cebo y el sedal tenso, con clic de carrete, sube a Nila hasta dejarla colgando. Desde ahí, salta para soltarte o sigue sorbiendo hacia el siguiente aro. Así se suben pozos y salientes.
 - **Soplido** (botón propio, SOPLO): Bigotes toma aire con los mofletes hinchados y suelta una ráfaga que viaja (remolinos, frente de viento, espirales, hojas y polvo levantados) y empuja y aturde a los bichos, hace girar los **molinillos** (abren su compuerta mientras giran) y, encima de una **balsa**, la impulsa hacia el lado contrario.
 - **Escupir** (toque con la boca llena): las **piedras** rompen muros agrietados, rebotan y se quedan; las **cajas** vuelan en arco corto y se quedan donde caen; los **bichos** se llevan por delante a otros bichos (¡DOBLE!); el **agua** apaga hogueras y empuja enemigos.
 - **Soltar** (↓ y BIGOTES en el suelo): deja lo que lleves a los pies de Nila. Es la forma de poner una caja sobre una **placa de presión**, que mantiene abierta su compuerta mientras algo pese encima.

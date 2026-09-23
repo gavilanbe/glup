@@ -6,7 +6,7 @@ const Aprende = (() => {
   const ABSORB = 34, RAISE = 36, NAME = 80, DEMO = 118, READY = 150, EXIT = 22;
   const KEYS = {
     aleteo: '{jump} otra vez en el aire', soplido: 'Pulsa {puff} para soplar', ventosa: '{jump} pegada al muro de raíces',
-    chorro: 'Con agua, mantén {fish} en el aire', mordisco: '{up} y mantén {fish} hacia el aro', panzazo: '{down} y {jump} en el aire',
+    chorro: 'Con agua, mantén {fish} en el aire', mordisco: 'Mantén {fish} hacia el anzuelo ({up} si está arriba)', panzazo: '{down} y {jump} en el aire',
     guindilla: 'Mantén {fish} con la boca llena y suelta', resbalon: '{down} mientras corres' };
   const hash = i => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
   const ease = k => k <= 0 ? 0 : k >= 1 ? 1 : 1 - (1 - k) * (1 - k);
@@ -79,11 +79,11 @@ const Aprende = (() => {
         carry(x, y, N.dangle ? N.dangle[(k >> 3) % 2] : N.fall, ART.fish.full); Game.drawStream(g, x + 20, y - 4, x + 20, ground, t, 1, 3);
         break; }
       case 'mordisco': {
-        const rx = cx, ry = y0 + 14; g.drawImage(ART.ring, rx - 5, ry - 5);
+        const rx = cx, ry = y0 + 14; g.fillStyle = '#d8e0e8'; g.fillRect(rx, y0, 1, ry - y0 - 6); Item.hookShape(g, rx, ry, (t % 110) < 30, t);
         const k = loop(110), up = k > 30 ? Math.min(1, (k - 30) / 30) : 0, y = ground - up * (ground - ry - 30);
         carry(cx - 10, y, up > 0 && up < 1 ? (N.dangle ? N.dangle[0] : N.jump) : N.idle[0], k > 20 ? ART.fish.open : ART.fish.closed);
         if (k > 20 && k < 34) { g.fillStyle = '#cfe8f0'; for (let i = 0; i < 4; i++) g.fillRect(rx - 2 + i, ry + 8 + ((k * 2 + i * 5) % 20), 1, 2); }
-        if (k > 60 && k < 70) ART.text(g, '¡ARO!', rx, ry - 12, '#f2c46a', 'center', '#1b2430');
+        if (k > 30 && k < 44) ART.text(g, '¡PICA!', rx + 12, ry - 6, '#f2c46a', 'center', '#1b2430');
         break; }
       case 'panzazo': {
         const bx = cx - 8, k = loop(110); if (k < 62) g.drawImage(T.cracked ? T.cracked[0] : ART.cracked, bx, ground - 16);

@@ -255,7 +255,7 @@ const POWERS = {
   aleteo: { name: 'Aleteo', food: 'una luciérnaga dorada', text: 'Pulsa {jump} otra vez en el aire y Bigotes aletea: salto doble.' },
   ventosa: { name: 'Ventosa', food: 'una lapa del pantano', text: 'Bigotes se pega a los muros de raíces: empuja contra ellos, resbala y salta de pared en pared.' },
   chorro: { name: 'Trago de agua', food: 'un nenúfar azul', text: 'Bigotes traga agua: sórbela de una charca, escúpela sobre el fuego, o mantén {fish} en el aire para flotar con el chorro.' },
-  mordisco: { name: 'Mordisco', food: 'un anzuelo viejo', text: 'Bigotes muerde los aros: sorbe apuntando arriba con {up} y te izará. Salta para soltarte.' },
+  mordisco: { name: 'Mordisco', food: 'un anzuelo viejo', text: 'Bigotes pica los anzuelos como un pez: sorbe hacia uno (con {up} si está arriba) y el sedal os izará. Salta para soltarte.' },
   panzazo: { name: 'Panzazo', food: 'un canto de río', text: 'En el aire, {down} y {jump}: Bigotes cae de panza. Rompe suelo agrietado, aturde y rebota en las setas.' },
   guindilla: { name: 'Escupitajo picante', food: 'una guindilla del pantano', text: 'Mantén {fish} con la boca llena y suelta: el escupitajo cargado sale recto, atraviesa bichos y rompe piedra reforzada.' },
   resbalon: { name: 'Resbalón', food: 'un alga resbaladiza', text: 'Corriendo, {down}: Nila se desliza sobre Bigotes. Pasa huecos bajos a toda velocidad.' } };
@@ -509,7 +509,7 @@ const Player = {
       if (e.pullT < 4 && e.enemy) e.tug = 2;
       if (d < 9) Player.capture(e);
     }
-    if (best) { if (p.grapple) Game.word('¡OTRO!', best.x + 5, best.y - 8, '#e6c46a', false); p.grapple = best; p.grappleT = 0; p.hanging = false; p.vx = 0; p.vy = 0; p.crouch = false; Sound.play('confirm'); Game.word('¡ARO!', best.x + 5, best.y - 8, '#e6c46a', false); }
+    if (best) { if (p.grapple) Game.word('¡OTRO!', best.x + 5, best.y - 8, '#e6c46a', false); p.grapple = best; p.grappleT = 0; p.hanging = false; p.vx = 0; p.vy = 0; p.crouch = false; Sound.play('glup', .6); Game.word('¡PICA!', best.x + 5, best.y - 8, '#e6c46a', true); Cam.shake(2, 5); for (let i = 0; i < 2; i++) L.parts.push({ x: best.x + 5, y: best.y - 12, vx: 0, vy: 0, life: 14 - i * 4, color: '#e8fbff', size: 1, g: 0, kind: 'ring' }); }
   },
   // Bigotes has clamped onto a ring: it reels Nila in until she hangs just under it.
   pull() {
@@ -521,7 +521,7 @@ const Player = {
     const sp = Math.min(4.4, 1.8 + (p.grappleT - 4) * .45, d); const mx = dx / d * sp, my = dy / d * sp;
     const bx = moveX(p, mx), by = moveY(p, my); p.vy = 0;
     if ((bx && Math.abs(dx) > 4) || (by && Math.abs(dy) > 4)) { if (++p.stuck > 12) { Player.letGo(); p.stuck = 0; } } else p.stuck = 0;
-    if (p.animT % 2 === 0) L.parts.push({ x: a.x + 5 + rnd(-3, 3), y: a.y + 5 + rnd(-3, 3), vx: 0, vy: 0, life: 24, color: ['#e6c46a', '#fff6d6'][(Math.random() * 2) | 0], size: 1, g: 0, kind: 'suck' });
+    if (p.grappleT % 3 === 0) Sound.play('text');   // the reel clicking as it winds in
   },
   letGo() { const p = Player; if (p.grapple) { p.grapple = null; p.hanging = false; } if (p.sucking) { p.sucking = false; Sound.suck(false); } },
   capture(e) {
@@ -731,6 +731,9 @@ const Player = {
         slices(tuck ? PIV : 0, n);
         Player.drawBarbels(g, at, 'near');
         Player.drawFishLife(g, at, fs, t);
+        if (p.grapple) { const hd = Player.fishHead, a = p.grapple, top = Math.round(a.top - Cam.y), cx = Math.round(a.x + 5 - Cam.x), vib = p.hanging ? 0 : Math.sin(t * 2.3) * .6;
+          g.fillStyle = '#e8f0f8'; const n = Math.max(1, Math.round(Math.hypot(hd.x - cx, hd.y - top))); for (let i = 0; i <= n; i++) { const k = i / n; g.fillRect(Math.round(cx + (hd.x - cx) * k + Math.sin(k * Math.PI) * vib), Math.round(top + 2 + (hd.y - 2 - top) * k), 1, 1); }
+          Item.hookShape(g, Math.round(hd.x), Math.round(hd.y) - 4, false, t, p.dir); }
         // Nila's hand comes down over his flank, just under her chin.
         const hs = p.dir > 0 ? ART.hand : ART.flip(ART.hand);
         g.drawImage(hs, HX - (p.dir > 0 ? 3 : hs.width - 4), HY - 3);
@@ -934,7 +937,33 @@ const Item = {
       e.t++; if (e.t % 6 === 0) spawnParts(1, e.x + rnd(0, 8), e.y + rnd(0, 8), { color: ['#fff6d6', '#ffe36a', '#e8fbff'], speed: [.1, .4], life: [14, 26], g: -.02 });
       if (!Player.dead && !Game.learning && overlap({ x: e.x - 6, y: e.y - 6, w: 20, h: 20 }, Player.rect())) { e.dead = true; Game.learn(e.power); }
     }, draw(e, g) { const bob = Math.round(Math.sin(e.t / 16) * 2); const sx = Math.round(e.x - Cam.x), sy = Math.round(e.y - Cam.y + bob); g.globalAlpha = .25 + Math.sin(e.t / 8) * .1; g.fillStyle = '#ffe36a'; g.beginPath(); g.arc(sx + 4, sy + 4, 9, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; g.drawImage(ART.morsels[e.power], sx, sy); if ((e.t >> 3) % 4 === 0) g.drawImage(ART.star, sx + 7, sy - 3); } }; },
-  anchor(x, y) { return { kind: 'anchor', x, y, w: 10, h: 10, t: 0, update(e) { e.t++; }, draw(e, g) { const sx = Math.round(e.x - Cam.x), sy = Math.round(e.y - Cam.y); g.fillStyle = '#2a2418'; for (let yy = sy - 1; yy >= sy - 10; yy -= 2) g.fillRect(sx + 4, yy, 2, 1); g.fillStyle = '#4a3a24'; g.fillRect(sx - 4, sy - 13, 18, 3); g.fillStyle = '#5e8a2e'; g.fillRect(sx - 2, sy - 14, 3, 1); g.fillRect(sx + 9, sy - 14, 4, 1); g.drawImage(ART.ring, sx, sy + (Player.grapple === e ? 1 : Math.round(Math.sin(e.t / 30) * 1))); if (Player.grapple === e && (e.t >> 2) % 2) g.drawImage(ART.tint(ART.ring, '#fff6d6'), sx, sy + 1); } }; },
+  // A fishing hook hanging on its line from the ledge above, with a float and a worm for bait.
+  anchor(x, y) {
+    let top = y - 60, tied = false; const tx = (x + 5) >> 4; for (let k = 1; k <= 8; k++) { const ty = ((y + 5) >> 4) - k; if (solidChar(tileAt(tx, ty)) || tileAt(tx, ty) === '=') { top = (ty + 1) * TS; tied = true; break; } }
+    return { kind: 'anchor', x, y, w: 10, h: 10, t: Math.random() * 100, top, tied, bait: true, bite: 0, update(e) { e.t++; if (e.bite > 0) e.bite--; if (Player.grapple === e && e.bait) { e.bait = false; e.bite = 30; } }, draw(e, g) { Item.hookDraw(g, e); } }; },
+  hookDraw(g, e) {
+    const cx = Math.round(e.x + 5 - Cam.x), top = Math.round(e.top - Cam.y), held = Player.grapple === e;
+    const sway = held ? 0 : Math.sin(e.t / 40) * 1.6, hx = Math.round(cx + sway), hy = Math.round(e.y + 1 - Cam.y + Math.sin(e.t / 25) * .8);
+    // Where the line is tied: a knot round a twig under the ledge (or it runs off the top of the screen).
+    if (e.tied) { g.fillStyle = '#1a1420'; g.fillRect(cx - 4, top, 9, 3); g.fillStyle = '#6b4a30'; g.fillRect(cx - 3, top, 7, 2); g.fillStyle = '#8a6a4a'; g.fillRect(cx - 3, top, 7, 1); g.fillStyle = '#5e8a2e'; g.fillRect(cx + 3, top + 2, 2, 1); }
+    if (held) return;   // the hook is in Bigotes' mouth; the fish draws it and the taut line.
+    // The line, a slight curve, and the float on it (it ducks under when something bites).
+    g.fillStyle = '#d8e0e8'; const fy = hy - 14; for (let y = top + 2; y < hy - 5; y++) { const k = (y - top) / Math.max(1, hy - top); g.fillRect(Math.round(cx + sway * k), y, 1, 1); }
+    const fx = Math.round(cx + sway * (fy - top) / Math.max(1, hy - top)); g.fillStyle = '#1a1420'; g.fillRect(fx - 2, fy - 3, 5, 7); g.fillStyle = '#e8403a'; g.fillRect(fx - 1, fy - 2, 3, 3); g.fillStyle = '#ffffff'; g.fillRect(fx - 1, fy + 1, 3, 2); g.fillStyle = '#ff9a8a'; g.fillRect(fx - 1, fy - 2, 1, 1); g.fillStyle = '#1a1420'; g.fillRect(fx, fy - 5, 1, 2);
+    Item.hookShape(g, hx, hy, e.bait, e.t);
+  },
+  // The hook itself: an eye, a shank, the bend and a barbed point, in steel with a highlight; a worm curls on the bend.
+  hookShape(g, hx, hy, bait, t, flip = 1) {
+    const P = (x, y, c) => { g.fillStyle = c; g.fillRect(hx + x * flip, hy + y, 1, 1); };
+    const O = '#1a1420', S = '#b8c4d0', Sh = '#6a7480', Hi = '#ffffff';
+    for (const [x, y] of [[-1, -5], [1, -5], [-1, -4], [1, -4], [0, -6], [0, -3]]) P(x, y, O);  // eye outline
+    P(0, -5, '#2a3040'); P(0, -4, '#2a3040');
+    for (let y = -2; y <= 3; y++) { P(-1, y, O); P(1, y, O); P(0, y, y < 0 ? Hi : S); }  // shank
+    for (const [x, y, c] of [[0, 4, S], [1, 5, S], [2, 5, Sh], [3, 4, S], [4, 3, S], [4, 2, Hi], [5, 1, S]]) P(x, y, c);  // bend and point
+    for (const [x, y] of [[-1, 4], [0, 5], [0, 6], [1, 6], [2, 6], [3, 6], [4, 5], [5, 4], [5, 3], [5, 2], [6, 1], [6, 0], [4, 1], [4, 0], [3, 3]]) P(x, y, O);
+    P(5, 0, S); P(3, 2, Sh);  // barb
+    if (bait) { const w = Math.round(Math.sin(t / 5) * 1); for (const [x, y, c] of [[1, 3, '#e88a9a'], [2, 4, '#e88a9a'], [2, 3, '#b85a6a'], [-1 + w, 6, '#e88a9a'], [-2 + w, 7, '#b85a6a'], [-2 + w * 2, 8, '#e88a9a'], [3, 3, '#e88a9a']]) P(x, y, c); }
+  },
   plate(x, y, idx) { return { kind: 'plate', x, y, w: 16, h: 5, idx, pressed: false, t: 0, update(e) {
       e.t++; let on = false; const top = { x: e.x + 1, y: e.y, w: 14, h: 7 };
       if (!Player.dead && overlap(top, { x: Player.x, y: Player.y + Player.h - 2, w: Player.w, h: 3 })) on = true;
