@@ -109,10 +109,39 @@ const Screen = {
 
 // ---------------------------------------------------------------- Guardado
 const Save = {
-  data: { unlocked: 0, pearls: {}, totals: {}, best: {}, mute: false, finished: false, powers: {}, seen: {} },
+  // Version 2: everything per level is keyed by the level's stable id (LEVELS[i].id), not by its place in the list.
+  //   abiertos {id: true}      places reached on the map (every place up to the furthest one can be played again)
+  //   crias {id: {'x,y': 1}}   which crías of each level are home (tile keys; 'garza:k' for the ones in the heron's crop)
+  //   best {id: secs}   powers {power: true}   seen {flags}
+  data: null,
+  fresh() { return { version: 2, abiertos: {}, crias: {}, best: {}, mute: false, finished: false, powers: {}, seen: {} }; },
   has(p) { return !!Save.data.powers[p]; },
-  load() { try { const s = localStorage.getItem('glup.v1'); if (s) Object.assign(Save.data, JSON.parse(s)); } catch (e) { } },
-  write() { try { localStorage.setItem('glup.v1', JSON.stringify(Save.data)); } catch (e) { } }
+  load() {
+    Save.data = Save.fresh();
+    try { const s = localStorage.getItem('glup.v1'); if (s) { const d = JSON.parse(s); Object.assign(Save.data, d.version >= 2 ? d : Save.migrate(d)); } } catch (e) { }
+  },
+  // The first saves counted by position in a list of five levels: move them over to ids.
+  migrate(old) {
+    const OLD = ['embarcadero', 'juncos', 'molino', 'cueva', 'nido'], d = Save.fresh();
+    d.mute = !!old.mute; d.finished = !!old.finished; d.powers = old.powers || {}; d.seen = old.seen || {};
+    for (let i = 0; i <= Math.min(old.unlocked || 0, OLD.length - 1); i++) d.abiertos[OLD[i]] = true;
+    for (const i in old.best || {}) if (OLD[i]) d.best[OLD[i]] = old.best[i];
+    // Only how many crías were counted, not which: take the first ones of the level, in reading order.
+    for (const i in old.pearls || {}) { const def = LEVELS[NIVEL.index(OLD[i])]; if (!def) continue; const set = d.crias[OLD[i]] = {}; NIVEL.criasDe(def).slice(0, old.pearls[i]).forEach(k => { set[k] = 1; }); }
+    return d;
+  },
+  write() { try { localStorage.setItem('glup.v1', JSON.stringify(Save.data)); } catch (e) { } },
+  // The furthest place reached; everything up to it can be played.
+  reached() { let m = 0; LEVELS.forEach((def, i) => { if (Save.data.abiertos[def.id]) m = i; }); return m; },
+  open(i) { const def = LEVELS[i]; if (def && !Save.data.abiertos[def.id]) { Save.data.abiertos[def.id] = true; Save.write(); } },
+  criasSet(id) { return Save.data.crias[id] || (Save.data.crias[id] = {}); },
+  // Crías of a level that are home (only keys the current layout still has, so an edited level never over-counts).
+  criasGot(i) { const def = LEVELS[i], set = Save.data.crias[def.id] || {}; let n = NIVEL.criasDe(def).filter(k => set[k]).length; if (def.boss) for (let k = 0; k < Boss.CRIAS; k++) if (set['garza:' + k]) n++; return n; },
+  criasTotal(i) { const def = LEVELS[i]; return NIVEL.criasDe(def).length + (def.boss ? Boss.CRIAS : 0); },
+  criasAll() { let got = 0, all = 0; LEVELS.forEach((d, i) => { got += Save.criasGot(i); all += Save.criasTotal(i); }); return { got, all }; },
+  // What the wall of thorns counts: crías home from every other level.
+  gateCount(i) { let n = 0; LEVELS.forEach((d, k) => { if (k !== i) n += Save.criasGot(k); }); return n; },
+  locked(i) { const r = LEVELS[i] && LEVELS[i].requiere; return !!(r && r.crias && Save.gateCount(i) < r.crias); }
 };
 
 // ---------------------------------------------------------------- Utilidades
@@ -178,7 +207,8 @@ function loadLevel(index) {
   for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) {
     const ch = L.t[y][x];
     if (ch === '@') { L.start = { x: x * TS + 3, y: y * TS - 4 }; L.t[y][x] = '.'; }
-    else if ('sfmKcr*HL?EBOR!N'.includes(ch)) { L.spawn.push({ ch, x, y }); L.t[y][x] = '.'; if (ch === '*') L.pearlsTotal++; if (ch === 'B') L.pearlsTotal += Boss.CRIAS; /* the crías in her crop: one per blow, the rest at the end */ }
+    else if ('sfmKcr*HL?EBORNQ'.includes(ch)) { L.spawn.push({ ch, x, y }); L.t[y][x] = '.'; if (ch === '*') L.pearlsTotal++; if (ch === 'B') L.pearlsTotal += Boss.CRIAS; /* the crías in her crop: one per blow, the rest at the end */ }
+    else if (ch === '!') L.t[y][x] = '.'; // the old ground morsels: tricks are given by the teachers now
     else if (ch === 'T') targets.push({ x, y, ch });
     else if (ch === 'P' || ch === 'V') { targets.push({ x, y, ch }); L.spawn.push({ ch, x, y }); L.t[y][x] = '.'; }
     else if (ch === 'G') gateTiles.push({ x, y });
@@ -194,11 +224,15 @@ function loadLevel(index) {
   targets.forEach(t => { if (!(prev && t.ch === 'P' && prev.ch === 'P' && prev.y === t.y && prev.x === t.x - 1)) ti++; prev = t; L.targets.set(key(t.x, t.y), ti); if (t.ch !== 'T') L.triggerIdx.set(key(t.x, t.y), ti); });
   L.gates.forEach(g => { g.open = false; });
   L.checkpoint = { x: L.start.x, y: L.start.y };
-  spawnEntities(); Player.reset(L.start.x, L.start.y, true);
+  // Crías already home from an earlier visit stay home: they count from the start and leave a faint ghost bubble.
+  L.home = new Set(); const set = Save.data.crias[def.id] || {};
+  for (const s of L.spawn) if (s.ch === '*' && set[key(s.x, s.y)]) { L.home.add(key(s.x, s.y)); L.taken.add(key(s.x, s.y)); L.pearls++; }
+  L.maestro = null;
+  spawnEntities(); Player.seenPearls = L.pearls; Player.reset(L.start.x, L.start.y, true);
   Cam.snap();
 }
 function spawnEntities() {
-  L.ents = []; L.projs = []; L.parts = []; L.solids = []; L.signs = []; L.boss = null; let signIdx = 0, morselIdx = 0, rucaIdx = 0;
+  L.ents = []; L.projs = []; L.parts = []; L.solids = []; L.signs = []; L.boss = null; let signIdx = 0, rucaIdx = 0;
   for (const s of L.spawn) {
     const px = s.x * TS, py = s.y * TS;
     switch (s.ch) {
@@ -208,7 +242,7 @@ function spawnEntities() {
       case 'K': L.ents.push(Enemy.crab(px, py + 6)); break;
       case 'c': L.ents.push(Item.crate(px + 1, py + 2)); break;
       case 'r': L.ents.push(Item.rock(px + 2, py + 6)); break;
-      case '*': if (!L.taken.has(key(s.x, s.y))) L.ents.push(Item.pearl(px + 3, py + 3, key(s.x, s.y), solidChar(tileAt(s.x, s.y + 1)))); break;
+      case '*': if (!L.taken.has(key(s.x, s.y))) L.ents.push(Item.pearl(px + 3, py + 3, key(s.x, s.y), solidChar(tileAt(s.x, s.y + 1)))); else if (L.home.has(key(s.x, s.y))) L.ents.push(Item.ghostPearl(px + 3, py + 3)); break;
       case 'H': if (!L.taken.has(key(s.x, s.y))) L.ents.push(Item.heart(px + 3, py + 4, key(s.x, s.y))); break;
       case 'L': L.ents.push(Item.lantern(px + 3, py - 2, key(s.x, s.y))); break;
       case '?': L.ents.push(Item.sign(px + 1, py + 4, signIdx++)); break;
@@ -219,7 +253,7 @@ function spawnEntities() {
       case 'P': L.ents.push(Item.plate(px, py + 11, L.triggerIdx.get(key(s.x, s.y)))); break;
       case 'V': L.ents.push(Item.pinwheel(px, py, L.triggerIdx.get(key(s.x, s.y)))); break;
       case 'R': L.ents.push(Item.raft(px, py + 12)); break;
-      case '!': { const pw = (L.def.powers || [])[morselIdx++]; if (pw && !Save.has(pw)) L.ents.push(Item.morsel(px + 4, py + 4, pw)); break; }
+      case 'Q': L.maestro = Maestros.spawn(px, py, L.def.maestro, L.maestro); L.ents.push(L.maestro); break;
     }
   }
 }
@@ -809,7 +843,7 @@ const Player = {
       const e = at(eye.c, eye.r), ex = Math.round(e.x), ey = Math.round(e.y);
       let lx = p.dir, ly = 0;
       if (p.aimUp || p.grapple) { lx = p.dir * .3; ly = -1; } else if (!p.onGround && p.vy > 4) { lx = 0; ly = 1; } else if (!p.sucking) {
-        let best = null, bd = 110; for (const o of L.ents) if (!o.dead && (o.enemy || o.kind === 'pearl' || o.kind === 'morsel')) { const d = Math.hypot(o.x + o.w / 2 - (e.x + Cam.x), o.y + o.h / 2 - (e.y + Cam.y)); if (d < bd) { bd = d; best = o; } }
+        let best = null, bd = 110; for (const o of L.ents) if (!o.dead && (o.enemy || o.kind === 'pearl' || o.kind === 'maestro')) { const d = Math.hypot(o.x + o.w / 2 - (e.x + Cam.x), o.y + o.h / 2 - (e.y + Cam.y)); if (d < bd) { bd = d; best = o; } }
         if (best) { const dx = best.x + best.w / 2 - (e.x + Cam.x), dy = best.y + best.h / 2 - (e.y + Cam.y), dd = Math.hypot(dx, dy) || 1; lx = dx / dd; ly = dy / dd; }
         else if (p.idleT > 60) { const ph = Math.floor(t / 90) % 4; lx = [p.dir, -p.dir, 0, p.dir][ph]; ly = [0, -1, -1, 0][ph]; }
       }
@@ -916,7 +950,7 @@ const Item = {
     if (overlap({ x: e.x - 5, y: e.y - 5, w: e.w + 10, h: e.h + 10 }, Player.rect()) && !Player.dead) Item.freeCria(e);
   },
   freeCria(e) {
-    e.dead = true; L.taken.add(e.id); L.pearls++; Sound.play('pearl'); Game.pearlPop = 12; Input.rumble(40, .2, .2);
+    e.dead = true; L.taken.add(e.id); L.pearls++; Save.criasSet(L.def.id)[e.id] = 1; Save.write(); Sound.play('pearl'); Game.pearlPop = 12; Input.rumble(40, .2, .2);
     const cx = e.x + 4, cy = e.y + 4, d = Player.x + 5 < cx ? 1 : -1;
     L.parts.push({ x: cx - 3, y: cy - 1, vx: d * 1.1, vy: -2.6, life: 56, color: '#fff', size: 1, g: .1, kind: 'cria' });
     L.parts.push({ x: cx - 4, y: cy - 4, vx: 0, vy: 0, life: 8, color: '#cfe8f0', size: 1, g: 0, kind: 'ring' });
@@ -934,10 +968,8 @@ const Item = {
     if (!e.talkT && (e.t >> 5) % 2) g.drawImage(ART.bubble, Math.round(e.x - Cam.x) + 14, Math.round(e.y - Cam.y) - 14 + Math.round(Math.sin(e.t / 8)));
   },
   sign(x, y, idx) { return { kind: 'sign', x, y, w: 14, h: 12, idx, update() { }, draw(e, g) { g.drawImage(ART.sign, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y)); } }; },
-  morsel(x, y, power) { return { kind: 'morsel', x, y, w: 8, h: 8, power, t: Math.random() * 100, update(e) {
-      e.t++; if (e.t % 6 === 0) spawnParts(1, e.x + rnd(0, 8), e.y + rnd(0, 8), { color: ['#fff6d6', '#ffe36a', '#e8fbff'], speed: [.1, .4], life: [14, 26], g: -.02 });
-      if (!Player.dead && !Game.learning && overlap({ x: e.x - 6, y: e.y - 6, w: 20, h: 20 }, Player.rect())) { e.dead = true; Game.learn(e.power); }
-    }, draw(e, g) { const bob = Math.round(Math.sin(e.t / 16) * 2); const sx = Math.round(e.x - Cam.x), sy = Math.round(e.y - Cam.y + bob); g.globalAlpha = .25 + Math.sin(e.t / 8) * .1; g.fillStyle = '#ffe36a'; g.beginPath(); g.arc(sx + 4, sy + 4, 9, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; g.drawImage(ART.morsels[e.power], sx, sy); if ((e.t >> 3) % 4 === 0) g.drawImage(ART.star, sx + 7, sy - 3); } }; },
+  // Where a cría was already rescued on an earlier visit: the ghost of its bubble, so the spot is remembered.
+  ghostPearl(x, y) { return { kind: 'ghostPearl', x, y, w: 9, h: 9, t: Math.random() * 100, update(e) { e.t++; }, draw(e, g) { g.globalAlpha = .22 + Math.sin(e.t / 30) * .06; g.drawImage(ART.tint(ART.cria[0], '#cfe8f0'), Math.round(e.x - Cam.x), Math.round(e.y - Cam.y + Math.sin(e.t / 18) * 2)); g.globalAlpha = 1; } }; },
   // A fishing hook hanging on its line from the ledge above, with a float and a worm for bait.
   anchor(x, y) {
     let top = y - 60, tied = false; const tx = (x + 5) >> 4; for (let k = 1; k <= 8; k++) { const ty = ((y + 5) >> 4) - k; if (solidChar(tileAt(tx, ty)) || tileAt(tx, ty) === '=') { top = (ty + 1) * TS; tied = true; break; } }
@@ -1333,8 +1365,14 @@ const Game = {
   },
   runCapture() {
     const c = Game.capture;
-    if (c.scene === 'sprites' || c.scene === 'zoom') { Game.state = 'sprites'; return; }
-    if (c.scene === 'selector') { Save.data.unlocked = c.n; Save.data.pearls = { 0: 6, 1: 10 }; Save.data.totals = { 0: 11, 1: 10 }; Save.data.best = { 0: 245, 1: 312 }; Game.select(); Game.sel = Math.min(c.n, 1); Mapa.place(Game.sel); for (let i = 0; i < c.t; i++) Game.t++; return; }
+    if (c.scene === 'sprites' || c.scene === 'zoom' || c.scene === 'maestros') { Game.state = 'sprites'; return; }
+    if (c.scene === 'maestro') { Maestros.capture(c); return; }
+    if (c.scene === 'selector' || c.scene === 'mapa') {
+      Save.data = Save.fresh(); for (let i = 0; i <= Math.min(c.n, LEVELS.length - 1); i++) Save.open(i);
+      LEVELS.forEach((def, i) => { if (i < c.n) { const ks = NIVEL.criasDe(def); ks.slice(0, Math.ceil(ks.length * (i % 2 ? .4 : .7))).forEach(k => { Save.criasSet(def.id)[k] = 1; }); Save.data.best[def.id] = 200 + i * 17; if (def.maestro) Save.data.powers[def.maestro.poder] = true; } });
+      Game.select(); Game.sel = Math.min(c.n, LEVELS.length - 1); Mapa.place(Game.sel);
+      if (c.x >= 0) { Game.sel = c.x; Mapa.place(c.x); }
+      for (let i = 0; i < c.t; i++) { Input.pressed = {}; Game.update(); } Game.frozen = true; return; }
     if (c.scene === 'aprende') { Game.startLevel(0); Game.banner = 0; for (let i = 0; i < 40; i++) Game.updatePlay(); Aprende.start(POWER_ORDER[c.n]); for (let i = 0; i < c.t; i++) { Input.pressed = {}; Aprende.update(); } Game.frozen = true; return; }
     if (c.scene === 'cine') { Cine.start(() => { }); Cine.state.t = c.t; Game.frozen = true; return; }
     if (c.scene === 'titulo') { Game.title(); for (let i = 0; i < c.t; i++) Game.updateTitle(); Game.frozen = true; return; }
@@ -1360,7 +1398,7 @@ const Game = {
     if (Game.fade > 0) Game.fade = Math.max(0, Game.fade - .06);
     switch (Game.state) {
       case 'title': if (!Game.frozen) Game.updateTitle(); break;
-      case 'select': Game.updateSelect(); break;
+      case 'select': if (!Game.frozen) Game.updateSelect(); break;
       case 'play': if (Game.frozen) break; if (Game.paused) Game.updatePause(); else Game.updatePlay(); break;
       case 'clear': Game.updateClear(); break;
       case 'ending': Game.updateEnding(); break;
@@ -1391,21 +1429,42 @@ const Game = {
       else { Sound.play('confirm'); Title.press(Game.titleT); Game.transition(() => Game.select()); }
     }
   },
-  select() { Game.state = 'select'; Game.sel = Math.min(Save.data.unlocked, LEVELS.length - 1); Mapa.place(Game.sel); Sound.playMusic('dock'); },
+  // The map. With `from` and `to` (after finishing a level) Nila walks from the place she left to the next one.
+  select(from, to) {
+    Game.state = 'select'; Charla.stop();
+    if (from !== undefined && to !== undefined && to < LEVELS.length) { Mapa.place(from); Game.sel = to; Mapa.select(to); }
+    else { Game.sel = Math.min(Save.reached(), LEVELS.length - 1); Mapa.place(Game.sel); }
+    Sound.playMusic('dock');
+  },
   updateSelect() {
+    if (Charla.active()) { Charla.update(); return; }
     const n = LEVELS.length, before = Game.sel; Mapa.update();
     if (Input.pressed.left || Input.pressed.down) { Game.sel = Math.max(0, Game.sel - 1); }
     if (Input.pressed.right || Input.pressed.up) { Game.sel = Math.min(n - 1, Game.sel + 1); }
     if (Game.tapSel !== undefined) { const s = Game.tapSel; Game.tapSel = undefined; if (s === Game.sel) Game.tapped = true; else Game.sel = s; }
     if (Game.sel !== before) { Mapa.select(Game.sel); Sound.play('select'); }
+    // Reaching the wall of thorns for the first time: Ruca explains the song of the crías.
+    if (!Mapa.walking() && Save.locked(Game.sel) && Game.sel <= Save.reached() && !(Save.data.seen || {}).muro) { Game.explainWall(Game.sel); return; }
     if (Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Game.tapped) {
       Game.tapped = false;
-      if (Game.sel <= Save.data.unlocked) { Sound.play('confirm'); const i = Game.sel; Game.transition(() => Game.startLevel(i)); } else Sound.play('hurt');
+      const i = Game.sel;
+      if (i > Save.reached()) Sound.play('hurt');
+      else if (Save.locked(i)) { Sound.play('hurt'); Mapa.shake(i); Game.explainWall(i, true); }
+      else { Sound.play('confirm'); Game.transition(() => Game.startLevel(i)); }
     }
     if (Input.pressed.pause) { Sound.play('select'); Game.transition(() => Game.title()); }
   },
+  explainWall(i, again) {
+    const need = LEVELS[i].requiere.crias, have = Save.gateCount(i), left = need - have;
+    Save.data.seen = Object.assign(Save.data.seen || {}, { muro: true }); Save.write();
+    const lines = again ? ['Faltan ' + left + ' crías. Vuelve a los sitios donde dejaste alguna: con los trucos nuevos llegarás a los rincones que no podías.']
+      : ['¡Nila, espera! El ciprés de la Garza está rodeado por un muro de zarzas encantado.',
+        'Sólo se abre cuando cantan juntas muchas crías: la canción de las crías. Hacen falta ' + need + ' y hay ' + have + ' en casa.',
+        'Muchas se quedaron en rincones a los que no llegabas. Con los trucos nuevos de Bigotes, vuelve a buscarlas. El mapa te dice cuántas faltan en cada sitio.'];
+    Charla.start({ quien: 'ruca', lines });
+  },
   // ---- play
-  startLevel(i) { Game.level = i; Game.hitStop = 0; Game.heldPresses = {}; loadLevel(i); Game.state = 'play'; Game.paused = false; Game.banner = 190; Sound.playMusic(LEVELS[i].music); Game.toastT = 0; Game.weather = { bolt: 0, next: 200, x: 0, seed: 1, thunder: 0 }; },
+  startLevel(i) { Maestros.reset(); Game.level = i; Game.hitStop = 0; Game.heldPresses = {}; loadLevel(i); Game.state = 'play'; Game.paused = false; Game.banner = 190; Sound.playMusic(LEVELS[i].music); Game.toastT = 0; Game.weather = { bolt: 0, next: 200, x: 0, seed: 1, thunder: 0 }; },
   respawn() { Game.transition(() => { Player.reset(L.checkpoint.x, L.checkpoint.y, true); if (L.def.boss) { if (!Boss.restart()) { loadLevel(Game.level); Game.banner = 60; } } else { spawnEntities(); } Cam.snap(); Sound.playMusic(L.def.boss ? Boss.song() : L.def.music); }); },
   drown(fell) {
     const p = Player; if (p.dead) return;
@@ -1423,6 +1482,8 @@ const Game = {
   updatePlay() {
     if (Input.pressed.pause) { Game.pause(); return; }
     if (Game.learning) { Aprende.update(); return; }
+    // A teacher talking, or the morsel on its way to Bigotes: the world waits.
+    if (Maestros.busy()) { Maestros.updateModal(); return; }
     // A hit-stop freezes the world, not the hands: presses made during it are kept and land on the first live frame.
     if (Game.hitStop > 0) { Game.hitStop--; for (const k in Input.pressed) if (Input.pressed[k] && k !== 'pause') Game.heldPresses[k] = true; Cam.shakeOnly(); return; }
     // The heron's last blow plays in slow motion; presses are kept the same way.
@@ -1499,12 +1560,15 @@ const Game = {
     Victoria.start(boat);
   },
   finishLevel() {
-    const i = Game.level; const d = Save.data;
-    d.pearls[i] = Math.max(d.pearls[i] || 0, L.pearls); d.totals[i] = L.pearlsTotal;
-    const secs = Math.floor(L.time / 60), prevBest = d.best[i]; if (!d.best[i] || secs < d.best[i]) d.best[i] = secs;
-    if (i + 1 < LEVELS.length) d.unlocked = Math.max(d.unlocked, i + 1); else d.finished = true;
+    const i = Game.level, d = Save.data, id = L.def.id;
+    // The crías freed from the heron's crop are home too.
+    if (L.def.boss) { const set = Save.criasSet(id); for (let k = 0; k < Math.min(L.bossFreed || 0, Boss.CRIAS); k++) set['garza:' + k] = 1; }
+    const secs = Math.floor(L.time / 60), prevBest = d.best[id]; if (!d.best[id] || secs < d.best[id]) d.best[id] = secs;
+    if (i + 1 < LEVELS.length) Save.open(i + 1); else d.finished = true;
     Save.write(); Sound.duck(false);
-    Game.clearStats = { name: L.def.name, pearls: L.pearls, total: L.pearlsTotal, secs, last: i + 1 >= LEVELS.length, prevBest, boss: !!L.def.boss, tricksAll: L.def.powers || [], tricks: (L.def.powers || []).filter(Save.has) };
+    // The tally lists the trick this level's teacher teaches (stamped if Bigotes has it).
+    const taught = NIVEL.poderDe(L.def) ? [NIVEL.poderDe(L.def)] : [];
+    Game.clearStats = { name: L.def.name, pearls: L.pearls, total: L.pearlsTotal, secs, last: i + 1 >= LEVELS.length, prevBest, boss: !!L.def.boss, par: L.def.par, tricksAll: taught, tricks: taught.filter(Save.has) };
     Game.transition(() => { Game.state = 'clear'; Game.clearT = 0; Cam.fx = null; Victoria.startClear(); Sound.playMusic('victoria'); });
   },
   // The tally (letters, counts, medal) and the move on to the next level or the ending: victoria.js.
@@ -1531,9 +1595,9 @@ const Game = {
   stop(n) { Game.hitStop = Math.max(Game.hitStop, n); },
   toast(text, t) { Game.toastText = text; Game.toastT = t; },
   has(p) { return Save.has(p); },
-  // Bigotes eats a morsel and learns a trick: a beat of celebration, then a card that waits for a press.
-  learn(power) {
-    const p = Player; Aprende.start(power); Save.data.powers[power] = true; Save.write();
+  // Bigotes eats the morsel a teacher gave him and learns a trick: a beat of celebration, then a card that waits for a press.
+  learn(power, giver) {
+    const p = Player; Aprende.start(power, giver); Save.data.powers[power] = true; Save.write();
     p.vx = 0; p.sucking = false; Sound.suck(false); Sound.jet(false); p.hover = false; p.charge = 0; p.swallowT = 10; Player.letGo();
     Sound.duck(true); Cam.punch(1.05); Input.rumble(200, .6, .6);
     const m = p.mouth(); Game.word('¡ÑAM!', m.x, m.y - 14, '#ffe36a', true);
@@ -1546,6 +1610,7 @@ const Game = {
   },
   tap(pt) {
     if (Game.state === 'title') { Game.tapped = true; return; }
+    if ((Game.state === 'select' || Game.state === 'play') && Charla.active()) { Game.tapped = true; return; }
     if (Game.state === 'select') { const h = Mapa.hit(pt); if (h === 'panel') Game.tapped = true; else if (h >= 0) Game.tapSel = h; return; }
     if (Game.state === 'play' && Game.learning) { Game.tapped = true; return; }
     if (Game.state === 'play' && Game.paused) { const rows = Game.pauseRows(); for (let i = 0; i < rows.length; i++) if (pt.y >= rows[i] - 6 && pt.y < rows[i] + 12) { Game.tapSel = i; return; } return; }
@@ -1562,10 +1627,10 @@ const Game = {
     g.imageSmoothingEnabled = false;
     switch (Game.state) {
       case 'title': Game.drawTitle(g); break;
-      case 'select': Game.drawSelect(g); break;
+      case 'select': Game.drawSelect(g); if (Charla.active()) Charla.draw(g); break;
       case 'gate': Cine.gateDraw(g); break;
       case 'cine': Cine.draw(g); break;
-      case 'play': Game.drawPlay(g); if (Game.learning) Aprende.draw(g); if (Game.paused) Game.drawPause(g); break;
+      case 'play': Game.drawPlay(g); if (Game.learning) Aprende.draw(g); else if (Charla.active()) Charla.draw(g); if (Game.paused) Game.drawPause(g); break;
       case 'clear': Game.drawClear(g); break;
       case 'ending': Game.drawEnding(g); break;
       case 'sprites': Game.drawSprites(g); break;
@@ -1626,7 +1691,7 @@ const Game = {
       else if (e.kind === 'pearl') hole(e.x + 3, e.y + 3, 12);
       else if (e.kind === 'boat') hole(e.x + 14, e.y - 4, 34 * fl);
       else if (e.kind === 'anchor') hole(e.x + 5, e.y + 5, 10);
-      else if (e.kind === 'morsel') hole(e.x + 4, e.y + 4, 22 * fl);
+      else if (e.kind === 'maestro') hole(e.x + e.w / 2, e.y + e.h / 2, 30 * fl);
       else if (e.kind === 'pinwheel' && e.spin > 0) hole(e.x + 8, e.y + 8, 18);
     }
     for (const p of L.projs) if (p.kind === 'agua') hole(p.x + 4, p.y + 4, 10);
@@ -1731,6 +1796,7 @@ const Game = {
   },
   drawHud(g) {
     Hud.draw(g);
+    Maestros.drawOverlay(g);
     if (Game.hurtFlash > 0) { g.fillStyle = 'rgba(220,60,60,' + (Game.hurtFlash / 14 * .28) + ')'; g.fillRect(0, 0, W, H); }
     if (Game.banner > 0 && !Game.capture) {
       const t = Game.banner; const a = t > 170 ? (190 - t) / 20 : t < 30 ? t / 30 : 1;
@@ -1739,7 +1805,7 @@ const Game = {
       ART.text(g, (Game.level + 1) + ' · ' + L.def.name, W / 2, by + 6, '#fff6d6', 'center'); lines.forEach((l, k) => ART.text(g, l, W / 2, by + 18 + k * 10, '#9fc0cc', 'center')); g.globalAlpha = 1;
     }
     if (Game.toastT > 0) { const a = Math.min(1, Game.toastT / 20); g.globalAlpha = a; ART.text(g, Game.toastText, W / 2, 30, '#fff6d6', 'center', '#1b2430'); g.globalAlpha = 1; }
-    if (Player.nearSign && !Player.dead) {
+    if (Player.nearSign && !Player.dead && !Maestros.busy() && !Game.learning) {
       const lines = ART.wrap(Game.signText(null, Game.noteRaw(Player.nearSign)), W - 40); const h = lines.length * 10 + 10; const y = H - h - 6;
       const ruca = Player.nearSign.kind === 'ruca', edge = ruca ? '#8aa84a' : '#c78d4e';
       g.fillStyle = 'rgba(27,36,48,.9)'; g.fillRect(14, y, W - 28, h); g.fillStyle = edge; g.fillRect(14, y, W - 28, 1); g.fillRect(14, y + h - 1, W - 28, 1);
@@ -1778,7 +1844,7 @@ const Game = {
     Player.carryLook = { mood: 'sleep' }; Player.drawCarry(g, Math.round(bx) + 10, 114 + bob, ART.nila.idle[(t % 200) < 6 ? 1 : 0], ART.fish.closed); Player.carryLook = null;
     g.fillStyle = 'rgba(8,10,16,.55)'; g.fillRect(0, 0, W, 100);
     const lines = ['La Garza voló lejos, a otro río,', 'y las crías volvieron nadando a casa.', '', 'Nila remó hasta el embarcadero', 'con Bigotes dormido en el regazo.', '', 'GRACIAS POR JUGAR'];
-    const d = Save.data; let tot = 0, all = 0; for (const i in d.totals) { tot += d.pearls[i] || 0; all += d.totals[i]; }
+    const { got: tot, all } = Save.criasAll();
     lines.forEach((l, i) => { if (t > 20 + i * 18) ART.text(g, l, W / 2, 14 + i * 11, i === 6 ? '#f2c46a' : '#fff6d6', 'center'); });
     if (t > 160) ART.text(g, 'Crías rescatadas: ' + tot + '/' + all, W / 2, 168, '#9ecbd8', 'center', '#1b2430');
     if (t > 120 && (t >> 5) % 2) ART.text(g, Touch.enabled ? 'Toca para volver' : 'Z para volver', W - 6, 104, '#9fc0cc', 'right');
@@ -1786,6 +1852,7 @@ const Game = {
   // ---- development scenes
   drawSprites(g) {
     g.fillStyle = '#6a7a8a'; g.fillRect(0, 0, W, H);
+    if (Game.capture.scene === 'maestros') { Maestros.sheet(g, Game.t); return; }
     if (Game.capture.scene === 'zoom') { g.imageSmoothingEnabled = false; let x = 4, y = 4; for (const s of Game.zoomList()) { if (x + s.width * 3 > W) { x = 4; y += 50; } g.drawImage(s, x, y, s.width * 3, s.height * 3); x += s.width * 3 + 6; } return; }
     const items = [ART.nila.idle[0], ART.nila.idle[1], ART.nila.run[1], ART.nila.run[2], ART.nila.jump, ART.nila.fall, ART.nila.hurt, ART.nila.win, ART.fish.closed, ART.fish.open, ART.fish.full, ART.fish.spit, ART.fish.swallow, ART.hand,
       ART.snail[0], ART.snail[1], ART.frogSit, ART.frogJump, ART.mosquito[0], ART.mosquito[1], ART.crab[0], ART.crab[1], ART.crate, ART.rock, ART.cria[0], ART.cria[1], ART.cria[2], ART.criaFree[0], ART.ruca.idle, ART.ruca.blink, ART.ruca.talk, ART.bubble, ART.heart, ART.heartEmpty, ART.lantern.off, ART.lantern.on, ART.sign, ART.boat, ART.mushroom, ART.mushroomSquash, ART.thorns, ART.gate, ART.target.off, ART.target.on, ART.lily, ART.plank, ART.cracked, ART.dirt[0], ART.dirt[1], ART.grassCap[0], ART.grassCap[1], ART.roots, ART.water[0], ART.water[2], ART.waterDeep, ART.reed, ART.tuft, ART.shroomDeco, ART.egg, ART.puff[1], ART.star];

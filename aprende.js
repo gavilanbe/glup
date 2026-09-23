@@ -13,7 +13,7 @@ const Aprende = (() => {
   let shade = null;
   function shadeCanvas() { if (!shade) { shade = document.createElement('canvas'); shade.width = W; shade.height = H; } return shade; }
 
-  function start(power) { Game.learning = { power, t: 0, exit: 0 }; Sound.play('learn'); }
+  function start(power, giver) { Game.learning = { power, giver, t: 0, exit: 0 }; Sound.play('learn'); }
   function update() {
     const l = Game.learning; l.t++;
     Player.animT++; Player.sx += (1 - Player.sx) * .18; Player.sy += (1 - Player.sy) * .18; if (Player.swallowT > 0) Player.swallowT--;
@@ -142,7 +142,7 @@ const Aprende = (() => {
       if (k >= 1) { for (const s of [-1, 1]) { const ex = W / 2 + s * (W / 2); g.fillStyle = '#6a2a20'; g.beginPath(); g.moveTo(ex, ry - 2); g.lineTo(ex - s * 10, ry + 12); g.lineTo(ex, ry + 28); g.fill(); } }
       ART.text(g, '¡Bigotes ha aprendido!', W / 2, ry - 12, '#f2c46a', 'center', '#120c18');
       bigName(g, pw.name, W / 2, ry + 6, t - NAME - 8);
-      if (t > NAME + 26) ART.text(g, 'Se ha tragado ' + pw.food, W / 2, ry + 32, '#cfe0e8', 'center', '#120c18');
+      if (t > NAME + 26) ART.text(g, l.giver ? l.giver + ' le ha dado ' + (l.food || pw.food) : 'Se ha tragado ' + pw.food, W / 2, ry + 32, '#cfe0e8', 'center', '#120c18');
     }
     // The demo box and the buttons.
     if (t >= DEMO) {

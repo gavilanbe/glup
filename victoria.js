@@ -205,7 +205,6 @@ const Victoria = (() => {
     const off = Math.round((W - (x - 3)) / 2); for (const it of items) it.x += off;
     return items;
   }
-  const PAR = [210, 190, 200, 170, 150];
   const MEDALS = {
     bronce: { name: 'BRONCE', stars: 1, rim: '#7a4424', face: '#c07a44', hi: '#f0b27a', lo: '#8e5230' },
     plata: { name: 'PLATA', stars: 2, rim: '#5a6474', face: '#b8c4d0', hi: '#f2f6fa', lo: '#7d8a9a' },
@@ -215,7 +214,7 @@ const Victoria = (() => {
   const LT0 = 6, LGAP = 3, CGAP = 6, TGAP = 14;
   function startClear() {
     const s = Game.clearStats || { name: '', pearls: 0, total: 0, secs: 0, last: false };
-    const par = s.par || PAR[Game.level] || 200, fast = s.secs <= par, ratio = s.total ? s.pearls / s.total : 1;
+    const par = s.par || 200, fast = s.secs <= par, ratio = s.total ? s.pearls / s.total : 1;
     const rank = ratio >= 1 && fast ? 'perfecto' : ratio >= 1 || (ratio >= .75 && fast) ? 'oro' : ratio >= .5 ? 'plata' : 'bronce';
     const tricks = s.tricks || [], boss = !!s.boss;
     const items = titleLayout(), titleEnd = LT0 + items.length * LGAP + 8;
@@ -279,7 +278,7 @@ const Victoria = (() => {
       else if (t > T.rank + 10) {
         Sound.play('confirm');
         if (s.last) Game.transition(() => { Game.state = 'ending'; Game.endT = 0; Sound.playMusic('dock'); });
-        else Game.transition(() => Game.startLevel(Game.level + 1));
+        else Game.transition(() => Game.select(Game.level, Game.level + 1));
       }
     }
   }
@@ -374,6 +373,8 @@ const Victoria = (() => {
             const k = d < 0 ? (d + 6) / 6 : 1, sc = d < 0 ? 4 - 2 * k : 2 * (1 + (d < 10 ? Math.exp(-d / 3) * Math.cos(d / 1.5) * .25 : 0));
             g.save(); g.globalAlpha = Math.min(1, k * 1.5); g.translate(x + 8, y + 8); g.rotate(d < 0 ? (1 - k) * .8 : 0); g.scale(sc, sc); g.drawImage(spr, -4, -4); g.restore();
           } else if (!have) { g.globalAlpha = .3; g.drawImage(ART.tint(spr, '#5f7899'), x, y, 16, 16); g.globalAlpha = 1; }
+          // One teacher per level: name the trick beside its morsel.
+          if (all.length === 1 && d >= 4 && POWERS[pw]) ART.text(g, POWERS[pw].name, x + 22, y + 4, have ? '#ffe36a' : '#5f7899', 'left');
         });
         if (t >= T.tricksEnd - 6) ART.text(g, c.tricks.length + '/' + all.length, x1, ROW.tricks + 4, '#e8fbff', 'right');
       }
@@ -473,7 +474,7 @@ const Victoria = (() => {
     }
     g.restore();
     if (c.flash > 0 && !Game.still) { g.globalAlpha = c.flash / 6 * .35; g.fillStyle = '#fffbe0'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
-    if (t > T.rank + 10 && (t >> 5) % 2 === 0) { const msg = (Touch.enabled ? 'Toca · ' : '') + (c.s.last ? 'Continuar →' : 'Siguiente nivel →'); ART.text(g, msg, 200, 166, '#fff6d6', 'center', '#1b2430'); }
+    if (t > T.rank + 10 && (t >> 5) % 2 === 0) { const msg = (Touch.enabled ? 'Toca · ' : '') + (c.s.last ? 'Continuar →' : 'Al mapa →'); ART.text(g, msg, 200, 166, '#fff6d6', 'center', '#1b2430'); }
     else if (t < T.rank && t > 30) ART.text(g, Touch.enabled ? 'Toca para adelantar' : 'Z adelanta', W - 6, 170, '#5f7899', 'right');
   }
 

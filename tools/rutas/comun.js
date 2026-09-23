@@ -1,5 +1,5 @@
-// GLUP — rutas del bot, una por nivel. { reach: [col, fila] } lleva a Nila a pisar esa celda
-// (la fila es la del suelo que pisa); las demás acciones son de Bigotes. Ver tools/bot.js.
+// GLUP — piezas comunes de las rutas del bot (una ruta por nivel en tools/rutas/NN.js). { reach: [col, fila] }
+// lleva a Nila a pisar esa celda (la fila es la del suelo que pisa); las demás acciones son de Bigotes. Ver tools/bot.js.
 'use strict';
 const R = (x, y, o) => Object.assign({ reach: [x, y] }, o || {});
 const D = (name, ...args) => ({ do: name, args });
@@ -185,61 +185,8 @@ const RAFT = DO('balsa', g => {
   }
   return 'la balsa no llegó';
 });
-const near = (kind, side, fromX) => ({ reach: require('./bot').beside(kind, side, fromX), tol: 1 });
-module.exports = [
-  { powers: [], steps: [
-    R(16, 9), R(23, 11), D('face', 1), D('suck', 40), D('spit', 1), { wait: 30 }, R(37, 11),
-    R(58, 11, { crouch: true }), R(60, 11), D('face', 1), D('suck', 40), D('spit', 1), { wait: 20 },
-    near('crate', -2, 66), D('face', 1), D('suck', 40), R(72, 11), D('drop'), R(75, 7),
-    R(85, 11), R(96, 6), R(105, 11), R(111, 11), R(116, 11), R(119, 11),
-    R(126, 11), R(130, 11), D('puff', 1), R(140, 11),
-    R(142, 11), D('puff', 1), R(157, 11),
-    R(160, 11), D('face', 1), D('suck', 40), R(172, 11), D('drop'), R(176, 5),
-    R(193, 11), D('face', 1), D('suck', 40), D('spit', 1), { wait: 60 },
-    near('rock', -2), D('face', 1), D('suck', 40), D('spit', 1), { wait: 30 }, R(216, 11), R(215, 8, { tol: 1 }),
-    R(231, 10, { tol: 2 })] },
-  { powers: ['aleteo', 'soplido'], steps: [
-    near('rock', -2), D('face', 1), D('suck', 40), R(24, 11), D('face', 1), D('spit', 1), { wait: 40 }, near('crab', -2), D('face', 1), D('suck', 40), D('spit', 1), { wait: 30 },
-    { check: g => g.L.hitTargets.size === 1 || 'la diana 1 no se abrió' }, R(28, 11), ...FLAP(0), R(38, 11),
-    R(41, 11), R(44, 10, { tol: 1 }), RAFT, R(58, 11),
-    R(63, 11), R(73, 2), R(84, 2), R(95, 11),
-    R(108, 11), { hold: { fish: 1, up: 1 }, n: 140 },
-    { hold: { left: 1, jump: 1 }, n: 14 }, { hold: { fish: 1, up: 1 }, n: 160 }, { check: g => g.P.hanging || 'no volvió al aro' }, { hold: { fish: 1, up: 1, right: 1, jump: 1 }, n: 12 }, R(112, 1),
-    R(127, 11), near('rock', -2), D('face', 1), D('suck', 40), R(131, 11), D('face', 1), ...UP, { wait: 30 },
-    { check: g => g.L.hitTargets.size === 2 || 'la diana 2 no se abrió' }, R(138, 11),
-    R(141, 11), { hold: { right: 1 }, n: 1 },
-    DO('aros, salto atrás a la cría y vuelta al aro', g => {
-      for (let n = 0; n < 110 && !(g.P.hanging && g.P.x > 2420); n++) g.frame({ fish: 1 });
-      if (!g.P.hanging) return 'no llegó al aro';
-      g.frame({ fish: 1, jump: 1, left: 1 }); g.run({ jump: 1, left: 1 }, 17); g.run({ jump: 1, right: 1 }, 6);
-      for (let n = 0; n < 60 && !g.P.hanging; n++) g.frame({ fish: 1, right: 1 });
-      return g.P.hanging || 'no volvió al aro';
-    }), { hold: { fish: 1, right: 1, jump: 1 }, n: 14 }, R(157, 11),
-    near('rock', -2), D('face', 1), D('suck', 40), D('spit', 1), { wait: 20 }, D('suck', 40), D('spit', 1), { wait: 20 }, D('suck', 40),
-    R(172, 11), D('face', 1), D('spit', 1), { wait: 30 },
-    { check: g => g.L.hitTargets.size === 3 || 'la diana 3 no se abrió' }, R(167, 11), ...FLAP(0), R(178, 11),
-    R(189, 8), R(197, 10, { tol: 2 })] },
-  { powers: ['aleteo', 'soplido', 'ventosa', 'mordisco'], steps: [
-    R(24, 11), D('face', 1), D('suck', 40), D('spit', 1), { wait: 30 }, R(40, 11), R(45, 11), D('face', 1), D('suck', 40), ...HOVER(1, 14, 14), { hold: { right: 1 }, n: 14 }, { hold: { fish: 1, right: 1 }, n: 110 }, R(60, 11), D('spit', -1), { wait: 10 },
-    near('crate', -2), D('face', 1), D('suck', 40), R(70, 11), D('drop'), { wait: 40 }, R(77, 11), R(82, 11), R(86, 7), R(90, 7),
-    { hold: { jump: 1 }, n: 8 }, { hold: {}, n: 1 }, { hold: { down: 1, jump: 1 }, n: 2 }, { hold: { down: 1 }, n: 30 }, { wait: 20 },
-    R(107, 11), POUND_AT(1741, 1, false), { hold: { right: 1 }, n: 70 }, R(116, 1), R(125, 1), { hold: { right: 1, jump: 1 }, n: 18 }, { hold: { right: 1 }, n: 1 }, { hold: { right: 1, jump: 1 }, n: 40 }, { hold: { right: 1 }, n: 20 },
-    { hold: { right: 1, jump: 1 }, n: 14 }, { hold: { left: 1 }, n: 14 }, R(133, 4, { tol: 1 }), R(133, 11), { hold: { left: 1 }, n: 1 }, { hold: { fish: 1 }, n: 80 }, { wait: 2 }, D('spit', 1), { wait: 20 }, D('face', -1), D('suck', 40), D('spit', 1), { wait: 30 },
-    R(143, 11), D('face', 1), D('suck', 40), ...HOVER(1, 20, 6), R(151, 11, JET), WATER(1), UNTIL('mosquito lejos', g => g.L.ents.filter(e => e.kind === 'mosquito' && Math.abs(e.x - g.P.x) < 200).every(e => e.dir > 0 && e.x > 2470)), ...HOVER(1, 110, 4), R(168, 11), { hold: { jump: 1 }, n: 40 },
-    near('crate', -2), D('face', 1), D('suck', 40), R(190, 8, { tol: 1 }), D('drop'), { wait: 30 },
-    { hold: { jump: 1, right: 1 }, n: 16 }, { hold: { right: 1 }, n: 1 }, { hold: { jump: 1, right: 1 }, n: 14 }, R(200, 11), D('face', 1), D('suck', 40), D('spit', 1), { wait: 30 },
-    R(209, 11), { hold: { jump: 1 }, n: 30 }, R(214, 10, { tol: 2 }), { hold: { right: 1 }, n: 30 }] },
-  { powers: ['aleteo', 'soplido', 'ventosa', 'mordisco', 'chorro', 'panzazo'], steps: [
-    R(6, 11), near('rock', -2), D('face', 1), D('suck', 40), R(14, 11), D('charge', 1), { wait: 40 }, R(8, 11), ...FLAP(0), R(20, 11), R(40, 11),
-    R(42, 11), WATER(1), D('spit', 1), { wait: 30 }, R(51, 11), ...FLAP(0),
-    R(42, 11), UNTIL('cangrejo al fondo del túnel', g => g.L.ents.some(e => e.kind === 'crab' && e.dir > 0 && e.x > 1150)), R(62, 11), { check: g => g.Save.has('resbalon') || 'sin resbalón' }, D('face', 1), D('puff', 1), { check: g => g.L.ents.some(e => e.kind === 'pinwheel' && e.spin > 0) || 'el molinillo no gira' }, R(58, 11), SLIDE_AT(1008, 1, 220),
-    R(96, 11), R(109, 11), { hold: { fish: 1, up: 1 }, n: 160 },
-    { hold: { left: 1, jump: 1 }, n: 18 }, { hold: { fish: 1, up: 1 }, n: 160 }, { check: g => g.P.hanging || 'no volvió al aro' }, { hold: { fish: 1, up: 1, right: 1, jump: 1 }, n: 12 }, R(114, 1, { tol: 1 }), R(126, 1),
-    UNTIL('cangrejos lejos', g => g.L.ents.filter(e => e.kind === 'crab' && e.x > 2040).every(e => e.x > 2100)),
-    DO('salto a la cría y panzazo', g => { while (g.P.x < 2040) g.frame({ right: 1 }); g.frame({ right: 1, jump: 1 }); for (let n = 0; n < 60 && g.P.x < 2070; n++) g.frame({ right: 1, jump: 1 }); g.frame({}); g.run({ down: 1, jump: 1 }, 2); for (let n = 0; n < 80 && g.P.pound; n++) g.frame({ down: 1 }); return !g.P.pound || 'sin panzazo'; }), { wait: 4 }, DO('atrás', g => { for (let n = 0; n < 20 && g.P.x > 2050; n++) g.frame({ left: 1 }); g.run({}, 6); g.frame({ right: 1 }); }),
-    DO('sorbe la piedra', g => { for (let n = 0; n < 30 && !g.P.held; n++) g.frame({ fish: 1 }); g.frame({}); return !!g.P.held || 'sin piedra'; }),
-    { hold: { fish: 1 }, n: 44 }, { wait: 30 }, { check: g => g.L.hitTargets.size === 1 || 'la diana no se abrió' },
-    R(139, 11), near('rock', -2), D('face', 1), D('suck', 40), R(143, 11), { wait: 24 }, D('charge', 1), { wait: 40 }, R(157, 11), R(167, 11), R(172, 10, { tol: 2 }), { hold: { right: 1 }, n: 30 }] },
-  { powers: ['aleteo', 'soplido', 'ventosa', 'mordisco', 'chorro', 'panzazo', 'guindilla', 'resbalon'], steps: [
-    R(8, 9), R(18, 11), R(27, 8), R(39, 11), HERON, R(57, 12, { tol: 3 }), { wait: 60 }] },
-];
+const near = (kind, side, fromX) => ({ reach: require('../bot').beside(kind, side, fromX), tol: 1 });
+// Talk to the level's teacher: walk up beside them (side -2 = two tiles to their left), press {up}, read every line
+// and, unless `learns` is false (a quest still pending), check that Bigotes learned the trick.
+const TALK = (o = {}) => ({ talk: Object.assign({ side: -2, learns: true }, o) });
+module.exports = { R, D, UP, HOVER, DO, POUND_AT, JET, WATER, FLAP, BOWL, SLIDE_AT, UNTIL, HERON, RAFT, near, TALK };

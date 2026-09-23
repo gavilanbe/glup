@@ -1,9 +1,17 @@
-// GLUP — bot de pruebas. Recorre cada nivel siguiendo una ruta de pasos: los
+// GLUP — bot de pruebas. Recorre cada nivel siguiendo su ruta (tools/rutas/NN.js): los
 // desplazamientos ({ reach }) los resuelve una búsqueda best-first sobre bloques de
-// fotogramas; las acciones de Bigotes se escriben a mano. Así se comprueba que todos
-// los niveles se pueden terminar con los trucos que dan.
-//   node tools/bot.js            todos los niveles
-//   node tools/bot.js 2 -v       sólo el nivel 2, contando cada paso
+// fotogramas; las acciones de Bigotes se escriben a mano. Cada nivel empieza con los trucos
+// de los maestros de los niveles anteriores, y al acabar tiene que saber el de su maestro.
+// Así se comprueba que todos los niveles se pueden terminar con lo que se tiene en ese punto.
+//   node tools/bot.js            todos los niveles, en paralelo
+//   node tools/bot.js 3 -v       sólo el nivel 3 (o su id: node tools/bot.js raices), contando cada paso
+//
+// Pasos de una ruta:
+//   { reach: [col, fila], tol?, crouch?, hang?, extra?, nodes? }   ir hasta pisar esa celda (búsqueda)
+//   { do: 'suck'|'spit'|'charge'|'puff'|'drop'|'face'|'hold', args: [...] }   acciones de Bigotes (ver A)
+//   { hold: { right: 1, jump: 1 }, n }   mantener unas teclas n fotogramas     { wait: n }   no tocar nada
+//   { check: g => true | 'por qué falla', label }   comprobar (o hacer cualquier cosa fotograma a fotograma)
+//   { talk: { side: -2, learns: true } }   ir junto al maestro, hablar (↑), leerlo todo y, si learns, comprobar el truco
 'use strict';
 const { load } = require('./sim');
 const g = load();
@@ -79,18 +87,36 @@ function runStep(s, v) {
   } else if (s.do) { A[s.do](...(s.args || [])); if (v) console.log('  ' + s.do, JSON.stringify(s.args || []), '→', g.P.held ? g.P.held.kind : '-'); }
   else if (s.hold) { g.run(s.hold, s.n || 1); }
   else if (s.wait) g.run({}, s.wait);
+  else if (s.talk) talk(s.talk, v);
   else if (s.check) { const why = s.check(g); if (why !== true) throw new Error('comprobación: ' + (why || s.label || 'falló')); if (v) console.log('  ok', s.label || ''); }
   if (g.P.dead) throw new Error('Nila murió tras ' + JSON.stringify(s));
 }
 
+// Walk up to the teacher, talk, read everything (the gift and the learning card run on their own).
+function talk(o, v) {
+  const e = g.L.maestro; if (!e) throw new Error('este nivel no tiene maestro');
+  // Two tiles' worth to the side of the teacher's middle (side -2: to the left), on the ground they stand on.
+  const r = search([Math.floor((e.x + e.w / 2 + o.side * 12) / TS), Math.floor((e.y + e.h + 1) / TS)], { tol: 0 });
+  if (r.fail) throw new Error('no llega junto al maestro (mejor ' + JSON.stringify(r.best) + ')');
+  g.run({}, 2); g.frame({ up: 1 }); g.frame({});
+  if (!g.Charla.active()) throw new Error('el maestro no quiere hablar (near=' + e.near + ')');
+  for (let n = 0; n < 3000 && (g.Maestros.busy() || g.Game.learning); n++) g.frame(n % 4 === 0 ? { confirm: 1 } : {});
+  g.run({}, 4);
+  const pw = e.def.poder;
+  if (v) console.log('  talk', e.who.id, pw, g.Save.has(pw) ? 'aprendido' : 'sin dar');
+  if (o.learns && !g.Save.has(pw)) throw new Error(e.who.name + ' no le ha dado el ' + pw + ' (¿encargo sin cumplir?)');
+}
+
 function runLevel(i, route, v) {
   const t0 = Date.now();
-  g.start(i, route.powers || []);
+  const powers = route.powers || g.NIVEL.poderesAntes(i);
+  g.start(i, powers);
   for (const s of route.steps) runStep(s, v);
   const won = g.P.win || g.Game.state === 'clear';
   g.run({}, 90);
   const pearls = g.L.pearls, total = g.L.pearlsTotal;
-  return { won: won || g.Game.state === 'clear', pearls, total, secs: ((Date.now() - t0) / 1000).toFixed(1), powers: Object.keys(g.Save.data.powers) };
+  const taught = g.NIVEL.poderDe(g.LEVELS[i]), learned = !taught || g.Save.has(taught);
+  return { won: (won || g.Game.state === 'clear') && learned, learned, taught, start: powers, pearls, total, secs: ((Date.now() - t0) / 1000).toFixed(1), powers: Object.keys(g.Save.data.powers) };
 }
 
 // Tile beside the nearest live entity of a kind: side -1 = to its left, +1 = to its right.
@@ -107,12 +133,30 @@ module.exports = { g, search, A, runLevel, beside };
 
 if (require.main === module) {
   const ROUTES = require('./rutas');
-  const only = process.argv[2] && !process.argv[2].startsWith('-') ? +process.argv[2] : null, v = process.argv.includes('-v');
-  let fails = 0;
-  ROUTES.forEach((r, i) => {
-    if (only !== null && only !== i) return;
-    try { const res = runLevel(i, r, v); console.log((res.won ? 'OK  ' : 'FAIL') + ' nivel ' + i + ' ' + g.LEVELS[i].name + ' · crías ' + res.pearls + '/' + res.total + ' · trucos ' + res.powers.join(',') + ' · ' + res.secs + 's'); if (!res.won) fails++; }
-    catch (e) { fails++; console.log('FAIL nivel ' + i + ' ' + g.LEVELS[i].name + ': ' + e.message + ' · x=' + Math.round(g.P.x) + ' y=' + Math.round(g.P.y) + ' tile ' + Math.floor(g.P.x / 16) + ',' + Math.floor(g.P.y / 16)); }
-  });
-  process.exit(fails ? 1 : 0);
+  const arg = process.argv[2] && !process.argv[2].startsWith('-') ? process.argv[2] : null, v = process.argv.includes('-v');
+  const only = arg === null ? null : /^\d+$/.test(arg) ? +arg - 1 : g.LEVELS.findIndex(l => l.id === arg);
+  if (only === null && !process.argv.includes('--serie')) {
+    // Every level in its own process, a few at a time.
+    const { spawn } = require('child_process'), max = Math.max(1, Math.min(g.LEVELS.length, require('os').cpus().length - 1));
+    const out = new Array(g.LEVELS.length); let next = 0, running = 0, fails = 0;
+    const launch = () => {
+      while (running < max && next < g.LEVELS.length) {
+        const i = next++; running++; let buf = '';
+        const ch = spawn(process.execPath, [__filename, String(i + 1)], { stdio: ['ignore', 'pipe', 'pipe'] });
+        ch.stdout.on('data', d => { buf += d; }); ch.stderr.on('data', d => { buf += d; });
+        ch.on('close', code => { out[i] = buf.trim(); if (code) fails++; running--; if (next < g.LEVELS.length) launch(); else if (!running) done(); });
+      }
+    };
+    const done = () => { console.log(out.join('\n')); console.log(fails ? fails + ' niveles fallan' : 'Todos los niveles se pueden terminar.'); process.exit(fails ? 1 : 0); };
+    launch();
+  } else {
+    let fails = 0;
+    g.LEVELS.forEach((lv, i) => {
+      if (only !== null && only !== i) return;
+      const r = ROUTES[lv.id]; if (!r) { fails++; console.log('FAIL nivel ' + (i + 1) + ' ' + lv.name + ': no hay ruta (tools/rutas/)'); return; }
+      try { const res = runLevel(i, r, v); console.log((res.won ? 'OK  ' : 'FAIL') + ' nivel ' + (i + 1) + ' ' + lv.name + ' · crías ' + res.pearls + '/' + res.total + ' · al llegar: ' + (res.start.join(',') || '-') + (res.taught ? ' · aprende ' + res.taught + (res.learned ? '' : ' (¡NO!)') : '') + ' · ' + res.secs + 's'); if (!res.won) fails++; }
+      catch (e) { fails++; console.log('FAIL nivel ' + (i + 1) + ' ' + lv.name + ': ' + e.message + ' · x=' + Math.round(g.P.x) + ' y=' + Math.round(g.P.y) + ' tile ' + Math.floor(g.P.x / 16) + ',' + Math.floor(g.P.y / 16)); }
+    });
+    process.exit(fails ? 1 : 0);
+  }
 }

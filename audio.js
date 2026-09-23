@@ -61,7 +61,7 @@ const Sound = (() => {
     learn() { const t = ctx.currentTime; ['C5', 'E5', 'G5', 'B5', 'D6', 'G6'].forEach((n, i) => osc('sine', freq(n), t + i * .05, .5 - i * .05, .1, sfxBus, null, .005, .3)); noise(t, .6, .05, 'highpass', 5000, 9000); osc('triangle', 130, t, .5, .12, sfxBus, 260, .02, .3); },
     gust() { const t = ctx.currentTime; noise(t, .45, .42, 'bandpass', 700, 2600, 1.4); noise(t + .05, .35, .2, 'lowpass', 500, 180); osc('sine', 140, t, .25, .12, sfxBus, 70, .01, .15); },
     inhale() { const t = ctx.currentTime; noise(t, .12, .12, 'bandpass', 2200, 900, 2); },
-    talk() { const t = ctx.currentTime; osc('triangle', 180 + Math.random() * 60, t, .05, .1, sfxBus, 140, .005, .03); },
+    talk(p) { const t = ctx.currentTime, f = p || 180; osc('triangle', f + Math.random() * f * .33, t, .05, .1, sfxBus, f * .78, .005, .03); },
     heart() { const t = ctx.currentTime; [523, 659, 784, 1046].forEach((f, i) => osc('triangle', f, t + i * .06, .12, .16, sfxBus, null, .003, .08)); },
     lantern() { const t = ctx.currentTime; [392, 523, 659, 784, 1046].forEach((f, i) => osc('triangle', f, t + i * .07, .2, .15, sfxBus, null, .003, .12)); noise(t, .4, .06, 'highpass', 4000); },
     bounce() { const t = ctx.currentTime; osc('sine', 180, t, .22, .25, sfxBus, 720, .005, .08); osc('triangle', 90, t, .1, .1, sfxBus, 360); },

@@ -4,7 +4,9 @@
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
-const FILES = ['art.js', 'mundo.js', 'audio.js', 'levels.js', 'cine.js', 'titulo.js', 'mapa.js', 'hud.js', 'aprende.js', 'fx.js', 'victoria.js', 'garza.js', 'game.js'].filter(f => fs.existsSync(path.join(ROOT, f)));
+// The levels: every file in niveles/, in name order (each one places itself by its id).
+const NIVELES = fs.readdirSync(path.join(ROOT, 'niveles')).filter(f => f.endsWith('.js')).sort().map(f => 'niveles/' + f);
+const FILES = ['art.js', 'mundo.js', 'audio.js', 'levels.js', ...NIVELES, 'cine.js', 'titulo.js', 'mapa.js', 'hud.js', 'aprende.js', 'maestros.js', 'fx.js', 'victoria.js', 'garza.js', 'game.js'].filter(f => fs.existsSync(path.join(ROOT, f)));
 
 function stubContext() {
   const noop = () => { };
@@ -46,9 +48,9 @@ function load() {
 ;(function () {
   const S = { powers: [] };
   function start(level, powers) {
-    Save.data = { unlocked: 99, pearls: {}, totals: {}, best: {}, mute: true, finished: false, powers: {}, seen: {} };
+    Save.data = Save.fresh(); Save.data.mute = true; LEVELS.forEach(d => { Save.data.abiertos[d.id] = true; });
     for (const p of powers || []) Save.data.powers[p] = true;
-    Game.still = true; Game.capture = null; Game.frozen = false; Game.learning = null; Game.fadeTo = null; Game.fade = 0; Game.story = null;
+    Maestros.reset(); Game.still = true; Game.capture = null; Game.frozen = false; Game.learning = null; Game.fadeTo = null; Game.fade = 0; Game.story = null;
     Game.startLevel(level); Game.banner = 0; Game.intro = null;
   }
   function frame(inp) {
@@ -93,11 +95,11 @@ function load() {
     Object.assign(Cam, copy.Cam); Object.assign(Game, copy.Game); Save.data = copy.save;
     if (copy.fx && typeof FX !== 'undefined') FX.state = copy.fx;
   }
-  window.__glup = { start, frame, ev: src => eval(src), setPrev(p) { S.prev = p || {}; }, snapshot, restore, get L() { return L; }, get P() { return Player; }, get Game() { return Game; }, get LEVELS() { return LEVELS; }, tileAt, get Save() { return Save; }, get Input() { return Input; } };
+  window.__glup = { start, frame, ev: src => eval(src), setPrev(p) { S.prev = p || {}; }, snapshot, restore, get L() { return L; }, get P() { return Player; }, get Game() { return Game; }, get LEVELS() { return LEVELS; }, tileAt, get Save() { return Save; }, get Input() { return Input; }, get NIVEL() { return NIVEL; }, get Maestros() { return Maestros; }, get Charla() { return Charla; } };
 })();`;
   vm.runInContext(src + api, ctx, { filename: 'glup.js' });
   const g = win.__glup;
   g.run = (inp, n) => { for (let i = 0; i < n; i++) g.frame(inp); };
   return g;
 }
-module.exports = { load };
+module.exports = { load, FILES, ROOT };
