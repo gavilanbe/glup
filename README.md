@@ -53,7 +53,7 @@ Nila, por su parte, tiene un repertorio de plataformas completo:
 - **Trepar salientes**: si llega al borde con las manos, se encarama sola.
 - Derrapa al cambiar de sentido, se apoya al sorber y cargar, deja las piernas colgando al flotar o izarse y retrocede al escupir. Carrera de seis fotogramas con bamboleo de capucha y vaivén del chubasquero, respiración en reposo, parpadeo, subida, ápice y caída distintos.
 
-Bigotes nunca está quieto: su cola tiene inercia (un muelle que reacciona a frenazos, saltos y aterrizajes), respira, parpadea y aletea en el salto doble.
+Bigotes está vivo: sus ojos miran lo que importa (el bicho más cercano, arriba al apuntar, abajo al caer, a Nila cuando se aburre), frunce las cejas al sorber y cargar y las arruga cuando le duele, cierra los ojos feliz con corazoncitos por cada cría, ve estrellas tras un golpe, respira por las agallas, rema con la aleta pectoral, brilla y gotea cuando está mojado, se sonroja al cargar, hace pompas si Nila se queda quieta y acaba durmiéndose. Además, nunca está quieto: su cola tiene inercia (un muelle que reacciona a frenazos, saltos y aterrizajes), respira, parpadea y aletea en el salto doble.
 
 Además: las **dianas** abren su compuerta para siempre, las **setas** rojas te lanzan muy alto, los **faroles** son puntos de control, las **crías** rescatadas cuentan por nivel y los **corazones** curan. Los **cangrejos** no se dejan sorber hasta que los volteas con una pedrada. El agua del pantano te traga; las espinas y las hogueras hieren.
 
@@ -91,6 +91,6 @@ Progreso y sonido se guardan en el navegador. El selector de niveles muestra las
 - `titulo.js` — la pantalla de título: el logotipo a trazos gordos con la piel de Bigotes (la G es su cabeza, con ojo y bigotes) y la entrada en la que Bigotes salta del agua, escupe las letras una a una y vuelve a los brazos de Nila.
 - `index.html`, `style.css` — envoltorio y mandos táctiles. `manifest.webmanifest`, `sw.js`, `icons/` — instalación como app.
 - `tools/sim.js` carga el juego en Node sin pantalla (fotograma a fotograma, con instantáneas); `tools/bot.js` recorre cada nivel siguiendo `tools/rutas.js` con una búsqueda best-first y comprueba que se puede terminar con los trucos que da; `tools/check-levels.js` revisa la forma de los niveles.
-- `tools/captura.sh` captura una escena con Chrome headless (`sprites`, `titulo`, `nivel` con `n`, `x` y un guion de entradas `GUION='fish@1-60;right@70-120'`); `tools/iconos.sh` regenera los iconos desde la escena `icono`.
+- `tools/captura.sh` captura una escena (con `ZOOM=5` se acerca a Nila) con Chrome headless (`sprites`, `titulo`, `nivel` con `n`, `x` y un guion de entradas `GUION='fish@1-60;right@70-120'`); `tools/iconos.sh` regenera los iconos desde la escena `icono`.
 
 Construido con Claude Fable 5.1. Licencia MIT.

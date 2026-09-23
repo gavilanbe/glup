@@ -153,7 +153,7 @@ const ART = (() => {
   // pequeños y separados en lo alto, aleta dorsal corta y cola redonda. Mira a la derecha: la
   // columna 0 es la punta de la cola y la última, la boca. La fila 6 es la espina (drawFish).
   // Los bigotes largos no están aquí: se dibujan aparte para que ondeen con inercia.
-  const FISH = { o: '#2b2233', D: '#4b4236', B: '#7c7040', L: '#a79a55', T: '#cdbd6a', S: '#554a36', C: '#f4e1a4', c: '#d6ab6c', F: '#665a36', f: '#a8975a',
+  const FISH = { o: '#2b2233', D: '#4a4a2c', B: '#88863a', L: '#b6b04e', T: '#e4d86c', S: '#565430', C: '#fff0b4', c: '#eab66a', F: '#7a5630', f: '#c8944a',
     E: '#1d1826', H: '#ffffff', w: '#e9e2c0', l: '#e4b98a', m: '#5a1f35', t: '#e0707f', k: '#8a3a44' };
   const fishClosed = [
     '......................',

@@ -375,6 +375,12 @@ const Player = {
     p.animT++;
     if (p.onGround && Math.abs(p.vx) > .5 && !p.carrier) { p.stepT++; if (p.stepT % 12 === 6) { Sound.play('step'); spawnParts(1, p.x + 5 - p.dir * 3, p.y + p.h, { color: '#c9b08a', angle: -Math.PI / 2 - p.dir * .6, spread: .4, speed: [.3, .8], life: [8, 14], g: .03 }); } } else p.stepT = 0;
     if (p.blink > 0) p.blink--; else if (Math.random() < .006) p.blink = 6;
+    // Bigotes' moods: bored when nothing happens, wet after water, happy for each cría, dizzy after a hit.
+    const busyIn = Input.held.left || Input.held.right || Input.held.jump || Input.held.fish || Input.held.up || Input.held.down;
+    p.idleT = p.onGround && Math.abs(p.vx) < .1 && !p.sucking && !p.held && !busyIn && !p.dead ? (p.idleT || 0) + 1 : 0;
+    if (p.hover || p.sucking && p.waterSrc) p.wetT = 200; else if (p.wetT > 0) p.wetT--;
+    if (L.pearls > (p.seenPearls || 0)) p.happyT = 70; p.seenPearls = L.pearls; if (p.happyT > 0) p.happyT--;
+    if (p.dizzyT > 0) p.dizzyT--;
     p.nearSign = null; for (const e of L.ents) if ((e.kind === 'sign' || e.kind === 'ruca') && Math.abs(e.x + 7 - (p.x + 5)) < (e.kind === 'ruca' ? 30 : 22) && Math.abs(e.y - p.y) < 30) p.nearSign = e;
   },
   wallAt(d) { const p = Player; const x = d > 0 ? p.x + p.w + 1 : p.x - 2; return tileAt(x >> 4, (p.y + 3) >> 4) === 'M' || tileAt(x >> 4, (p.y + p.h - 3) >> 4) === 'M'; },
@@ -603,7 +609,7 @@ const Player = {
   },
   hurt(fromDir) {
     const p = Player; if (p.inv > 0 || p.dead || p.win) return;
-    p.hp--; p.inv = 90; p.hurtT = 20; p.vx = -fromDir * 2.4; p.vy = -3.2; p.onGround = false; p.charge = 0; p.hover = false; Player.letGo(); Sound.jet(false); Sound.play('hurt'); Cam.shake(3, 10); Game.stop(5); Game.hurtFlash = 14; Input.rumble(200, 1, .6);
+    p.hp--; p.inv = 90; p.hurtT = 20; p.dizzyT = 80; p.vx = -fromDir * 2.4; p.vy = -3.2; p.onGround = false; p.charge = 0; p.hover = false; Player.letGo(); Sound.jet(false); Sound.play('hurt'); Cam.shake(3, 10); Game.stop(5); Game.hurtFlash = 14; Input.rumble(200, 1, .6);
     if (p.held) { const h = p.held; p.held = null; if (h.kind !== 'agua') { const e = Item.fromHeld(h, p.x + 5 - h.w / 2, p.y - h.h - 2); if (e) { e.vy = -2; e.vx = -fromDir * 1.5; L.ents.push(e); } } else spawnParts(8, p.x + 5, p.y + 8, { color: ['#8fd9d0', '#c8f2ea'], speed: [1, 2.5], life: [10, 18], g: .08 }); }
     if (p.hp <= 0) { p.dead = true; p.deadT = 0; p.vy = -4.5; p.vx = -fromDir * 1; }
   },
@@ -707,10 +713,73 @@ const Player = {
       front() {
         slices(tuck ? PIV : 0, n);
         Player.drawBarbels(g, at, 'near');
+        Player.drawFishLife(g, at, fs, t);
         // Nila's hand comes down over his flank, just under her chin.
         const hs = p.dir > 0 ? ART.hand : ART.flip(ART.hand);
         g.drawImage(hs, HX - (p.dir > 0 ? 3 : hs.width - 4), HY - 3);
       } };
+  },
+  // Where the eye is in each fish sprite, found once by its colours (white, shine and pupil).
+  eyeOf(spr) {
+    const E = Player._eyes || (Player._eyes = new Map()); if (E.has(spr)) return E.get(spr);
+    let box = null; try {
+      const d = spr.getContext('2d').getImageData(0, 0, spr.width, spr.height).data;
+      for (let y = 2; y < 9; y++) for (let x = 12; x < spr.width; x++) { const i = (y * spr.width + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2], al = d[i + 3]; if (!al) continue; const white = r > 225 && g > 215 && b > 180, pupil = r < 40 && g < 35 && b < 45;
+        if (white || pupil) box = box ? { x0: Math.min(box.x0, x), y0: Math.min(box.y0, y), x1: Math.max(box.x1, x), y1: Math.max(box.y1, y) } : { x0: x, y0: y, x1: x, y1: y }; }
+    } catch (e) { box = null; }
+    const eye = box ? { c: (box.x0 + box.x1) / 2, r: (box.y0 + box.y1) / 2 } : null; E.set(spr, eye); return eye;
+  },
+  // Life on top of the sprite: an eye that looks at things, brows for his mood, gills that breathe,
+  // a paddling fin, a wet shine, drips, bubbles when bored, sleep, hearts and dizzy stars.
+  drawFishLife(g, at0, fs, t) {
+    const at = (c, r) => at0(Math.max(0, Math.min(fs.width - 1, Math.round(c))), r);
+    const p = Player, F = ART.fish, px = (x, y, c, w = 1, h = 1) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
+    // Gills: a dark slit that opens with each breath and flashes red.
+    const br = Math.sin(t / 22), g1 = at(12, 5.5), g2 = at(12, 7.5), g3 = at(11.5, 8.5);
+    px(g1.x, g1.y, '#3e3a24'); px(g2.x, g2.y, '#3e3a24'); px(g3.x, g3.y, '#3e3a24'); if (br > .3 || p.charge > 8) { const gr = at(13, 7); px(gr.x, gr.y, '#d0604e'); }
+    // Pectoral fin paddling under the belly.
+    const act = p.hover ? 1 : p.onGround && Math.abs(p.vx) > .5 ? .8 : p.sucking ? .6 : .25, fa = Math.sin(t * (.15 + act * .35)) * (.5 + act * .6), fb = at(13, 9.5);
+    for (let i = 0; i < 4; i++) { const ang = Math.PI / 2 + fa - p.dir * .6, fxp = fb.x + Math.cos(ang) * i * -p.dir * .8 - p.dir * i * .7, fyp = fb.y + Math.sin(ang) * i * .8; px(fxp, fyp, i < 2 ? '#c8944a' : '#7a5630'); }
+    // Wet shine sliding along his back; more of it (and drips) after water.
+    const wet = p.wetT > 0, per = wet ? 60 : 170, sk = (t % per) / 22; if (sk < 1) { const sh = at(6 + sk * 13, 4.2); px(sh.x, sh.y, '#fffbe0', 2, 1); }
+    if (wet && t % 7 === 0) { const d = at(8 + Math.random() * 10, 10.5); L.parts.push({ x: d.x + Cam.x, y: d.y + Cam.y, vx: 0, vy: .3, life: 24, color: '#8fd9d0', size: 1, g: .15, kind: 'drip' }); }
+    // Charging: cheeks flush and pulse.
+    if (p.charge > 8) { const k = Math.min(1, p.charge / CHARGE_FULL); g.globalAlpha = .35 + k * .45 * (.6 + .4 * Math.sin(t * .8)); const ck = at(16, 8.2); px(ck.x - 1, ck.y, '#f05060', 3, 1); g.globalAlpha = 1; }
+    // The eye: bigger than the sprite's, looking at whatever matters right now.
+    const baked = fs === F.blink || fs === F.squint || fs === F.spit || fs === F.swallow, eye = Player.eyeOf(fs);
+    if (eye && !baked) {
+      const e = at(eye.c, eye.r), ex = Math.round(e.x), ey = Math.round(e.y);
+      let lx = p.dir, ly = 0;
+      if (p.aimUp || p.grapple) { lx = p.dir * .3; ly = -1; } else if (!p.onGround && p.vy > 4) { lx = 0; ly = 1; } else if (!p.sucking) {
+        let best = null, bd = 110; for (const o of L.ents) if (!o.dead && (o.enemy || o.kind === 'pearl' || o.kind === 'morsel')) { const d = Math.hypot(o.x + o.w / 2 - (e.x + Cam.x), o.y + o.h / 2 - (e.y + Cam.y)); if (d < bd) { bd = d; best = o; } }
+        if (best) { const dx = best.x + best.w / 2 - (e.x + Cam.x), dy = best.y + best.h / 2 - (e.y + Cam.y), dd = Math.hypot(dx, dy) || 1; lx = dx / dd; ly = dy / dd; }
+        else if (p.idleT > 60) { const ph = Math.floor(t / 90) % 4; lx = [p.dir, -p.dir, 0, p.dir][ph]; ly = [0, -1, -1, 0][ph]; }
+      }
+      const happy = p.happyT > 0, sleep = p.idleT > 900, shock = !p.onGround && p.vy > 4.5 || p.hurtT > 10, blinkNow = (t % 230) < 5;
+      if (happy || sleep || blinkNow) {
+        // Closed: a happy arc, or a sleepy line.
+        g.fillStyle = '#1d1826'; if (happy) { g.fillRect(ex - 2, ey, 1, 1); g.fillRect(ex - 1, ey - 1, 3, 1); g.fillRect(ex + 2, ey, 1, 1); px(ex - 2, ey + 2, '#f07080', 2, 1); px(ex + 2, ey + 2, '#f07080', 1, 1); }
+        else g.fillRect(ex - 2, ey, 5, 1);
+      } else {
+        // A 4×3 white with a 2×2 pupil that shifts toward what he looks at (a wider eye when startled).
+        const ew = shock ? 5 : 4, eh = shock ? 4 : 3, x0 = ex - (ew >> 1), y0 = ey - (eh >> 1);
+        g.fillStyle = '#1d1826'; g.fillRect(x0 - 1, y0 - 1, ew + 2, 1); g.fillRect(x0 - 1, y0, 1, eh); g.fillRect(x0 + ew, y0, 1, eh);
+        g.fillStyle = '#fbf6e0'; g.fillRect(x0, y0, ew, eh);
+        const pxo = lx > .35 ? ew - 2 : lx < -.35 ? 0 : (ew - 2) >> 1, pyo = ly > .35 ? eh - 2 : ly < -.35 ? 0 : (eh - 2) >> 1;
+        g.fillStyle = '#1d1826'; g.fillRect(x0 + pxo, y0 + pyo, shock ? 1 : 2, shock ? 1 : 2);
+        g.fillStyle = '#ffffff'; if (!shock) g.fillRect(x0 + pxo, y0 + pyo, 1, 1);
+      }
+      // Brows: determined when sucking or charging, worried when hurt or dizzy.
+      const mad = p.sucking || p.charge > 8, sad = p.hurtT > 0 || p.dizzyT > 40 || p.dead; if (mad || sad) { g.fillStyle = '#1d1826'; const d = p.dir, top = ey - (shock ? 4 : 3); for (let i = -2; i <= 2; i++) g.fillRect(ex + i, top + Math.round((mad ? i * d : -i * d) * .4), 1, 1); }
+      // Sleep: little z's drifting up.
+      if (sleep) for (let i = 0; i < 3; i++) { const k = ((t + i * 40) % 120) / 120, zx = ex + 4 + k * 8 + i * 2, zy = ey - 6 - k * 16; g.globalAlpha = 1 - k; ART.text(g, 'z', Math.round(zx), Math.round(zy), '#dfe8ff', 'left'); g.globalAlpha = 1; }
+      // Hearts for a rescued cría.
+      if (happy) for (let i = 0; i < 2; i++) { const k = ((70 - p.happyT) + i * 18) / 50; if (k > 1) continue; const hx = ex + (i ? 6 : -2) + Math.sin(k * 8 + i) * 2, hy = ey - 6 - k * 14; g.globalAlpha = 1 - k; g.fillStyle = '#f05070'; g.fillRect(Math.round(hx), Math.round(hy), 1, 1); g.fillRect(Math.round(hx) + 2, Math.round(hy), 1, 1); g.fillRect(Math.round(hx), Math.round(hy) + 1, 3, 1); g.fillRect(Math.round(hx) + 1, Math.round(hy) + 2, 1, 1); g.globalAlpha = 1; }
+      // Dizzy: stars circling his head.
+      if (p.dizzyT > 0) for (let i = 0; i < 3; i++) { const a = t * .18 + i * 2.1, sx = ex + Math.cos(a) * 7, sy = ey - 7 + Math.sin(a) * 2.5; g.fillStyle = Math.sin(a) > 0 ? '#fff3b8' : '#c8a850'; g.fillRect(Math.round(sx), Math.round(sy) - 1, 1, 3); g.fillRect(Math.round(sx) - 1, Math.round(sy), 3, 1); }
+    }
+    // Bored: he blows a bubble that grows at his lips and pops.
+    if (p.idleT > 150 && p.idleT < 900) { const k = (p.idleT - 150) % 160; if (k < 60) { const m = at(21.5, 7), r = k / 60 * 3.5; g.globalAlpha = .85; g.strokeStyle = '#cfeef8'; g.beginPath(); g.arc(m.x + p.dir * (r + 1), m.y - r * .3, Math.max(.8, r), 0, 7); g.stroke(); g.fillStyle = '#ffffff'; g.fillRect(Math.round(m.x + p.dir * (r + 1) - r * .4), Math.round(m.y - r * .3 - r * .5), 1, 1); g.globalAlpha = 1; } if (k === 60) { const m = at(21.5, 7); Sound.play('pop'); for (let i = 0; i < 6; i++) L.parts.push({ x: m.x + Cam.x + p.dir * 4, y: m.y + Cam.y - 1, vx: Math.cos(i) * .8, vy: Math.sin(i) * .8, life: 10, color: '#cfeef8', size: 1, g: 0 }); } }
   },
   // Bigotes' whiskers: two long ones from the corners of the upper jaw that droop, trail behind with
   // inertia (a little verlet chain in world space) and get dragged forward by his own suction; and two
@@ -1237,6 +1306,7 @@ const Game = {
     document.addEventListener('visibilitychange', () => { if (document.hidden && Game.state === 'play') Game.pause(); });
     Game.updateSoundButton();
     if (params.has('escena')) Game.capture = { scene: params.get('escena'), t: parseInt(params.get('t') || '0'), n: parseInt(params.get('n') || '0'), x: parseInt(params.get('x') || '-1'), guion: (params.get('guion') || '').split(';').filter(Boolean).map(s => { const [a, r] = s.split('@'); const [f0, f1] = (r || '0').split('-').map(Number); return { a, f0, f1: f1 === undefined ? f0 : f1 }; }) };
+    if (params.has('z')) Game.capZoom = +params.get('z');
     if (params.has('trucos')) for (const k of params.get('trucos').split(',')) if (k === 'todos') POWER_ORDER.forEach(q => Save.data.powers[q] = true); else Save.data.powers[k] = true;
     if (Game.capture) Game.runCapture(); else Game.state = 'gate';
     Game.last = performance.now(); Game.acc = 0; requestAnimationFrame(Game.frame);
@@ -1488,7 +1558,8 @@ const Game = {
   drawPlay(g) {
     const camX = Math.round(Cam.x) + Cam.ox, camY = Math.round(Cam.y) + Cam.oy;
     const zoom = Cam.zoom > 1 ? Cam.zoom : 1;
-    if (zoom > 1) { g.save(); g.translate(W / 2, H / 2); g.scale(zoom, zoom); g.translate(-W / 2, -H / 2); }
+    if (Game.capZoom) { g.save(); g.translate(W / 2, H / 2); g.scale(Game.capZoom, Game.capZoom); g.translate(-(Player.x - Cam.x + 12), -(Player.y - Cam.y + 10)); }
+    else if (zoom > 1) { g.save(); g.translate(W / 2, H / 2); g.scale(zoom, zoom); g.translate(-W / 2, -H / 2); }
     Game.drawBackground(g, camX, camY, L.bg);
     Game.drawTiles(g, camX, camY, 'back');
     // Depth: signs and lanterns behind, then items, enemies, player, projectiles.
@@ -1506,7 +1577,7 @@ const Game = {
     if (Game.weather && Game.weather.bolt > 8 && L.def.theme === 'storm' && !Game.still) { g.globalAlpha = (Game.weather.bolt - 8) / 4 * .35; g.fillStyle = '#e8f0ff'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
     Game.drawLight(g, camX, camY);
     Game.drawWords(g);
-    if (zoom > 1) g.restore();
+    if (zoom > 1 || Game.capZoom) g.restore();
     Game.drawHud(g);
   },
   // Darkness with pools of light: the cave is lit by Nila, lanterns, fire, pearls and glowing mushrooms.
