@@ -425,7 +425,7 @@ const Victoria = (() => {
     }
     if (d >= 0) {
       const lab = M.name, col = M.rainbow ? ['#f07080', '#ffe36a', '#8fd9d0', '#fff6d6'][(t >> 3) % 4] : '#fff6d6';
-      stampText(g, lab, x, y + 34, d, col, 0, 'center');
+      stampText(g, lab, Math.min(x, W - ART.textWidth(lab) / 2 - 5), y + 34, d, col, 0, 'center');
     }
   }
   function drawDancer(g, c, t) {
