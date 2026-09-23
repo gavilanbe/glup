@@ -107,9 +107,12 @@ function talk(o, v) {
   if (o.learns && !g.Save.has(pw)) throw new Error(e.who.name + ' no le ha dado el ' + pw + ' (¿encargo sin cumplir?)');
 }
 
+// --repaso: the level's `repaso` route, with every trick, must rescue every cría (secrets included).
+const REPASO = process.argv.includes('--repaso');
+const ALL_POWERS = ['soplido', 'aleteo', 'ventosa', 'chorro', 'mordisco', 'panzazo', 'guindilla', 'resbalon'];
 function runLevel(i, route, v) {
   const t0 = Date.now();
-  const powers = route.powers || g.NIVEL.poderesAntes(i);
+  const powers = route.powers === 'todos' ? ALL_POWERS : route.powers || g.NIVEL.poderesAntes(i);
   g.start(i, powers);
   for (const s of route.steps) runStep(s, v);
   const won = g.P.win || g.Game.state === 'clear';
@@ -142,7 +145,7 @@ if (require.main === module) {
     const launch = () => {
       while (running < max && next < g.LEVELS.length) {
         const i = next++; running++; let buf = '';
-        const ch = spawn(process.execPath, [__filename, String(i + 1)], { stdio: ['ignore', 'pipe', 'pipe'] });
+        const ch = spawn(process.execPath, [__filename, String(i + 1)].concat(REPASO ? ['--repaso'] : []), { stdio: ['ignore', 'pipe', 'pipe'] });
         ch.stdout.on('data', d => { buf += d; }); ch.stderr.on('data', d => { buf += d; });
         ch.on('close', code => { out[i] = buf.trim(); if (code) fails++; running--; if (next < g.LEVELS.length) launch(); else if (!running) done(); });
       }
@@ -153,8 +156,9 @@ if (require.main === module) {
     let fails = 0;
     g.LEVELS.forEach((lv, i) => {
       if (only !== null && only !== i) return;
-      const r = ROUTES[lv.id]; if (!r) { fails++; console.log('FAIL nivel ' + (i + 1) + ' ' + lv.name + ': no hay ruta (tools/rutas/)'); return; }
-      try { const res = runLevel(i, r, v); console.log((res.won ? 'OK  ' : 'FAIL') + ' nivel ' + (i + 1) + ' ' + lv.name + ' · crías ' + res.pearls + '/' + res.total + ' · al llegar: ' + (res.start.join(',') || '-') + (res.taught ? ' · aprende ' + res.taught + (res.learned ? '' : ' (¡NO!)') : '') + ' · ' + res.secs + 's'); if (!res.won) fails++; }
+      const r0 = ROUTES[lv.id], r = r0 && (REPASO ? r0.repaso : r0);
+      if (!r) { if (REPASO && r0 && lv.boss) return; fails++; console.log('FAIL nivel ' + (i + 1) + ' ' + lv.name + ': no hay ruta' + (REPASO ? ' de repaso (export repaso: { powers: \'todos\', steps })' : ' (tools/rutas/)')); return; }
+      try { const res = runLevel(i, REPASO ? Object.assign({ powers: 'todos' }, r) : r, v); if (REPASO) { const ok = res.pearls === res.total; console.log((ok ? 'OK  ' : 'FAIL') + ' repaso ' + (i + 1) + ' ' + lv.name + ' · crías ' + res.pearls + '/' + res.total + ' · ' + res.secs + 's'); if (!ok) fails++; return; } console.log((res.won ? 'OK  ' : 'FAIL') + ' nivel ' + (i + 1) + ' ' + lv.name + ' · crías ' + res.pearls + '/' + res.total + ' · al llegar: ' + (res.start.join(',') || '-') + (res.taught ? ' · aprende ' + res.taught + (res.learned ? '' : ' (¡NO!)') : '') + ' · ' + res.secs + 's'); if (!res.won) fails++; }
       catch (e) { fails++; console.log('FAIL nivel ' + (i + 1) + ' ' + lv.name + ': ' + e.message + ' · x=' + Math.round(g.P.x) + ' y=' + Math.round(g.P.y) + ' tile ' + Math.floor(g.P.x / 16) + ',' + Math.floor(g.P.y / 16)); }
     });
     process.exit(fails ? 1 : 0);
