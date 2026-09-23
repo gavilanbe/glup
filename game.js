@@ -239,6 +239,7 @@ function updateParts() {
     p.vy += p.g; p.x += p.vx; p.y += p.vy;
     if (p.bounce && p.vy > 0 && rectSolid(p.x, p.y, 1, 1)) { p.y -= p.vy; p.vy *= -p.bounce; p.vx *= .7; }
     if (p.kind === 'amb') { p.x += Math.sin(p.life / 17 + p.ph) * .15; }
+    if (p.kind === 'wetrun') { p.y0 = p.y0 || p.y; if (!rectSolid(p.x + (Math.random() < .5 ? 1 : -1), p.y + 2, 1, 1) && !rectSolid(p.x - 1, p.y + 2, 3, 1)) p.vy = 0; }
     else if (p.kind === 'fly') { p.x += Math.sin(p.life / 23 + p.ph) * .25; p.y += Math.cos(p.life / 31 + p.ph) * .18; }
     else if (p.kind === 'leaf') p.y += Math.sin(p.life / 6 + p.ph) * .5;
     else if (p.kind === 'drip' && (rectSolid(p.x, p.y, 1, 1) || waterAt(p.x, p.y))) { p.life = 0; for (let k = 0; k < 2; k++) L.parts.push({ x: p.x, y: p.y - 1, vx: k ? .4 : -.4, vy: -.6, life: 6, color: '#9ac8e8', size: 1, g: .12 }); continue; }
@@ -546,14 +547,15 @@ const Player = {
   },
   spitWater(charged, up, down) {
     const p = Player, m = p.mouth(); const n = charged ? 9 : 4;
+    const volley = { projs: [], charged: !!charged, splashes: 0 };
     for (let i = 0; i < n; i++) {
       let vx = p.dir * (5.5 + i * .25 + (charged ? 1.5 : 0)), vy = -1.5 + i * .12; if (up) { vx = p.dir * .5; vy = -7 - i * .5; } else if (down) { vx = p.dir * .6; vy = 5.5; }
-      const proj = Proj.create({ kind: 'agua', w: 8, h: 8, sprite: ART.drop }, m.x - 4, m.y - 4, vx, vy, false); proj.delay = i * 2; L.projs.push(proj);
+      const proj = Proj.create({ kind: 'agua', w: 8, h: 8, sprite: ART.drop }, m.x - 4, m.y - 4, vx, vy, false); proj.delay = i * 2; proj.volley = volley; volley.projs.push(proj); L.projs.push(proj);
     }
+    Water.muzzle(m, p.dir, up, down, charged);
     if (down) { p.vy = -4.2; p.jumpCut = false; }
     for (let i = 0; i < 4; i++) L.parts.push({ x: m.x + rnd(-3, 3), y: m.y + 2, vx: rnd(-.3, .3), vy: rnd(0, .4), life: 22 + i * 6, color: ['#8fd9d0', '#e8fbff'][i & 1], size: 1, g: .1, kind: 'dot' });
     Sound.play('splash'); p.sx = 1.2; p.sy = .85; Cam.shake(charged ? 3 : 1, 6); Input.rumble(80, .3, .3);
-    spawnParts(charged ? 14 : 7, m.x, m.y, { color: ['#8fd9d0', '#c8f2ea', '#e8fbff'], angle: up ? -Math.PI / 2 : down ? Math.PI / 2 : (p.dir > 0 ? 0 : Math.PI), spread: .4, speed: [1.5, 4], life: [8, 18], g: .05 });
   },
   // Before the puff is learned, a tap with an empty mouth is only a bubble: Bigotes tried, nothing happens.
   burp() { const p = Player, m = p.mouth(); p.puffCd = 18; p.puffT = 4; Sound.play('blub'); spawnParts(2, m.x, m.y, { color: ['#cfe8f0', '#e8fbff'], angle: -Math.PI / 2, spread: .6, speed: [.2, .5], life: [16, 26], g: -.03 }); },
@@ -940,6 +942,81 @@ const Enemy = {
 };
 
 // ---------------------------------------------------------------- Proyectiles
+// ---------------------------------------------------------------- Agua
+// Water drawn as water: a thick column with a dark rim, a translucent body, a bright core and
+// highlights that run along it; a stretched head with froth; spray, mist and a crown on impact.
+const Water = {
+  C: { rim: '#123a44', body: '#2a8a90', inner: '#5cc4bc', light: '#bdf0e4', shine: '#f2fffb', foam: '#ffffff' },
+  disc(g, x, y, r, col) { g.fillStyle = col; if (r < .8) { g.fillRect(Math.round(x), Math.round(y), 1, 1); return; } const R = Math.round(r); for (let dy = -R; dy <= R; dy++) { const hw = Math.round(Math.sqrt(Math.max(0, r * r - dy * dy))); g.fillRect(Math.round(x) - hw, Math.round(y) + dy, hw * 2 + 1, 1); } },
+  // Samples a polyline (screen coords, head first) every pixel with the normal and the 0..1 position.
+  sample(pts) {
+    const S = []; let total = 0; for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    if (total < 1) return S; let acc = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i], len = Math.hypot(b.x - a.x, b.y - a.y); if (len < .01) continue;
+      const nx = -(b.y - a.y) / len, ny = (b.x - a.x) / len;
+      for (let d = 0; d < len; d += 1) S.push({ x: a.x + (b.x - a.x) * d / len, y: a.y + (b.y - a.y) * d / len, u: (acc + d) / total, nx: ny < 0 ? nx : -nx, ny: ny < 0 ? ny : -ny, s: acc + d });
+      acc += len;
+    }
+    return S;
+  },
+  // A tapered ribbon: w0 at the head, w1 at the tail. flow moves the highlights (positive: toward the head).
+  ribbon(g, pts, t, o = {}) {
+    const S = Water.sample(pts); if (!S.length) return; const C = Water.C, w0 = o.w0 || 6, w1 = o.w1 !== undefined ? o.w1 : 3, flow = o.flow !== undefined ? o.flow : 1;
+    const rad = q => Math.max(.6, (w0 + (w1 - w0) * q.u) / 2 + Math.sin(t * .5 + q.s * .4) * .45 * (o.wobble !== undefined ? o.wobble : 1));
+    const off = q => Math.sin(t * .35 + q.s * .23) * (.6 + q.u) * (o.wobble !== undefined ? o.wobble : 1);
+    if (o.alpha !== undefined) g.globalAlpha = o.alpha;
+    for (const q of S) Water.disc(g, q.x + q.nx * off(q), q.y + q.ny * off(q), rad(q) + 1, C.rim);
+    for (const q of S) Water.disc(g, q.x + q.nx * off(q), q.y + q.ny * off(q), rad(q), C.body);
+    for (const q of S) { const r = rad(q) - 1; if (r > .4) Water.disc(g, q.x + q.nx * (off(q) + .6), q.y + q.ny * (off(q) + .6), r, C.inner); }
+    // Running highlights on the lit side, and a foam core when charged.
+    for (const q of S) {
+      const r = rad(q), o2 = off(q), ph = ((q.s - t * 3 * flow) % 11 + 11) % 11;
+      if (ph < 5 && r > 1.4) { g.fillStyle = ph < 2 ? C.shine : C.light; g.fillRect(Math.round(q.x + q.nx * (o2 + r * .55)), Math.round(q.y + q.ny * (o2 + r * .55)), 1, 1); }
+      if (o.foam && r > 2.2 && ((q.s + t * 2) % 5) < 3) { g.fillStyle = C.foam; g.fillRect(Math.round(q.x + q.nx * o2), Math.round(q.y + q.ny * o2), 1, 1); }
+    }
+    g.globalAlpha = 1;
+  },
+  // The leading blob: stretched along its speed, with a highlight and a fringe of froth ahead.
+  head(g, x, y, vx, vy, r, t, foam) {
+    const C = Water.C, sp = Math.hypot(vx, vy) || 1, ax = vx / sp, ay = vy / sp, a = r * (1 + Math.min(.8, sp * .08)), b = r * (1 - Math.min(.25, sp * .03));
+    const blob = (grow, col, dx = 0, dy = 0) => { g.fillStyle = col; const A = a + grow, B = b + grow, R = Math.ceil(A) + 1; for (let py = -R; py <= R; py++) for (let px = -R; px <= R; px++) { const u = (px * ax + py * ay) / A, v = (-px * ay + py * ax) / B; if (u * u + v * v <= 1) g.fillRect(Math.round(x + px + dx), Math.round(y + py + dy), 1, 1); } };
+    blob(1, C.rim); blob(0, C.body); blob(-1, C.inner, -ax * .5, -.5); if (r > 2) blob(-r * .55, C.light, ax * .6 - .8, -1.2);
+    g.fillStyle = C.shine; g.fillRect(Math.round(x + ax * r * .3 - 1), Math.round(y - b * .5), 2, 1);
+    g.fillStyle = foam ? C.foam : C.light; for (let i = 0; i < (foam ? 6 : 3); i++) { const k = (t * 7 + i * 41) % 13, s = i % 2 ? 1 : -1; g.fillRect(Math.round(x + ax * (a + 1 + (k % 3)) - ay * s * (k % 4)), Math.round(y + ay * (a + 1 + (k % 3)) + ax * s * (k % 4)), 1, 1); }
+  },
+  // A volley: the drops of one spit, drawn as one column that is still tied to Bigotes' mouth while it pours.
+  drawVolley(g, v) {
+    const alive = v.projs.filter(q => !q.dead && q.delay <= 0), pouring = v.projs.some(q => !q.dead && q.delay > 0) || (alive.length && alive[alive.length - 1].t < 3);
+    if (!alive.length) return;
+    const pt = q => ({ x: q.x - Cam.x + 4, y: q.y - Cam.y + 4, q });
+    const chains = []; let cur = [pt(alive[0])];
+    for (let i = 1; i < alive.length; i++) { const a = cur[cur.length - 1], b = pt(alive[i]); if (Math.hypot(b.x - a.x, b.y - a.y) > 22) { chains.push(cur); cur = [b]; } else cur.push(b); }
+    chains.push(cur);
+    if (pouring && !Player.dead) { const m = Player.mouth(), last = chains[chains.length - 1], e = last[last.length - 1], mp = { x: m.x - Cam.x, y: m.y - Cam.y }; if (Math.hypot(mp.x - e.x, mp.y - e.y) < 40) last.push(mp); }
+    const big = v.charged ? 1.6 : 1, t = Game.t;
+    chains.forEach((c, ci) => {
+      const lead = c[0].q === v.projs.find(q => !q.dead && q.delay <= 0), tied = pouring && ci === chains.length - 1;
+      if (c.length > 1) Water.ribbon(g, c, t, { w0: (lead ? 7 : 4.5) * big, w1: tied ? 3.2 * big : 1.6, flow: 1, foam: v.charged });
+      const h = c[0]; if (lead || c.length === 1) Water.head(g, h.x, h.y, h.q.vx, h.q.vy, (lead ? 3.4 : 2.2) * big, t, v.charged);
+    });
+  },
+  muzzle(m, dir, up, down, charged) {
+    const ang = up ? -Math.PI / 2 : down ? Math.PI / 2 : dir > 0 ? 0 : Math.PI;
+    L.parts.push({ x: m.x, y: m.y, vx: 0, vy: 0, life: 10, max: 10, color: '#dffcf6', size: 1, g: 0, kind: 'wring', ang, big: charged ? 1.6 : 1 });
+    for (let i = 0; i < (charged ? 14 : 8); i++) { const a = ang + rnd(-.55, .55), v = rnd(1.5, charged ? 4.5 : 3.2); L.parts.push({ x: m.x, y: m.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - .4, life: rnd(8, 16) | 0, color: Math.random() < .4 ? '#f2fffb' : '#8fd9d0', size: 1, g: .14, kind: 'spray' }); }
+    for (let i = 0; i < (charged ? 8 : 5); i++) L.parts.push({ x: m.x + rnd(-3, 3), y: m.y + rnd(-3, 3), vx: Math.cos(ang) * rnd(.2, .9) + rnd(-.2, .2), vy: Math.sin(ang) * rnd(.2, .9) - rnd(0, .3), life: rnd(14, 26) | 0, max: 26, color: '#e8fbff', size: 1, g: -.005, kind: 'mist' });
+  },
+  // Impact: a crown thrown back along the surface normal, a ring, mist and, on walls, runs of water.
+  impact(x, y, nx, ny, strong, wallX) {
+    const base = Math.atan2(ny, nx), n = strong ? 16 : 7;
+    for (let i = 0; i < n; i++) { const a = base + rnd(-1.25, 1.25), v = rnd(1.2, strong ? 3.8 : 2.6); L.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - .5, life: rnd(12, 24) | 0, color: Math.random() < .35 ? '#f2fffb' : Math.random() < .5 ? '#8fd9d0' : '#5cc4bc', size: 1, g: .16, kind: 'spray', bounce: .25 }); }
+    L.parts.push({ x, y, vx: 0, vy: 0, life: 12, max: 12, color: '#dffcf6', size: 1, g: 0, kind: 'wring', ang: base + Math.PI / 2 * 0, big: strong ? 1.5 : 1, flat: true, nx, ny });
+    for (let i = 0; i < (strong ? 7 : 3); i++) L.parts.push({ x: x + rnd(-4, 4), y: y + rnd(-4, 2), vx: nx * rnd(.1, .6) + rnd(-.3, .3), vy: ny * rnd(.1, .6) - rnd(.1, .4), life: rnd(16, 30) | 0, max: 30, color: '#e8fbff', size: 1, g: -.004, kind: 'mist' });
+    if (wallX !== undefined) for (let i = 0; i < (strong ? 4 : 2); i++) L.parts.push({ x: wallX + (nx > 0 ? 0 : -1), y: y + rnd(-6, 6), y0: 0, vx: 0, vy: rnd(.12, .3), life: rnd(70, 120) | 0, max: 120, color: '#5cc4bc', size: 1, g: 0, kind: 'wetrun' });
+  }
+};
+
 const Proj = {
   create(h, x, y, vx, vy, charged) {
     const kind = h.kind; let g = kind === 'rock' ? .1 : kind === 'crate' ? .14 : kind === 'agua' ? .09 : .06;
@@ -950,7 +1027,8 @@ const Proj = {
     if (p.delay > 0) { p.delay--; return; }
     p.t++; p.vy = Math.min(p.vy + p.g, 7);
     if ((p.charged || p.kind === 'agua') && p.t % (p.kind === 'agua' ? 1 : 2) === 0) { p.trail.unshift({ x: p.x, y: p.y }); if (p.trail.length > (p.kind === 'agua' ? 6 : 5)) p.trail.pop(); }
-    if (p.kind === 'agua' && p.t % 3 === 0) spawnParts(1, p.x + 4, p.y + 6, { color: ['#8fd9d0', '#e8fbff'], speed: [.1, .5], life: [8, 16], g: .12 });
+    if (p.kind === 'agua' && p.t % 2 === 0 && Math.random() < .7) { const s = Math.random() < .5 ? 1 : -1, sp = Math.hypot(p.vx, p.vy) || 1; L.parts.push({ x: p.x + 4, y: p.y + 4, vx: p.vx * .25 - p.vy / sp * s * rnd(.3, .9), vy: p.vy * .25 + p.vx / sp * s * rnd(.3, .9) - .3, life: rnd(8, 16) | 0, color: Math.random() < .3 ? '#f2fffb' : '#8fd9d0', size: 1, g: .15, kind: 'spray' }); }
+    if (p.kind === 'agua' && p.volley && p.volley.projs[0] === p && p.t % 3 === 0) L.parts.push({ x: p.x + 4 + rnd(-2, 2), y: p.y + 4 + rnd(-2, 2), vx: rnd(-.2, .2), vy: rnd(-.3, 0), life: 16, max: 16, color: '#e8fbff', size: 1, g: 0, kind: 'mist' });
     const hx = moveX(p, p.vx), hy = moveY(p, p.vy);
     if (hx || hy) {
       // Movement stops up to a pixel short of the wall, so probe a whole pixel past the edge.
@@ -980,7 +1058,7 @@ const Proj = {
     if (waterAt(p.x + p.w / 2, p.y + p.h / 2)) { p.dead = true; if (p.kind !== 'agua') Game.word('SPLASH', p.x + p.w / 2, p.y - 6, '#8fd9d0', false); Sound.play('splash'); spawnParts(10, p.x + p.w / 2, p.y + p.h, { color: ['#8fd9d0', '#c8f2ea'], angle: -Math.PI / 2, spread: 1, speed: [1, 3], life: [14, 26] }); }
   },
   land(p, hx, hy) {
-    if (p.kind === 'agua') { p.dead = true; Proj.splashOut(p, hy && p.vy > 0); return; }
+    if (p.kind === 'agua') { p.dead = true; Proj.splashOut(p, hy && p.vy > 0, hx ? Math.sign(p.vx) : 0); return; }
     if (p.kind === 'crate' || p.kind === 'rock') {
       if (hy && p.vy > 0) { p.dead = true; Proj.dropAsItem(p); Sound.play('thud'); spawnParts(5, p.x + p.w / 2, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.4, speed: [.4, 1.2], life: [8, 14], g: .04 }); return; }
       if (hx) { Sound.play(p.kind === 'rock' ? 'hit' : 'thud'); Cam.shake(p.kind === 'rock' ? (p.charged ? 4 : 2) : 1, 4); if (p.kind === 'crate') { p.vx = 0; p.vy = Math.max(p.vy, 0); } else { p.vx = -p.vx * .25; p.vy = Math.min(p.vy, -1.5); } p.charged = false; spawnParts(6, p.vx < 0 ? p.x + p.w : p.x, p.y + p.h / 2, { color: p.kind === 'rock' ? ['#a6abb8', '#7d8290'] : ['#c78d4e', '#e0a862'], speed: [.5, 2], life: [10, 20] }); return; }
@@ -988,10 +1066,16 @@ const Proj = {
     }
     p.dead = true; Proj.splat(p);
   },
-  splashOut(p, ground) {
-    Sound.play('splash'); spawnParts(10, p.x + 4, p.y + 4, { color: ['#8fd9d0', '#c8f2ea', '#e8fbff'], angle: ground ? -Math.PI / 2 : undefined, spread: 1.3, speed: [.8, 3], life: [10, 22], g: .1, bounce: .3 });
-    L.parts.push({ x: p.x + 4, y: p.y + (ground ? 8 : 4), vx: 0, vy: 0, life: 16, color: '#c8f2ea', size: 1, g: 0, kind: 'ripple' });
-    if (ground) L.parts.push({ x: p.x + 4, y: p.y + 8, vx: 0, vy: 0, life: 90, color: '#2f7f88', size: 5 + Math.random() * 3, g: 0, kind: 'puddle' });
+  splashOut(p, ground, wall) {
+    // The first drop of a volley makes the big splash; the rest add to it without repeating the sound.
+    const v = p.volley, first = !v || v.splashes++ === 0, strong = first && (!v || v.charged || v.projs.length > 3);
+    const x = p.x + 4 + (wall > 0 ? 4 : wall < 0 ? -4 : 0), y = p.y + (ground ? 8 : 4);
+    const nx = wall ? -wall : ground ? 0 : -Math.sign(p.vx) * .6, ny = wall ? -.35 : ground ? -1 : -.8;
+    if (first || (v && v.splashes % 3 === 0)) Sound.play('splash');
+    if (first) { Cam.shake(v && v.charged ? 2 : 1, 4); if (strong) Game.word('¡CHOF!', x, y - 10, '#bdf0e4', false); }
+    Water.impact(x, y, nx, ny, strong, wall ? (wall > 0 ? p.x + p.w + 1 : p.x - 1) : undefined);
+    if (first || Math.random() < .5) L.parts.push({ x: p.x + 4, y: p.y + (ground ? 8 : 4), vx: 0, vy: 0, life: 16, color: '#c8f2ea', size: 1, g: 0, kind: 'ripple' });
+    if (ground) L.parts.push({ x: p.x + 4, y: p.y + 8, vx: 0, vy: 0, life: 90, color: '#2f7f88', size: 5 + Math.random() * 3 + (first ? 3 : 0), g: 0, kind: 'puddle' });
   },
   splat(p) { const fake = { kind: p.kind, x: p.x, y: p.y, w: p.w, h: p.h, dead: false }; Enemy.kill(fake, 'proj'); Sound.play('hit'); Cam.shake(2, 5); },
   dropAsItem(p, bounceBack) {
@@ -1006,11 +1090,9 @@ const Proj = {
     const x = Math.round(p.x - Cam.x + (p.w - s.width) / 2), y = Math.round(p.y - Cam.y + p.h - s.height);
     if (p.charged) { p.trail.forEach((t, i) => { g.globalAlpha = .35 - i * .06; g.drawImage(ART.tint(s, i % 2 ? '#e79b3f' : '#fff6d6'), Math.round(t.x - Cam.x + (p.w - s.width) / 2), Math.round(t.y - Cam.y + p.h - s.height)); }); g.globalAlpha = 1; }
     if (p.kind === 'agua') {
-      // A bead of water dragging a ribbon behind it.
-      const cx = Math.round(p.x - Cam.x) + 4, cy = Math.round(p.y - Cam.y) + 4;
-      if (p.trail.length > 1) { const tl = p.trail[p.trail.length - 1]; Game.drawStream(g, Math.round(tl.x - Cam.x) + 4, Math.round(tl.y - Cam.y) + 4, cx, cy, p.t * 2, .85, 2.6); }
-      g.fillStyle = '#2f7f88'; g.fillRect(cx - 2, cy - 2, 5, 4); g.fillRect(cx - 1, cy - 3, 3, 6);
-      g.fillStyle = '#8fd9d0'; g.fillRect(cx - 1, cy - 2, 3, 3); g.fillStyle = '#e8fbff'; g.fillRect(cx - 1, cy - 2, 2, 1);
+      // A volley is drawn once, by its first live drop, as a single column of water.
+      if (p.volley) { if (p.volley.projs.find(q => !q.dead && q.delay <= 0) === p) Water.drawVolley(g, p.volley); return; }
+      Water.head(g, Math.round(p.x - Cam.x) + 4, Math.round(p.y - Cam.y) + 4, p.vx, p.vy, 2.4, p.t, false);
       return;
     }
     if (p.kind !== 'crate' && p.kind !== 'rock') { const f = (p.t >> 2) % 2; g.save(); g.translate(x + s.width / 2, y + s.height / 2); g.scale(f ? -1 : 1, 1); g.rotate(Math.sin(p.t / 3) * .2); g.translate(-(x + s.width / 2), -(y + s.height / 2)); g.drawImage(s, x, y); g.restore(); }
@@ -1144,6 +1226,7 @@ const Game = {
   runCapture() {
     const c = Game.capture;
     if (c.scene === 'sprites' || c.scene === 'zoom') { Game.state = 'sprites'; return; }
+    if (c.scene === 'selector') { Save.data.unlocked = c.n; Save.data.pearls = { 0: 6, 1: 10 }; Save.data.totals = { 0: 11, 1: 10 }; Save.data.best = { 0: 245, 1: 312 }; Game.select(); Game.sel = Math.min(c.n, 1); Mapa.place(Game.sel); for (let i = 0; i < c.t; i++) Game.t++; return; }
     if (c.scene === 'cine') { Cine.start(() => { }); Cine.state.t = c.t; Game.frozen = true; return; }
     if (c.scene === 'titulo') { Game.title(); Game.titleT = c.t; for (let i = 0; i < c.t; i++) Game.updateTitle(); return; }
     if (c.scene === 'icono') { Game.state = 'icon'; return; }
@@ -1197,12 +1280,13 @@ const Game = {
       else { Sound.play('confirm'); Game.transition(() => Game.select()); }
     }
   },
-  select() { Game.state = 'select'; Game.sel = Math.min(Save.data.unlocked, LEVELS.length - 1); Sound.playMusic('dock'); },
+  select() { Game.state = 'select'; Game.sel = Math.min(Save.data.unlocked, LEVELS.length - 1); Mapa.place(Game.sel); Sound.playMusic('dock'); },
   updateSelect() {
-    const n = LEVELS.length;
-    if (Input.pressed.left) { Game.sel = (Game.sel + n - 1) % n; Sound.play('select'); }
-    if (Input.pressed.right) { Game.sel = (Game.sel + 1) % n; Sound.play('select'); }
-    if (Game.tapSel !== undefined) { const s = Game.tapSel; Game.tapSel = undefined; if (s === Game.sel) Game.tapped = true; else { Game.sel = s; Sound.play('select'); } }
+    const n = LEVELS.length, before = Game.sel; Mapa.update();
+    if (Input.pressed.left || Input.pressed.down) { Game.sel = Math.max(0, Game.sel - 1); }
+    if (Input.pressed.right || Input.pressed.up) { Game.sel = Math.min(n - 1, Game.sel + 1); }
+    if (Game.tapSel !== undefined) { const s = Game.tapSel; Game.tapSel = undefined; if (s === Game.sel) Game.tapped = true; else Game.sel = s; }
+    if (Game.sel !== before) { Mapa.select(Game.sel); Sound.play('select'); }
     if (Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Game.tapped) {
       Game.tapped = false;
       if (Game.sel <= Save.data.unlocked) { Sound.play('confirm'); const i = Game.sel; Game.transition(() => Game.startLevel(i)); } else Sound.play('hurt');
@@ -1363,7 +1447,7 @@ const Game = {
   },
   tap(pt) {
     if (Game.state === 'title') { Game.tapped = true; return; }
-    if (Game.state === 'select') { const cards = Game.selectCards(); for (let i = 0; i < cards.length; i++) { const c = cards[i]; if (pt.x >= c.x && pt.x < c.x + c.w && pt.y >= c.y && pt.y < c.y + c.h) { Game.tapSel = i; return; } } return; }
+    if (Game.state === 'select') { const h = Mapa.hit(pt); if (h === 'panel') Game.tapped = true; else if (h >= 0) Game.tapSel = h; return; }
     if (Game.state === 'play' && Game.learning) { Game.tapped = true; return; }
     if (Game.state === 'play' && Game.paused) { const rows = Game.pauseRows(); for (let i = 0; i < rows.length; i++) if (pt.y >= rows[i] - 6 && pt.y < rows[i] + 12) { Game.tapSel = i; return; } return; }
     if (Game.state === 'clear' || Game.state === 'ending') Game.tapped = true;
@@ -1453,16 +1537,10 @@ const Game = {
   },
   // A wavy ribbon of water between two points: dark edges, light core, bright beads sliding along.
   drawStream(g, x0, y0, x1, y1, t, alpha = 1, width = 3) {
-    const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy); if (len < 2) return;
-    const nx = -dy / len, ny = dx / len; g.globalAlpha = alpha;
-    for (let d = 0; d < len; d += 2) {
-      const u = d / len, wob = Math.sin(t * .45 + d * .35) * (1 + u) * .9;
-      const cx = x0 + dx * u + nx * wob, cy = y0 + dy * u + ny * wob;
-      const w = width * (1 - u * .35);
-      g.fillStyle = '#2f7f88'; g.fillRect(Math.round(cx - w / 2), Math.round(cy - w / 2), Math.ceil(w), Math.ceil(w));
-      g.fillStyle = ((d + t * 3) % 12) < 4 ? '#e8fbff' : '#8fd9d0'; g.fillRect(Math.round(cx - w / 2) + 1, Math.round(cy - w / 2) + 1, Math.max(1, Math.ceil(w) - 2), Math.max(1, Math.ceil(w) - 2));
-    }
-    g.globalAlpha = 1;
+    // The jet and the sip: a column from (x0,y0) to (x1,y1) that widens where it lands, highlights running along it.
+    const len = Math.hypot(x1 - x0, y1 - y0); if (len < 2) return;
+    const pts = []; for (let k = 0; k <= 4; k++) pts.push({ x: x1 + (x0 - x1) * k / 4, y: y1 + (y0 - y1) * k / 4 });
+    Water.ribbon(g, pts, Math.abs(t), { w0: width * 1.5, w1: width * 1.05, flow: t < 0 ? 1 : -1, alpha: alpha < 1 ? alpha : undefined, wobble: .8 });
   },
   drawWords(g) {
     for (const w of L.words) {
@@ -1495,6 +1573,10 @@ const Game = {
       if (p.kind === 'amb') { g.globalAlpha = .35 + Math.sin(p.life / 9 + p.ph) * .35; g.fillStyle = p.color; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; continue; }
       if (p.kind === 'fly') { const a = Math.max(0, Math.sin(p.life / 11 + p.ph)) * Math.min(1, p.life / 30); if (a > .05) { g.fillStyle = p.color; g.globalAlpha = a * .3; g.fillRect(x - 1, y - 1, 3, 3); g.globalAlpha = a * .5; g.fillRect(x - 2, y, 5, 1); g.fillRect(x, y - 2, 1, 5); g.globalAlpha = Math.min(1, a * 1.4); g.fillStyle = '#ffffe0'; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; } continue; }
       if (p.kind === 'drip') { g.fillStyle = p.color; g.fillRect(x, y, 1, 2); continue; }
+      if (p.kind === 'spray') { g.fillStyle = p.color; g.fillRect(x, y, 1, 1); const sp = Math.hypot(p.vx, p.vy); if (sp > 1.2) g.fillRect(Math.round(x - p.vx / sp * 1.5), Math.round(y - p.vy / sp * 1.5), 1, 1); continue; }
+      if (p.kind === 'mist') { const k = p.life / (p.max || 20), sz = k > .6 ? 1 : k > .3 ? 2 : 3; g.globalAlpha = k * .55; g.fillStyle = p.color; g.fillRect(x - (sz >> 1), y - (sz >> 1), sz, sz); g.globalAlpha = 1; continue; }
+      if (p.kind === 'wring') { const k = 1 - p.life / p.max, r = (2 + k * 9) * (p.big || 1); g.globalAlpha = (1 - k) * .9; g.fillStyle = p.color; const ca = Math.cos(p.flat ? Math.atan2(p.ny, p.nx) : p.ang), sa = Math.sin(p.flat ? Math.atan2(p.ny, p.nx) : p.ang); for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2, ex = Math.cos(a) * r * .35, ey = Math.sin(a) * r; g.fillRect(Math.round(x + ex * ca - ey * sa), Math.round(y + ex * sa + ey * ca), 1, 1); } g.globalAlpha = 1; continue; }
+      if (p.kind === 'wetrun') { const k = Math.min(1, p.life / 40), y0 = Math.round((p.y0 || p.y) - Cam.y); g.globalAlpha = k * .5; g.fillStyle = '#2a8a90'; g.fillRect(x, y0, 1, Math.max(1, y - y0)); g.globalAlpha = k; g.fillStyle = p.color; g.fillRect(x, y, 1, 2); g.fillStyle = '#dffcf6'; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; continue; }
       if (p.kind === 'leaf') { g.fillStyle = p.color; g.fillRect(x, y, 2, 1); if ((p.life >> 2) & 1) g.fillRect(x + 1, y - 1, 1, 1); continue; }
       g.fillStyle = p.color; g.fillRect(x, y, p.size, p.size);
     }
@@ -1547,31 +1629,7 @@ const Game = {
     MUNDO.drawScene(g, t, theme, W, H);
   },
   drawTitle(g) { Title.draw(g, Game.titleT); },
-  selectCards() { const n = LEVELS.length, cw = 64, gap = 8, x0 = (W - (n * cw + (n - 1) * gap)) / 2; return LEVELS.map((_, i) => ({ x: x0 + i * (cw + gap), y: 54, w: cw, h: 74 })); },
-  drawSelect(g) {
-    Game.drawScene(g, Game.t, 'night');
-    g.fillStyle = 'rgba(8,10,16,.55)'; g.fillRect(0, 0, W, H);
-    ART.text(g, 'El pantano', W / 2, 20, '#e79b3f', 'center', '#1b2430');
-    ART.text(g, 'Elige por dónde seguir', W / 2, 32, '#9fc0cc', 'center');
-    const cards = Game.selectCards(); const d = Save.data;
-    cards.forEach((c, i) => {
-      const lv = LEVELS[i], locked = i > d.unlocked, sel = i === Game.sel;
-      const y = c.y + (sel ? Math.round(Math.sin(Game.t / 12) * 2) - 3 : 0);
-      g.fillStyle = sel ? '#e79b3f' : '#1b2430'; g.fillRect(c.x - 1, y - 1, c.w + 2, c.h + 2);
-      g.fillStyle = locked ? '#1f2733' : '#26303f'; g.fillRect(c.x, y, c.w, c.h);
-      // Little themed vignette with the sky of that level.
-      const bg = ART.background(lv.theme); g.drawImage(bg.sky, 60, 20, 160, 60, c.x + 2, y + 2, c.w - 4, 26);
-      g.drawImage(bg.mid, 100, 60, 200, 90, c.x + 2, y + 6, c.w - 4, 22);
-      if (locked) { g.fillStyle = 'rgba(8,10,16,.6)'; g.fillRect(c.x + 2, y + 2, c.w - 4, 26); }
-      ART.text(g, String(i + 1), c.x + c.w / 2, y + 32, locked ? '#5f7899' : '#fff6d6', 'center');
-      const lines = ART.wrap(lv.name, c.w - 6); lines.forEach((l, k) => ART.text(g, l, c.x + c.w / 2, y + 42 + k * 9, locked ? '#5f7899' : '#e8fbff', 'center'));
-      if (!locked) { const got = d.pearls[i] || 0, tot = d.totals[i]; g.drawImage(ART.pearl[0], c.x + 8, y + 62); ART.text(g, tot !== undefined ? got + '/' + tot : '' + got, c.x + 18, y + 62, '#9ecbd8'); if (d.best[i]) ART.text(g, Game.fmtTime(d.best[i]), c.x + c.w - 4, y + 62, '#5f7899', 'right'); }
-      else ART.text(g, lv.boss ? 'jefa' : 'cerrado', c.x + c.w / 2, y + 62, '#5f7899', 'center');
-    });
-    ART.text(g, Touch.enabled ? 'Toca un nivel para jugar' : '← → elegir · Z jugar · Esc volver', W / 2, 150, '#9fc0cc', 'center');
-    const known = POWER_ORDER.filter(Game.has).length; ART.text(g, 'Bigotes sabe ' + known + '/' + POWER_ORDER.length + ' trucos', W / 2, 40, '#e8fbff', 'center');
-    if (d.finished) ART.text(g, '★ Pantano completado ★', W / 2, 162, '#f2c46a', 'center');
-  },
+  drawSelect(g) { Mapa.draw(g, Game.t, Game.sel); },
   fmtTime(s) { return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); },
   drawClear(g) {
     const s = Game.clearStats; Game.drawScene(g, Game.t, L.def.theme);
