@@ -337,10 +337,32 @@ const ART = (() => {
     '.osssssssso.',
     '..oossssoo..',
     '....oooo....'], { o: '#2e2f3a', S: '#7d8290', s: '#565a68', L: '#a6abb8' }, 'rock');
-  const PEARL = { o: '#4a6a7a', W: '#ffffff', L: '#cfe8f0', l: '#9ecbd8' };
-  const pearl = [sprite(['..ooo..', '.oWWLo.', 'oWWWLLo', 'oWWLLLo', 'oLLLllo', '.oLllo.', '..ooo..'], PEARL, 'pearl'),
-    sprite(['..ooo..', '.oLLLo.', 'oLWWLlo', 'oLWLLlo', 'oLLlllo', '.olllo.', '..ooo..'], PEARL, 'pearl2'),
-    sprite(['..ooo..', '.oLLLo.', 'oLLLLlo', 'oLLLWlo', 'oLllWlo', '.olllo.', '..ooo..'], PEARL, 'pearl3')];
+  // Las crías de pez gato que la Garza escupió por el pantano, cada una en su burbuja.
+  const CRIA = { c: '#9ecbd8', W: '#ffffff', B: '#5f7899', b: '#43597a', w: '#d3dbe2', E: '#161a24', F: '#e79b3f' };
+  const criaRows = [
+    ['..ccccc..', '.cW....c.', 'cW......c', 'c.b.BBB.c', 'c.bBBBEFc', 'c.b.wwF.c', 'c.......c', '.c.....c.', '..ccccc..'],
+    ['..ccccc..', '.c.W...c.', 'c.W.....c', 'c..bBBB.c', 'c.bBBBEFc', 'c..bwwF.c', 'c.......c', '.c.....c.', '..ccccc..'],
+    ['..ccccc..', '.c.....c.', 'c.W..BB.c', 'cW.bBBBEc', 'c.bBBBBFc', 'c..bwwF.c', 'c.......c', '.c.....c.', '..ccccc..']];
+  const cria = criaRows.map((r, i) => sprite(r, CRIA, 'cria' + i));
+  const criaFree = [sprite(['.b.BBB.', 'bbBBBEF', '.b.wwF.'], CRIA, 'cria-free'), sprite(['b..BBB.', '.bBBBEF', 'b..wwF.'], CRIA, 'cria-free2')];
+  // Ruca, la tortuga vieja del pantano: concha con musgo, párpados caídos y mucha paciencia.
+  const RUCA = { o: '#1e2a1c', S: '#6a7a3a', s: '#4a5a2a', M: '#8aa84a', H: '#c9b56a', h: '#9a8a4a', K: '#9aa86a', k: '#6f7a48', E: '#161a14', W: '#f4f0dc', m: '#5a3a2a', r: '#c9463a' };
+  const rucaRows = [
+    '.......oooooo...........',
+    '.....ooMMsMSoo..........',
+    '....oMSSSsSSMSo....oooo.',
+    '...oSSsSSSSsSSSo..okkkKo',
+    '..oSSSsSSSSsSSSSo.oKWEKo',
+    '..oSsSSSSSSSsSSSo.oKKKKo',
+    '.oSSsSSSSSSSSsSSSooKKmmo',
+    '.oHHhHHHhHHHHhHHHHoKKoo.',
+    'oKKohHHHHhHHHHhHHooKo...',
+    'oKKKo.oKKo...oKKo.oo....',
+    '.ooo..oooo...oooo.......'];
+  const ruca = { idle: sprite(rucaRows, RUCA, 'ruca'),
+    blink: sprite(rucaRows.map((r, i) => i === 4 ? r.replace('KWEK', 'Kkkk') : r), RUCA, 'ruca-blink'),
+    talk: sprite(rucaRows.map((r, i) => i === 6 ? r.replace('KKmmo', 'Kmrmo') : i === 7 ? r.replace('oKKoo.', 'oKmmo.') : r), RUCA, 'ruca-talk') };
+  const bubble = sprite(['.ooooooo.', 'oWWWWWWWo', 'oWkWkWkWo', 'oWWWWWWWo', '.oooWWoo.', '....oWo..', '.....o...'], { o: '#1b2430', W: '#fff6d6', k: '#1b2430' }, 'bubble');
   const heart = sprite(['.oo...oo.', 'oRRo.oRRo', 'oRHRoRRRo', 'oRRRRRRRo', '.oRRRRRo.', '..oRRRo..', '...oRo...', '....o....'], { o: '#4a1a2a', R: '#e2445a', H: '#ffb0bd' }, 'heart');
   const heartEmpty = sprite(['.oo...oo.', 'oddo.oddo', 'oddodrddo', 'odddddddo', '.oddddDo.', '..odddo..', '...odo...', '....o....'], { o: '#2a1a24', d: '#3f2f3a', r: '#4a3644', D: '#4a3644' }, 'heart-empty');
   const lanternRows = [
@@ -571,6 +593,23 @@ const ART = (() => {
     for (let i = 0; i < 6; i++) { const x = (r() * 480) | 0, y = 6 + (r() * 30) | 0, w = 30 + (r() * 50) | 0; for (let k = 0; k < 5; k++) { const bw = (w * (0.4 + r() * 0.6)) | 0, bh = 3 + (r() * 5) | 0; g.fillRect(x + ((r() * w) | 0) - bw / 2, y + k * 2 - bh / 2, bw, bh); } }
     return c;
   }
+  // Storm clouds: a low, heavy bank with lighter bellies, tiled sideways.
+  function stormLayer(seed) {
+    const c = canvas(480, 64), g = c.getContext('2d'), r = rng(seed);
+    const blob = (x, y, rad, col) => { g.fillStyle = col; for (let dy = -rad; dy <= rad; dy++) { const hw = Math.round(Math.sqrt(rad * rad - dy * dy)); for (const dx of [-480, 0, 480]) g.fillRect(x - hw + dx, y + dy, hw * 2, 1); } };
+    const clouds = []; for (let i = 0; i < 14; i++) clouds.push({ x: (r() * 480) | 0, y: 8 + (r() * 22) | 0, n: 3 + (r() * 4) | 0, rad: 7 + (r() * 7) | 0 });
+    for (const pass of [['#1c2430', 2], ['#10151d', 0]]) for (const cl of clouds) for (let k = 0; k < cl.n; k++) { const rr = r(); blob(cl.x + k * cl.rad, cl.y + pass[1] + ((rr * 4) | 0), Math.round(cl.rad * (.7 + rr * .5)), pass[0]); }
+    g.fillStyle = '#10151d'; g.fillRect(0, 0, 480, 12);
+    return c;
+  }
+  // The old flooded mill on the horizon; its sails are drawn live so they turn in the wind.
+  function millLayer() {
+    const c = canvas(40, 70), g = c.getContext('2d');
+    g.fillStyle = '#0d1219'; for (let y = 0; y < 52; y++) { const hw = 6 + (y * 7 / 52) | 0; g.fillRect(20 - hw, 18 + y, hw * 2, 1); }
+    g.fillRect(12, 14, 16, 5); g.fillRect(14, 11, 12, 3); g.fillRect(17, 9, 6, 2);
+    g.fillStyle = '#f2c46a'; g.fillRect(18, 40, 3, 4); g.fillStyle = '#8a6a3a'; g.fillRect(18, 44, 3, 1);
+    return c;
+  }
   const mossWall = sprite([
     'dDdgDdDDdgDdDDdd',
     'DdgDDdgDDdgDDdgD',
@@ -792,17 +831,19 @@ const ART = (() => {
       far: { fill: '#16243a' }, mid: { fill: '#0f1a2a', moss: '#1f3d3a' }, reeds: { stem: '#0d1a1a', head: '#2a1e14', leaf: '#1e3a26' }, fog: '#2f5566', ground: '#0a0d14' },
     cave: { sky: ['#0d0a12', '#160f1c', '#1f1526', '#2a1b30', '#33223a', '#3a2a40'], moon: [-100, -100], moonBase: '#000', moonLight: '#000', moonEdge: '#000', star: '#5d4a6e',
       far: { fill: '#241a2c' }, mid: { fill: '#1a1220', moss: '#4a3358' }, reeds: { stem: '#2a1e30', head: '#3a2a44', leaf: '#3c2a48' }, fog: '#4a3358', ground: '#0a070d' },
+    storm: { sky: ['#0e1016', '#151a24', '#1c2330', '#232c3a', '#2a3442', '#33404c'], moon: [-100, -100], moonBase: '#000', moonLight: '#000', moonEdge: '#000', star: '#2a3442', cloud: 'rgba(120,140,160,.18)',
+      far: { fill: '#1c2430' }, mid: { fill: '#121820', moss: '#24323a' }, reeds: { stem: '#0c1216', head: '#1e1a16', leaf: '#16241e' }, fog: '#3a4a58', ground: '#0a0d12' },
     nest: { sky: ['#3a1f3a', '#6b2f4a', '#a4444e', '#d0684a', '#e89a52', '#f2c46a'], moon: [60, 40], moonBase: '#fff1c4', moonLight: '#fffbe8', moonEdge: '#e8c98a', star: '#f6dfb0',
       far: { fill: '#5c2f4a' }, mid: { fill: '#3a2038', moss: '#6a4a3a' }, reeds: { stem: '#2a1a24', head: '#4a2a1c', leaf: '#4a3a2a' }, fog: '#b86a5a', ground: '#1a0d14' } };
   const bgCache = {};
   function background(theme) {
     if (bgCache[theme]) return bgCache[theme];
     const p = THEMES[theme];
-    return bgCache[theme] = { clouds: theme === 'cave' ? null : cloudLayer(p.cloud || 'rgba(255,240,220,.10)', 41), sky: skyLayer(p), far: treeLayer(480, 120, p.far, 11, 1.2, 40), mid: treeLayer(640, 150, p.mid, 23, 1.4, 70), reeds: reedLayer(320, p.reeds, 31), fog: p.fog, ground: p.ground, theme: p };
+    return bgCache[theme] = { clouds: theme === 'cave' ? null : cloudLayer(p.cloud || 'rgba(255,240,220,.10)', 41), sky: skyLayer(p), far: treeLayer(480, 120, p.far, 11, 1.2, 40), mid: treeLayer(640, 150, p.mid, 23, 1.4, 70), reeds: reedLayer(320, p.reeds, 31), fog: p.fog, ground: p.ground, theme: p, storm: theme === 'storm' ? stormLayer(57) : null, mill: theme === 'storm' ? millLayer() : null };
   }
 
   return { sprite, flip, tint, canvas, rng, text, textWidth, wrap, glyph, logo, background, THEMES, GROUND, WATER,
     nila, fish, hand, snail, frogSit, frogJump, mosquito, crab, heronBody, heronFly, wingUp, wingDown, wingMid, egg,
-    crate, rock, pearl, heart, drop, fire, ash, ring, plate, pinwheel, hard, raft, mossWall, morsels, heartEmpty, lantern, sign, boat, mushroom, mushroomSquash, thorns, gate, target, lily, plank, puff, star, cracked,
+    crate, rock, pearl: cria, cria, criaFree, ruca, bubble, heart, drop, fire, ash, ring, plate, pinwheel, hard, raft, mossWall, morsels, heartEmpty, lantern, sign, boat, mushroom, mushroomSquash, thorns, gate, target, lily, plank, puff, star, cracked,
     dirt, grassCap, roots, edgeL, edgeR, water, waterDeep, reed, tuft, shroomDeco };
 })();

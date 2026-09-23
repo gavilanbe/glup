@@ -17,6 +17,7 @@ const Sound = (() => {
     noiseBuffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const d = noiseBuffer.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     if (music.song) { music.next = ctx.currentTime + .05; if (!music.timer) music.timer = setInterval(schedule, music.interval); }
+    if (rainWanted) rain(true);
   }
   let noiseBuffer = null;
   function setMuted(m) { muted = m; if (master) master.gain.setTargetAtTime(m ? 0 : 1, ctx.currentTime, .02); }
@@ -52,7 +53,9 @@ const Sound = (() => {
     thud() { const t = ctx.currentTime; noise(t, .1, .2, 'lowpass', 500, 100); osc('sine', 70, t, .1, .25, sfxBus, 35); },
     hurt() { const t = ctx.currentTime; osc('sawtooth', 500, t, .25, .16, sfxBus, 120); osc('square', 250, t + .05, .2, .1, sfxBus, 70); },
     death() { const t = ctx.currentTime; [0, .12, .24, .4].forEach((d, i) => osc('square', 400 - i * 80, t + d, .16, .14, sfxBus, 200 - i * 40)); },
-    pearl() { const t = ctx.currentTime; osc('sine', 1046, t, .09, .18, sfxBus, null, .003, .06); osc('sine', 1568, t + .07, .16, .18, sfxBus, null, .003, .1); },
+    pearl() { const t = ctx.currentTime; osc('sine', 900, t, .05, .16, sfxBus, 300, .002, .04); noise(t, .04, .08, 'highpass', 3000); osc('sine', 1046, t + .06, .08, .16, sfxBus, 1400, .003, .05); osc('sine', 1568, t + .13, .14, .14, sfxBus, 1900, .003, .1); },
+    thunder() { const t = ctx.currentTime; noise(t, 2.2, .5, 'lowpass', 900, 60, .7); noise(t + .05, .25, .35, 'highpass', 1500, 400); osc('sine', 48, t, 1.2, .3, sfxBus, 30, .02, .8); },
+    talk() { const t = ctx.currentTime; osc('triangle', 180 + Math.random() * 60, t, .05, .1, sfxBus, 140, .005, .03); },
     heart() { const t = ctx.currentTime; [523, 659, 784, 1046].forEach((f, i) => osc('triangle', f, t + i * .06, .12, .16, sfxBus, null, .003, .08)); },
     lantern() { const t = ctx.currentTime; [392, 523, 659, 784, 1046].forEach((f, i) => osc('triangle', f, t + i * .07, .2, .15, sfxBus, null, .003, .12)); noise(t, .4, .06, 'highpass', 4000); },
     bounce() { const t = ctx.currentTime; osc('sine', 180, t, .22, .25, sfxBus, 720, .005, .08); osc('triangle', 90, t, .1, .1, sfxBus, 360); },
@@ -102,6 +105,18 @@ const Sound = (() => {
       const g = ctx.createGain(); g.gain.setValueAtTime(0, ctx.currentTime); g.gain.linearRampToValueAtTime(.16, ctx.currentTime + .08);
       src.connect(fl); fl.connect(g); g.connect(sfxBus); src.start(); jetNode = { src, g };
     } else if (!on && jetNode) { const n = jetNode; jetNode = null; n.g.gain.setTargetAtTime(0, ctx.currentTime, .05); n.src.stop(ctx.currentTime + .3); }
+  }
+
+  // Rain is a soft, steady hiss under the storm song; it lives on the music bus so pausing ducks it too.
+  let rainNode = null, rainWanted = false;
+  function rain(on) {
+    rainWanted = on; if (!ctx) return;
+    if (on && !rainNode) {
+      const src = ctx.createBufferSource(); src.buffer = noiseBuffer; src.loop = true;
+      const fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 1800; const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 300;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0, ctx.currentTime); g.gain.linearRampToValueAtTime(.22, ctx.currentTime + 1.5);
+      src.connect(fl); fl.connect(hp); hp.connect(g); g.connect(musicBus); src.start(); rainNode = { src, g };
+    } else if (!on && rainNode) { const n = rainNode; rainNode = null; n.g.gain.setTargetAtTime(0, ctx.currentTime, .3); n.src.stop(ctx.currentTime + 1.5); }
   }
 
   // ---------------------------------------------------------------- Música
@@ -160,6 +175,22 @@ const Sound = (() => {
       { inst: 'kick', vol: .45, steps: P(`
         x . . . x . . . x . . . x . . .   x . . . x . . . x . . . x . x .
         x . . . x . . . x . . . x . . .   x . . . x . . . x . x . x . x .`) } ] },
+    storm: { bpm: 100, swing: .1, rain: true, tracks: [
+      { inst: 'bass', vol: .5, steps: P(`
+        A1 . . A1 . . A1 . . . A1 . C2 . E2 .   F1 . . F1 . . F1 . . . F1 . A1 . C2 .
+        D2 . . D2 . . D2 . . . D2 . F2 . A2 .   E2 . . E2 . . E2 . . . G#1 . B1 . E2 .`) },
+      { inst: 'pluck', vol: .24, steps: P(`
+        A3 . C4 . E4 . C4 . A3 . C4 . E4 . A4 .   F3 . A3 . C4 . A3 . F3 . A3 . C4 . F4 .
+        D3 . F3 . A3 . F3 . D3 . F3 . A3 . D4 .   E3 . G#3 . B3 . G#3 . E3 . G#3 . B3 . E4 .`) },
+      { inst: 'lead', vol: .15, steps: P(`
+        . . . . E4 - - . D4 - C4 - B3 - . .   . . . . C4 - - . D4 - E4 - - - . .
+        . . . . F4 - - . E4 - D4 - C4 - . .   . . . . B3 - - - G#3 - - - - - . .
+        . . . . E4 - - . A4 - G4 - E4 - . .   . . . . F4 - - . E4 - C4 - - - . .
+        . . . . D4 - - . F4 - E4 - D4 - . .   . . . . E4 - - - - - - - - - . .`) },
+      { inst: 'drip', vol: .12, steps: P(`
+        . . . . . . . . . . . . . . x .   . . . . . . x . . . . . . . . .`) },
+      { inst: 'kick', vol: .38, steps: P(`
+        x . . . . . x . x . . . . . . .   x . . . . . x . x . . . x . . .`) } ] },
     dock: { bpm: 72, swing: .25, tracks: [
       { inst: 'pluck', vol: .28, steps: P(`
         D3 . . . A3 . . . F3 . . . A3 . . .   Bb2 . . . F3 . . . D3 . . . F3 . . .
@@ -198,12 +229,12 @@ const Sound = (() => {
   }
   function playMusic(name) {
     if (music.name === name) return;
-    music.name = name; music.song = SONGS[name] || null; music.step = 0;
+    music.name = name; music.song = SONGS[name] || null; music.step = 0; rain(!!(music.song && music.song.rain));
     if (!ctx) return; music.next = ctx.currentTime + .05;
     if (!music.timer) music.timer = setInterval(schedule, music.interval);
   }
   function stopMusic() { music.name = null; music.song = null; }
   function duck(on) { if (musicBus) musicBus.gain.setTargetAtTime(on ? .18 : .5, ctx.currentTime, .1); }
   function resume() { if (ctx && ctx.state === 'suspended') ctx.resume(); if (music.song && ctx) music.next = Math.max(music.next, ctx.currentTime + .05); }
-  return { init, play, suck, jet, playMusic, stopMusic, duck, setMuted, isMuted, resume, get ready() { return !!ctx; } };
+  return { init, play, suck, jet, rain, playMusic, stopMusic, duck, setMuted, isMuted, resume, get ready() { return !!ctx; } };
 })();

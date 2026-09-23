@@ -6,6 +6,12 @@ Plataformas 2D en pixel art para móvil y web. Nila, una niña con chubasquero a
 
 Todo es HTML + JS vanilla sin dependencias: 320×180 nativos escalados a enteros, sprites dibujados a mano como matrices de caracteres, fondos y tierra generados por procedimiento con la misma paleta, y audio sintetizado con WebAudio. Se instala como app (PWA) y funciona sin conexión.
 
+## La historia
+
+Cada verano, las crías de pez gato nacen bajo el embarcadero de Nila. Un anochecer bajó la **Garza** y se las tragó a todas… menos a una: **Bigotes**, la más pequeña, que se escondió entre los pilotes. Nila lo coge en brazos y salen río arriba a buscarlas. Un prólogo en viñetas lo cuenta antes del primer nivel (se ve una vez; Esc lo salta).
+
+Por el camino, la Garza ha ido dejando crías dormidas en **burbujas**: al tocarlas, la burbuja revienta (*¡PLOP!*) y la cría salta y vuelve nadando a casa. En la pelea final, cada golpe le hace escupir una de las que aún lleva en el buche. **Ruca**, una tortuga vieja que siempre llega antes por sus atajos, espera en cada nivel con consejos y noticias de la Garza; habla letra a letra y lleva un bocadillo mientras no has hablado con ella.
+
 ## Bigotes aprende comiendo
 
 Como en Rayman, las habilidades se van consiguiendo, y aquí todas las da el pez: Bigotes es un pez gato joven que aprende un truco cada vez que traga un **bocado** especial. Los bocados brillan en el nivel; al comerlos, Bigotes hace *¡ÑAM!*, hay fanfarria y una tarjeta explica el truco y sus controles. Lo aprendido se guarda.
@@ -21,7 +27,7 @@ Como en Rayman, las habilidades se van consiguiendo, y aquí todas las da el pez
 | Guindilla del pantano | **Escupitajo picante** | Mantener y soltar con la boca llena: disparo cargado, rompe piedra reforzada |
 | Alga resbaladiza | **Resbalón** | ↓ corriendo: Nila se desliza sobre Bigotes |
 
-El embarcadero da aleteo, ventosa, soplido y mordisco; los juncos, trago de agua y panzazo; la cueva, guindilla y resbalón. De serie Bigotes sólo sabe sorber y escupir, y Nila correr, saltar y agacharse. El menú de pausa lista lo aprendido y el selector cuenta los trucos.
+El embarcadero da aleteo y soplido; los juncos, ventosa y mordisco; el molino anegado, trago de agua y panzazo; la cueva, guindilla y resbalón. De serie Bigotes sólo sabe sorber y escupir, y Nila correr, saltar y agacharse. El menú de pausa lista lo aprendido y el selector cuenta los trucos.
 
 ## Las habilidades de Bigotes
 
@@ -49,13 +55,13 @@ Nila, por su parte, tiene un repertorio de plataformas completo:
 
 Bigotes nunca está quieto: su cola tiene inercia (un muelle que reacciona a frenazos, saltos y aterrizajes), respira, parpadea y aletea en el salto doble.
 
-Además: las **dianas** abren su compuerta para siempre, las **setas** rojas te lanzan muy alto, los **faroles** son puntos de control, las **perlas** cuentan por nivel y los **corazones** curan. Los **cangrejos** no se dejan sorber hasta que los volteas con una pedrada. El agua del pantano te traga; las espinas y las hogueras hieren.
+Además: las **dianas** abren su compuerta para siempre, las **setas** rojas te lanzan muy alto, los **faroles** son puntos de control, las **crías** rescatadas cuentan por nivel y los **corazones** curan. Los **cangrejos** no se dejan sorber hasta que los volteas con una pedrada. El agua del pantano te traga; las espinas y las hogueras hieren.
 
-Cada nivel está construido sobre esos puzles y alturas: tres celdas se saltan, cuatro piden el aleteo, seis piden caja y aleteo, y más arriba sólo llegan los aros o los muros de raíces. Trepar salientes es sólo una ayuda de cinco píxeles, para que ningún muro se suba sin el truco que toca. El embarcadero enseña a sorber, escupir, planchar, agacharse, aletear, trepar muros, soplar, apilar e izarse; los juncos combinan dianas, agua y fuego, chorro, placa y balsa; la cueva de barro, a oscuras salvo por faroles, hogueras y perlas, pide el escupitajo cargado, el molinillo, un pozo de tres aros y disparos hacia arriba; y en el nido espera la Garza, que deja caer piedras, planea y se lanza en picado.
+Cada nivel está construido sobre esos puzles y alturas: tres celdas se saltan, cuatro piden el aleteo, seis piden caja y aleteo, y más arriba sólo llegan los aros o los muros de raíces. Trepar salientes es sólo una ayuda de cinco píxeles, para que ningún muro se suba sin el truco que toca. El embarcadero enseña a sorber, escupir, planchar, agacharse, aletear, trepar muros, soplar, apilar e izarse; los juncos combinan dianas, agua y fuego, chorro, placa y balsa; el molino anegado, bajo la tormenta, junta agua, fuego fatuo, placas y setas; la cueva de barro, a oscuras salvo por faroles, hogueras y crías, pide el escupitajo cargado, el molinillo, un pozo de tres aros y disparos hacia arriba; y en el nido espera la Garza, que deja caer piedras, planea y se lanza en picado.
 
 ## Juice
 
-Onomatopeyas flotantes (GLUP, PFF, ¡CRAC!, ¡ZAS!, ¡BOING!, ¡ARO!, ¡GIRA!, CLIC, SPLASH, +1), golpe de zoom y sacudida de cámara graduados por impacto, hit-stop, squash & stretch en Nila y en el pez, destello blanco y anillo al reventar un bicho, estelas en los disparos cargados, viñeta roja al recibir daño, vibración del mando, nenúfares que se hunden al pisarlos, oscuridad con charcos de luz en la cueva, nubes a la deriva, luciérnagas al anochecer, esporas en la cueva y cenizas en el nido, ascuas en las hogueras y humo al apagarlas. Todo se apaga con la preferencia de movimiento reducido del sistema.
+Onomatopeyas flotantes (GLUP, PFF, ¡PLOP!, ¡PUM!, ¡CRAC!, ¡ZAS!, ¡BOING!, ¡ARO!, ¡GIRA!, CLIC, SPLASH, +1), golpe de zoom y sacudida de cámara graduados por impacto, hit-stop, squash & stretch en Nila y en el pez, destello blanco y anillo al reventar un bicho, estelas en los disparos cargados, viñeta roja al recibir daño, vibración del mando, nenúfares que se hunden al pisarlos, oscuridad con charcos de luz en la cueva, nubes a la deriva, luciérnagas al anochecer, lluvia que salpica al caer y relámpagos con trueno sobre el molino, esporas en la cueva y cenizas en el nido, crías que saltan de su burbuja y se van nadando, ascuas en las hogueras y humo al apagarlas. Todo se apaga con la preferencia de movimiento reducido del sistema.
 
 ## Controles
 
@@ -65,15 +71,17 @@ Onomatopeyas flotantes (GLUP, PFF, ¡CRAC!, ¡ZAS!, ¡BOING!, ¡ARO!, ¡GIRA!, C
 
 **Móvil:** en horizontal los mandos flotan sobre el juego (cruceta a la izquierda; ▲, ▼, BIGOTES y SALTO a la derecha); en vertical el juego queda arriba y los mandos debajo. Se puede deslizar el pulgar entre ◀ y ▶ sin levantarlo. Los carteles del juego cambian sus textos según juegues con teclado, mando o pantalla táctil. La barra superior tiene pausa, sonido y pantalla completa; se respetan las zonas seguras del teléfono y al pasar la página a segundo plano el juego se pausa solo.
 
-Progreso y sonido se guardan en el navegador. El selector de niveles muestra las perlas y el mejor tiempo de cada uno.
+Progreso y sonido se guardan en el navegador. El selector de niveles muestra las crías rescatadas y el mejor tiempo de cada uno.
 
 ## Código
 
-- `art.js` — paleta, sprites (Nila con parpadeo y carrera; Bigotes cerrado, abierto, lleno, escupiendo y tragando; caracol, rana, mosquito, cangrejo, la Garza con alas en tres posiciones), objetos, tiles, fuente 5×7 con acentos y eñe, logotipo y capas de fondo por tema (anochecer, noche, cueva, nido).
-- `audio.js` — efectos sintetizados (el sorbo es un viento en bucle que sube de tono; el chorro, un siseo) y un secuenciador por pasos con tres canciones: pantano, cueva y jefa, más el tema del muelle.
+- `art.js` — paleta, sprites (Nila con parpadeo y carrera; Bigotes cerrado, abierto, lleno, escupiendo y tragando; caracol, rana, mosquito, cangrejo, la Garza con alas en tres posiciones), objetos, tiles, fuente 5×7 con acentos y eñe, logotipo y capas de fondo por tema (anochecer, noche, tormenta con molino, cueva, nido).
+- `audio.js` — efectos sintetizados (el sorbo es un viento en bucle que sube de tono; el chorro, un siseo) y un secuenciador por pasos con canciones de pantano, tormenta (con lluvia de fondo), cueva y jefa, más el tema del muelle; trueno y voz de Ruca.
 - `levels.js` — niveles compuestos por pantallas de 20×14 celdas con una leyenda de caracteres (aros, placas, molinillos, balsas, piedra reforzada, hogueras); los carteles llevan marcadores `{jump}` `{fish}` que se sustituyen por el control real.
 - `game.js` — entrada unificada (teclado, mando, táctil), física por pasos de un píxel con plataformas atravesables, coyote time y buffer de salto, succión con apuntado, aros que izan, soplido, soltar, agacharse, carga, agua y chorro, balsas que llevan, placas y molinillos que abren y cierran compuertas, iluminación por máscara, proyectiles con perforación y estela, enemigos, cajas y piedras que descansan como sólidos, dianas y compuertas, la Garza, cámara con adelanto, partículas, squash & stretch, hit-stop, HUD, título, selector, pausa, resumen de nivel y final.
+- `story.js` — el prólogo en viñetas animadas.
 - `index.html`, `style.css` — envoltorio y mandos táctiles. `manifest.webmanifest`, `sw.js`, `icons/` — instalación como app.
+- `tools/sim.js` carga el juego en Node sin pantalla (fotograma a fotograma, con instantáneas); `tools/bot.js` recorre cada nivel siguiendo `tools/rutas.js` con una búsqueda best-first y comprueba que se puede terminar con los trucos que da; `tools/check-levels.js` revisa la forma de los niveles.
 - `tools/captura.sh` captura una escena con Chrome headless (`sprites`, `titulo`, `nivel` con `n`, `x` y un guion de entradas `GUION='fish@1-60;right@70-120'`); `tools/iconos.sh` regenera los iconos desde la escena `icono`.
 
 Construido con Claude Fable 5.1. Licencia MIT.
