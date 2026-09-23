@@ -154,7 +154,8 @@ const key = (x, y) => x + ',' + y;
 // ---------------------------------------------------------------- Nivel
 const L = { rows: null, t: null, w: 0, h: 0, def: null, index: 0, ents: [], projs: [], parts: [], solids: [], signs: [], broken: new Set(), targets: new Map(), gates: [], gateOpen: new Set(), lit: new Set(), taken: new Set(), start: null, checkpoint: null, pearlsTotal: 0, pearls: 0, time: 0, bg: null, boss: null, breakQueue: [], gateQueue: [], mush: new Map(), hitTargets: new Set(), boatSpawned: false, exit: null, words: [], ghosts: [], lily: new Map(), triggerIdx: new Map() };
 const SOLID = { '#': 1, 'x': 1, 'G': 1, 'X': 1, 'M': 1 };
-function tileAt(tx, ty) { if (tx < 0 || tx >= L.w) return '#'; if (ty < 0 || ty >= L.h) return '.'; return L.t[ty][tx]; }
+// Above the level, a solid top row carries on upward, so no one walks along the top of a closed level.
+function tileAt(tx, ty) { if (tx < 0 || tx >= L.w) return '#'; if (ty < 0) return L.t[0][tx] === '#' ? '#' : '.'; if (ty >= L.h) return '.'; return L.t[ty][tx]; }
 function setTile(tx, ty, ch) { if (tx >= 0 && tx < L.w && ty >= 0 && ty < L.h) L.t[ty][tx] = ch; }
 function solidChar(ch) { return SOLID[ch] === 1; }
 function rectSolid(x, y, w, h, self) {
@@ -591,7 +592,8 @@ const Player = {
     const proj = Proj.create(h, up || down ? m.x - h.w / 2 : (p.dir > 0 ? m.x - 4 : m.x - h.w + 4), m.y - h.h / 2 + (up ? -6 : 0), vx, vy, charged);
     // A fat crate starts a few pixels clear of the ground; pointed at a wall, the shot starts on Nila's side of it
     // (and hits it on its first step) instead of popping out over the top.
-    for (let n = 0; n < 4 && rectSolid(proj.x, proj.y, proj.w, proj.h, proj); n++) proj.y--;
+    for (let n = 0; n < 4 && rectSolid(proj.x, proj.y, proj.w, proj.h, proj); n++) proj.y += up ? 1 : -1;
+    if (up) for (let n = 0; n < 16 && rectSolid(proj.x, proj.y, proj.w, proj.h, proj); n++) proj.y++;
     if (!up && !down) for (let n = 0; n < 30 && rectSolid(proj.x, proj.y, proj.w, proj.h, proj); n++) proj.x -= p.dir;
     for (let n = 0; n < 16 && rectSolid(proj.x, proj.y, proj.w, proj.h, proj); n++) proj.y--;
     L.projs.push(proj);
@@ -1474,10 +1476,20 @@ const Game = {
     if (p.hp <= 0) { p.dead = true; p.deadT = 40; p.vy = 0; p.vx = 0; p.y = L.h * TS + 100; }
     else if (safe) {
       // Back on the last firm ground, with the world left as it was; whatever she carried lands beside her.
-      Game.transition(() => { const hp = p.hp; Player.reset(safe.x, safe.y, false); p.hp = hp; p.inv = 60; p.lastSafe = safe; Cam.snap();
+      Game.transition(() => { const hp = p.hp; Player.reset(safe.x, safe.y, false); p.hp = hp; p.inv = 60; p.lastSafe = safe; Cam.snap(); Game.restoreProps();
         if (carried) { const e = Item.fromHeld(carried, safe.x + 5 - carried.w / 2, safe.y + 18 - carried.h); if (e) { for (let n = 0; n < 16 && rectSolid(e.x, e.y, e.w, e.h, e); n++) e.y--; L.ents.push(e); } } });
     }
     else { Game.transition(() => { const hp = p.hp; Player.reset(L.checkpoint.x, L.checkpoint.y, false); p.hp = hp; p.inv = 60; spawnEntities(); Cam.snap(); }); }
+  },
+  // After a fall into the water the world is kept, but the rafts go back to their moorings and any crate
+  // or rock that was lost (sunk, carried off) reappears where it started, so no puzzle is left without its piece.
+  restoreProps() {
+    L.ents = L.ents.filter(e => e.kind !== 'raft');
+    for (const s of L.spawn) if (s.ch === 'R') L.ents.push(Item.raft(s.x * TS, s.y * TS + 12));
+    for (const [ch, kind, make] of [['c', 'crate', (x, y) => Item.crate(x, y)], ['r', 'rock', (x, y) => Item.rock(x + 1, y + 4)]]) {
+      const spots = L.spawn.filter(s => s.ch === ch); let have = L.ents.filter(e => e.kind === kind && !e.dead).length + L.projs.filter(q => q.kind === kind && !q.dead).length + (Player.held && Player.held.kind === kind ? 1 : 0);
+      for (const s of spots) { if (have >= spots.length) break; L.ents.push(make(s.x * TS + 1, s.y * TS + 2)); have++; }
+    }
   },
   updatePlay() {
     if (Input.pressed.pause) { Game.pause(); return; }
