@@ -34,235 +34,311 @@ const ART = (() => {
   function replaceRows(rows, from, to) { return rows.map(r => r.split(from).join(to)); }
 
   // ---------------------------------------------------------------- Nila
-  const NILA = { o: '#33242c', Y: '#f2c53d', y: '#c9932a', W: '#fbe37a', s: '#f3cba6', k: '#d9a077', e: '#2b2230', p: '#e88a83', m: '#a3513f', r: '#c9463a', R: '#8a2f2c' };
-  const nilaBody = [
-    '.....oooo.....',
-    '...ooYWWYoo...',
-    '..oYWWYYYYYo..',
-    '.oYWWYYYYYYYo.',
-    '.oYWYYYYYYYYYo',
-    '.oYYYyyyyyyYYo',
-    'oYYYysssssyYYo',
-    'oYYysssssssyYo',
-    'oYYysesseskyYo',
-    'oYYysesseskyYo',
-    'oYYypsssskpyYo',
-    '.oYyksmmsskyYo',
-    '.oYYyyyyyyyyYo',
-    '..oYYYYYYYYYo.',
-    '..oYyYYYYYYyo.',
-    '..oYyYYYYYYyo.',
-    '..oyyYYYYYyyo.',
-    '..oyyyyyyyyyo.'];
-  const nilaBlink = nilaBody.map((r, i) => i === 8 ? 'oYYysssssskyYo' : i === 9 ? 'oYYyseesseekyYo'.slice(0, 3) + 'yseessekyYo' : r);
-  const feet = {
-    stand: ['..orro..orro..', '..oRRo..oRRo..'],
-    spread: ['.orro....orro.', '.oRRo....oRRo.'],
-    together: ['....orroorro..', '....oRRooRRo..'],
-    jump: ['...orro.orro..', '...oRRo.oRRo..'],
-    fall: ['.orro....orro.', '.oRRo....oRRo.'],
-    wide: ['orro......orro', 'oRRo......oRRo'],
-    dangle1: ['..orro...orro.', '..oRRo...oRRo.'],
-    dangle2: ['...orro.orro..', '...oRRo.oRRo..'] };
-  const blank = '..............';
-  const hemL = '.oyyyyyyyyyo..', hemR = '...oyyyyyyyyyo';
-  function nilaFrame(body, f, bob = 0, hem = 0) {
-    const rows = body.slice(); if (bob) rows.unshift(blank);
-    if (hem) rows[rows.length - 1] = hem < 0 ? hemL : hemR;
-    const out = rows.concat(feet[f]); while (out.length < 20) out.push(blank); return sprite(out.slice(0, 20), NILA, 'nila');
+  // Nila mira a la derecha. Cada pose es un lienzo de 16×22 con los pies en la última fila: la caja
+  // de choque (10×18) cae en las columnas 3–12 y la capucha asoma por encima. Las poses se montan
+  // por capas (piernas, abrigo, cabeza con su gesto) para que todas compartan la misma cara.
+  // Luz desde arriba a la izquierda; sombras hacia el rojo y el violeta, nunca negro puro.
+  const NILA = { q: '#2c2a4e', o: '#3b2335', W: '#fff4a8', Y: '#f7c843', y: '#dc8a2c', z: '#9c4f33', s: '#fcdcbc', k: '#e8a37f', p: '#f2847e', e: '#2b1d3e',
+    h: '#6e3a36', n: '#a45e3e', r: '#e4473b', R: '#992c42', l: '#ff9e7a', L: '#3d3b66', m: '#a8373f', w: '#ffffff' };
+  function paint(w, h, layers) {
+    const g = []; for (let y = 0; y < h; y++) g.push(new Array(w).fill('.'));
+    for (const [rows, dx, dy] of layers) rows.forEach((r, y) => { for (let x = 0; x < r.length; x++) { const ch = r[x], X = x + dx, Y = y + dy; if (ch !== '.' && X >= 0 && X < w && Y >= 0 && Y < h) g[Y][X] = ch === '_' ? '.' : ch; } });
+    return g.map(r => r.join(''));
   }
-  const nilaBreath = [blank].concat(nilaBody.slice(0, 12), ['..oYYYYYYYYYo.', '..oYyYYYYYYyo.', '..oyyYYYYYyyo.', '..oyyyyyyyyyo.']);
-  const nilaTuck = nilaBody.slice(1, 13).concat(['..oyyYYYYYyyo.', '..oyyyyyyyyyo.', '...orroorro...', '...oRRooRRo...']);
+  // Capucha de chubasquero con visera, flequillo castaño asomando y la cara abierta hacia delante.
+  const HOOD = [
+    '.....oooooo.....',
+    '...ooWWWYYYoo...',
+    '..oWWYYYYYYYYoo.',
+    '.oWYYYYYYYYYYYYo',
+    '.oWYYYYYyyyyyyyo',
+    'oWYYYYyhhhhhhhho',
+    'oYYYYyhhnnhhhnho',
+    'oYYYYyhhhshhshso',
+    'oYYYYyhssessesso',
+    'oYYYyyhssessesso',
+    'oyYYyyhkpssmspko',
+    '.oyyyyyokkkkkoo.'];
+  // Gestos: filas 8–10 de la capucha (ojos, mejillas, boca), columnas 7–14.
+  const FACES = {
+    calm: ['ssessess', 'ssessess', 'kpssmspk'], blink: ['ssssssss', 'seessees', 'kpssmspk'],
+    happy: ['ssessess', 'seseeses', 'kpsmmspk'], hurt: ['sesssses', 'ssessess', 'kesmmsek'],
+    oh: ['ssessess', 'ssessess', 'kpsmmspk'], strain: ['ssssssss', 'seessees', 'kpmwwmpk'], shut: ['ssssssss', 'seessees', 'kpsmmspk'] };
+  function head(face) { const f = FACES[face]; return HOOD.map((r, i) => i >= 8 && i <= 10 ? r.slice(0, 7) + f[i - 8] + r.slice(15) : r); }
+  // Abrigo (filas 12–18) con el brazo de atrás; el de delante sostiene a Bigotes (la mano va aparte).
+  const COAT = {
+    stand: [
+      '....oyyyyyyyo...',
+      '...oWYYYYYYYYo..',
+      '..oWYoYYYzYYyyo.',
+      '.oYYyoYYYYYYyyyo',
+      '.oyyyoYYYzYyyyzo',
+      'ozzzoskzzzzzzzzo'],
+    back: [
+      '....oyyyyyyyo...',
+      '...oWYYYYYYYYo..',
+      '..oWYYYYYzYYyyo.',
+      '.ooYYYYYYYYYyyyo',
+      'oyYoyYYYYzYyyyzo',
+      'oskozzzzzzzzzzzo'],
+    fwd: [
+      '....oyyyyyyyo...',
+      '...oWYYYYYYYYo..',
+      '..oWYYoYYzYYyyo.',
+      '.oYYYYyoYYYYyyyo',
+      '.oyyyyyoYzYyyyzo',
+      'ozzzzzzoskzzzzzo'],
+    flare: [
+      '....oyyyyyyyo...',
+      '...oWYYYYYYYYo..',
+      '..oWYoYYYzYYyyo.',
+      '.oYYyoYYYYYYyyyo',
+      'oyyyyoskyzyyyyzo',
+      'ozzzzzoozzzzzzzo'],
+    reach: [
+      '....oyyyyyyyo...',
+      '...oWYYYYYYYYo..',
+      '..oWYYYYYzYYyyo.',
+      '..oYYYYYYYYYyyyo',
+      '.oyyyyYYYzYyyyzo',
+      '.ozzzzzzzzzzzzzo'] };
+  // Piernas con botas de agua rojas; la de atrás, más oscura. Cada una: [x de la bota, cuánto se levanta].
+  function legs(back, front) {
+    const g = []; for (let y = 0; y < 22; y++) g.push(new Array(16).fill('.'));
+    const put = (x, y, ch, soft) => { if (x >= 0 && x < 16 && y >= 0 && y < 22 && (!soft || g[y][x] === '.')) g[y][x] = ch; };
+    [[back, 5, true], [front, 9, false]].forEach(([[bx, lift], hip, far]) => {
+      const by = 20 - lift, L = far ? 'q' : 'L';
+      for (let r = 17; r < by; r++) { const t = (r - 17) / Math.max(1, by - 17), x = Math.round(hip + (bx + 1 - hip) * t); put(x - 1, r, 'o', true); put(x, r, L); put(x + 1, r, L); put(x + 2, r, 'o', true); }
+      const top = far ? 'oRrRo' : 'olrro';
+      for (let i = 0; i < 5; i++) put(bx + i, by, top[i]); for (let i = 0; i < 6; i++) put(bx + i, by + 1, 'oRRRRo'[i]);
+      if (lift) for (let i = 1; i < 5; i++) put(bx + i, by + 2, 'o', true);
+    });
+    return g.map(r => r.join(''));
+  }
+  // Mano de atrás apoyada en la pared.
+  const PALM = ['.oo', 'osk', 'oYo', 'oYo'];
+  // pose(gesto, abrigo, piernas, opciones): hx/hy mueven la cabeza, cx/cy el abrigo (inclinación, rebote);
+  // low pone las botas por delante del abrigo (agachada, deslizándose).
+  function pose(face, coat, lg, o = {}) {
+    const c = [COAT[coat], o.cx || 0, 12 + (o.cy || 0)], layers = o.low ? [c, [lg, 0, 0], [head(face), o.hx || 0, 1 + (o.hy || 0)]] : [[lg, 0, 0], c, [head(face), o.hx || 0, 1 + (o.hy || 0)]];
+    if (o.extra) layers.push(...o.extra);
+    return sprite(paint(16, 22, layers), NILA, 'nila-' + face + '-' + coat);
+  }
+  const STAND = legs([3, 0], [8, 0]);
   const nila = {
-    idle: [nilaFrame(nilaBody, 'stand'), nilaFrame(nilaBlink, 'stand'), sprite(nilaBreath.concat(feet.stand), NILA, 'nila-breath')],
-    run: [nilaFrame(nilaBody, 'wide', 0, -1), nilaFrame(nilaBody, 'spread', 1, -1), nilaFrame(nilaBody, 'together', 1, 0), nilaFrame(nilaBody, 'wide', 0, 1), nilaFrame(nilaBody, 'spread', 1, 1), nilaFrame(nilaBody, 'together', 1, 0)],
-    apex: nilaFrame(nilaBody, 'together'),
-    tuck: sprite(nilaTuck, NILA, 'nila-tuck'),
-    skid: nilaFrame(nilaBody.map((r, i) => i === 11 ? '.oYyksmomskyYo' : r), 'wide', 1),
-    jump: nilaFrame(nilaBody.slice(0, 17), 'jump'),
-    fall: nilaFrame(nilaBody, 'fall'),
-    hurt: nilaFrame(nilaBody.map((r, i) => i === 8 || i === 9 ? r.replace(/e/g, 'k') : i === 11 ? '.oYykssmmskyYo' : r), 'spread', 1),
-    win: nilaFrame(nilaBody.map((r, i) => i === 11 ? '.oYyksmmmmkyYo' : r), 'together'),
-    brace: nilaFrame(nilaBody, 'wide', 1),
-    dangle: [nilaFrame(nilaBody, 'dangle1'), nilaFrame(nilaBody, 'dangle2')],
-    crouch: sprite(nilaBody.slice(1, 13).concat(['..oyyYYYYYyyo.', '..oyyyyyyyyyo.', '.orro....orro.', '.oRRo....oRRo.']), NILA, 'nila-crouch') };
-
+    idle: [pose('calm', 'stand', STAND), pose('blink', 'stand', STAND), pose('calm', 'stand', STAND, { hy: 1 })],
+    // Carrera: contacto, recepción (baja), paso (sube); dos veces con las piernas cambiadas.
+    run: [
+      pose('calm', 'back', legs([0, 0], [10, 0])),
+      pose('calm', 'stand', legs([2, 1], [8, 0]), { hy: 1, cy: 1 }),
+      pose('calm', 'fwd', legs([6, 3], [7, 0]), { hy: -1, cy: -1 }),
+      pose('calm', 'fwd', legs([10, 0], [0, 0])),
+      pose('calm', 'stand', legs([8, 0], [2, 1]), { hy: 1, cy: 1 }),
+      pose('calm', 'back', legs([7, 0], [5, 3]), { hy: -1, cy: -1 })],
+    jump: pose('oh', 'fwd', legs([4, 3], [8, 2]), { hy: -1, cy: -1 }),
+    apex: pose('oh', 'flare', legs([3, 2], [9, 1])),
+    fall: pose('oh', 'flare', legs([2, 0], [10, 1]), { hy: 1 }),
+    tuck: pose('shut', 'flare', legs([3, 5], [9, 5]), { hy: 4, cy: 2, low: true }),
+    skid: pose('strain', 'reach', legs([3, 0], [11, 0]), { hx: -1, cx: -1 }),
+    hurt: pose('hurt', 'flare', legs([1, 1], [10, 0]), { hx: -1 }),
+    win: pose('happy', 'stand', STAND, { hy: 1 }),
+    brace: pose('strain', 'reach', legs([0, 0], [10, 0]), { hx: -1, cx: -1 }),
+    spit: pose('shut', 'reach', legs([1, 0], [9, 0]), { hx: -1 }),
+    wall: pose('strain', 'back', legs([2, 1], [9, 3]), { extra: [[PALM, 0, 7]] }),
+    dangle: [pose('calm', 'flare', legs([3, 0], [8, 1])), pose('calm', 'flare', legs([4, 1], [9, 0]))],
+    crouch: pose('calm', 'flare', legs([1, 0], [10, 0]), { hy: 6, cy: 4, low: true }),
+    slide: pose('strain', 'flare', legs([0, 0], [11, 1]), { hx: -1, hy: 7, cy: 5, low: true }) };
   // ---------------------------------------------------------------- Bigotes, el pez gato
-  const FISH = { o: '#26303f', B: '#5f7899', b: '#43597a', L: '#8aa3c0', W: '#d3dbe2', w: '#a7b4c1', E: '#161a24', H: '#f4f6f8', F: '#e79b3f', f: '#b8692a', m: '#7c2f44', t: '#d96a7c' };
+  // Un bagre joven: lomo oliva moteado, panza crema, cabeza ancha y chata con bocaza, ojos
+  // pequeños y separados en lo alto, aleta dorsal corta y cola redonda. Mira a la derecha: la
+  // columna 0 es la punta de la cola y la última, la boca. La fila 6 es la espina (drawFish).
+  // Los bigotes largos no están aquí: se dibujan aparte para que ondeen con inercia.
+  const FISH = { o: '#2b2233', D: '#4b4236', B: '#7c7040', L: '#a79a55', T: '#cdbd6a', S: '#554a36', C: '#f4e1a4', c: '#d6ab6c', F: '#665a36', f: '#a8975a',
+    E: '#1d1826', H: '#ffffff', w: '#e9e2c0', l: '#e4b98a', m: '#5a1f35', t: '#e0707f', k: '#8a3a44' };
   const fishClosed = [
-    '........ooo...........',
-    '.......oBLBo..........',
-    '.o....oBLBBBooooo....F',
-    '.oo..oLLBBBBBBBBBoo.F.',
-    '.oBo.oLBBBBBBBBBBBBoF.',
-    '.oBBooBBBBBBBBBBHEBBo.',
-    '.oBBBBBBBBBBBBBBBBBmo.',
-    '.oBo.obWWWWWWWWWWwboF.',
-    '.oo..owwWWWWWWWwwbo.F.',
-    '.o....oooooooooooo...F'];
-  const fishOpen = [
-    '........ooo...........',
-    '.......oBLBo..........',
-    '.o....oBLBBBooooo....F',
-    '.oo..oLLBBBBBBBBBoo.F.',
-    '.oBo.oLBBBBBBBBBBoooF.',
-    '.oBBooBBBBBBBBBHEommo.',
-    '.oBBBBBBBBBBBBBBommmo.',
-    '.oBo.obWWWWWWWWWommoF.',
-    '.oo..owwWWWWWWwwoooF..',
-    '.o....oooooooooooo.F..'];
+    '......................',
+    '..........ooo.........',
+    '.........oTfo.........',
+    '........oTfFoooooo....',
+    '.oo...ooLLLLLLLLLTLoo.',
+    'oFfoooLLBBSBBBLLLwHELo',
+    'oFfFFoBBBBBSBBBBBwEEBo',
+    'oFfFFBBSBBBBBBSBBBBBBo',
+    'oFfFFoDBBBBBBBBBBBommo',
+    'oFfoooccCCCCCCooCClllo',
+    '.oo...oocCCCCoFfocco..',
+    '........oFoFo.oo.oo...'];
+  const fishRows = (base, map) => base.map((r, i) => map[i] !== undefined ? r.slice(0, 22 - map[i].length) + map[i] : r);
+  // Boca abierta de par en par para sorber: un agujero redondo con labios claros.
+  const fishOpen = fishRows(fishClosed, { 4: 'LLLLTLooo', 5: 'LLwHEloo.', 6: 'BBwEElmmo', 7: 'BBBBlmmmo', 8: 'BBBBlmmmo', 9: 'CClllmmo.', 10: 'occlooo..' });
+  // Llena: carrillos hinchados y panza redonda, los ojos un poco apretados de satisfacción.
   const fishFull = [
-    '........ooo...........',
-    '.......oBLBo..........',
-    '.o....oBLBBBooooooo..F',
-    '.oo..oLLBBBBBLLBBBBoF.',
-    '.oBo.oLBBBBBLBBBBBBBoF',
-    '.oBBooBBBBBBBBBBBHEBo.',
-    '.oBBBBBBBBBBBBBBBBBBmo',
-    '.oBo.obWWWWWWWWWWWWoF.',
-    '.oo..owwWWWWWWWwwwoF..',
-    '.o....ooooooooooooo..F'];
-  const fishSpit = fishOpen.map((r, i) => i === 6 ? '.oBBBBBBBBBBBBBBotttoF' : i === 7 ? '.oBo.obWWWWWWWWWottoF.' : r);
-  const fishFullOpen = fishFull.map((r, i) => i === 5 ? '.oBBooBBBBBBBBBBBHEoo.' : i === 6 ? '.oBBBBBBBBBBBBBBBBommo' : i === 7 ? '.oBo.obWWWWWWWWWWWoFo.' : r);
-  const fishTail = fishClosed.map((r, i) => i >= 1 && i <= 4 ? fishClosed[i + 1].slice(0, 5) + r.slice(5) : i === 5 ? '.oBBo' + r.slice(5) : r);
-  const fishSquint = fishFull.map((r, i) => i === 5 ? r.replace('HE', 'oo') : r);
-  const fish = { blink: sprite(fishClosed.map(r => r.replace('HE', 'oo')), FISH, 'fish-blink'), tail: sprite(fishTail, FISH, 'fish-tail'), squint: sprite(fishSquint, FISH, 'fish-squint'), closed: sprite(fishClosed, FISH, 'fish'), open: sprite(fishOpen, FISH, 'fish-open'), full: sprite(fishFull, FISH, 'fish-full'), spit: sprite(fishSpit, FISH, 'fish-spit'), swallow: sprite(fishFullOpen, FISH, 'fish-swallow') };
-  const hand = sprite(['.ooo.', 'oYYYo', 'oYyYo', '.ooo.'], NILA, 'hand');
+    '..........ooo.........',
+    '.........oTfooooo.....',
+    '........oTfFLLLLLoo...',
+    '......ooLLLLLLLLLTLoo.',
+    '.oo..oLLBBSBBBLLLwHELo',
+    'oFfooBBBBBBSBBBBBwEEBo',
+    'oFfFFBBSBBBBBBSBBBBBBo',
+    'oFfFFoDBBBBBBBBBBBBmmo',
+    'oFfFoocCCCCCCCCCCCClko',
+    'oFfo.occCCCCCooCCCCco.',
+    '.oo...oocCCCoFfocccoo.',
+    '........oooo.oo.ooo...'];
+  const fishSpit = fishRows(fishClosed, { 4: 'LLLLTLooo', 5: 'LLwwwloo.', 6: 'BBEEElttmo', 7: 'BBBBltttmo', 8: 'BBBBlmtmo', 9: 'CClllmmo.', 10: 'occlooo..' });
+  const fishFullOpen = fishRows(fishFull, { 3: 'LLLTLLooo', 4: 'LLwHEloo.', 5: 'BBwEElmmo', 6: 'BBBBlmmmo', 7: 'BBBBlmmmo', 8: 'CCCClmmo.', 9: 'CCCClooo.', 10: 'cccoo....' });
+  const fishTail = fishClosed;
+  const fishSquint = fishFull.map((r, i) => i === 4 ? r.replace('wHE', 'www') : i === 5 ? r.replace('wEE', 'EEE') : r);
+  const fish = { blink: sprite(fishClosed.map((r, i) => i === 5 ? r.replace('wHE', 'www') : i === 6 ? r.replace('wEE', 'EEE') : r), FISH, 'fish-blink'), tail: sprite(fishTail, FISH, 'fish-tail'), squint: sprite(fishSquint, FISH, 'fish-squint'), closed: sprite(fishClosed, FISH, 'fish'), open: sprite(fishOpen, FISH, 'fish-open'), full: sprite(fishFull, FISH, 'fish-full'), spit: sprite(fishSpit, FISH, 'fish-spit'), swallow: sprite(fishFullOpen, FISH, 'fish-swallow') };
+  // La mano de Nila por encima del lomo de Bigotes: puño de manga amarilla y dedos que lo agarran.
+  const hand = sprite(['.ooo..', 'oWYYo.', 'oYyyso', '.oksko', '..ooo.'], NILA, 'hand');
 
   // ---------------------------------------------------------------- Enemigos
-  const SNAIL = { o: '#3a2a22', S: '#c8783c', s: '#94512a', L: '#e9a862', B: '#8fbf5a', b: '#5f8a3a', E: '#1c1c1c' };
-  const snailRows = [
-    '....oooooo......',
-    '...oLLSSSSo...oo',
-    '..oLSSssSSSo.oEo',
-    '..oSSsLLsSSo.oo.',
-    '..oSSsLssSSo..o.',
-    '..oSSSssSSSo..o.',
-    '.ooSSSSSSSSoBBo.',
-    'oBBoSSSSSSoBBBBo',
-    'oBBBoooooBBBbBBo',
-    '.oBbBBBBBBBbBBo.',
-    '..oooooooooooo..'];
-  const snailRows2 = snailRows.map((r, i) => i === 1 ? '...oLLSSSSo..oo.' : i === 2 ? '..oLSSssSSSooEo.' : i === 3 ? '..oSSsLLsSSo.o..' : i === 4 ? '..oSSsLssSSo.o..' : i === 5 ? '..oSSSssSSSo.o..' : r);
-  const snail = [sprite(snailRows, SNAIL, 'snail'), sprite(snailRows2, SNAIL, 'snail2')];
-  const FROG = { o: '#233a1e', G: '#6cbf4e', g: '#478a36', L: '#a6e07a', W: '#e8f0c8', E: '#111111', H: '#ffffff', m: '#7a3a44' };
-  const frogSit = sprite([
-    '..ooo....ooo..',
-    '.oHHEo..oHHEo.',
-    '.oHHEo..oHHEo.',
-    '.oGoooGGoooGo.',
-    'oGGGLGGGGGGGGo',
-    'oGLGGGGGGGGGGo',
-    'oGGGGGGGmmmmmo',
-    'ogGWWWWWWWWggo',
-    'ooGgWWWWWWgoGo',
-    'oGgooggggooGgo',
-    '.oooo.....ooo.'], FROG, 'frog');
-  const frogJump = sprite([
-    '..ooo....ooo..',
-    '.oHHEo..oHHEo.',
-    '.oHHEo..oHHEo.',
-    '.oGoooGGoooGo.',
-    'oGGGLGGGGGGGGo',
-    'oGLGGGGGGGGGGo',
-    'oGGGGGGGmmmmmo',
-    'ogGWWWWWWWWggo',
-    '.oGgWWWWWWgGo.',
-    '.oGoggggggoGo.',
+  // Caracol: mira a la izquierda (walkerDraw lo voltea al ir a la derecha). Concha en espiral
+  // con el surco más oscuro, pie baboso y ojos en antenas.
+  const SNAIL = { o: '#3a2230', S: '#d98a48', s: '#a4563a', d: '#6e3440', L: '#f7c47a', B: '#a6cf6e', b: '#6a9a52', k: '#3f6a4a', E: '#231a2a', W: '#ffffff', p: '#e89a8a', m: '#6a2a3a' };
+  const snailShell = [
+    '...oooo...',
+    '.ooLLSSoo.',
+    'oLLSSSSSso',
+    'oLSddddSso',
+    'oSdSLLdSso',
+    'oSdSdsdSso',
+    'oSdSSSdsso',
+    '.osddddso.',
+    '..oooooo..'];
+  const SNAIL_BODY = [
+    '.oo..oo.........',
+    'oEWooEWo........',
+    'oWWooWWo........',
+    '.oo..oo.........',
+    '..ob..ob........',
+    '..ob.ob.........',
+    '.oBBBBBo........',
+    'oBBBBBBBo.......',
+    'oBBBBBBBBo......',
+    'oBpmBBBBBBoooooo',
+    'obBBBBBBBBBBBBBo',
+    '.oooooooooooooo.'];
+  function snailBody(lower, foot) {
+    const rows = SNAIL_BODY.slice(); if (lower) rows.splice(0, 5, '................', SNAIL_BODY[0], SNAIL_BODY[1], SNAIL_BODY[2], '..obob..........');
+    if (foot) rows[11] = foot; return paint(16, 12, [[rows, 0, 0], [snailShell, 6, 1]]);
+  }
+  const snail = [sprite(snailBody(0), SNAIL, 'snail'), sprite(snailBody(1, 'ookoookooookooo.'), SNAIL, 'snail2')];
+  // Rana: ojos saltones arriba, papada crema, mofletes. Mira a la derecha.
+  const FROG = { o: '#1f3328', G: '#6cc24a', g: '#3c8a4a', d: '#2a5e44', L: '#b8ea7a', W: '#f2f2c4', w: '#c9d49a', E: '#1d1a26', H: '#ffffff', m: '#6a2a3a', p: '#f09a8a' };
+  const frogTop = [
+    '..ooo...ooo...',
+    '.oHHEo.oHHEo..',
+    '.oHEEoooHEEoo.',
+    'oLLGoGGGGoGGGo',
+    'oLGGGGGGGGGGGo',
+    'oGGGGGGGGGpGmo',
+    'ogGGGGGGmmmmGo',
+    'ogGWWWWWWWWGgo'];
+  const frogSit = sprite(frogTop.concat([
+    'oggwWWWWWWwgGo',
+    'oGGgoddddoGgGo',
+    '.ooo.oooo.ooo.']), FROG, 'frog');
+  const frogJump = sprite(frogTop.concat([
+    '.oGwwWWWWwwGo.',
+    '.oGodddddoGgo.',
     '.oGo.oooo.oGo.',
     '.ogo......ogo.',
     'oggo......oggo',
-    'oooo......oooo'], FROG, 'frog-jump');
-  const MOSQ = { o: '#2a2a3a', B: '#8a8aa8', b: '#5c5c78', W: '#d6e2ee', E: '#ff6a5a', P: '#3a3a4a' };
+    'oooo......oooo']), FROG, 'frog-jump');
+  // Mosquito: alas translúcidas, abdomen a rayas, ojo rojo y trompa afilada. Mira a la derecha.
+  const MOSQ = { o: '#2a2438', B: '#9a8ab8', b: '#5c4e7a', W: '#e4f2fa', w: '#9fc0d8', E: '#ff5a4a', e: '#ffd0a0', P: '#4a3a5a' };
   const mosquito = [sprite([
-    '..WWWW......',
-    '.WWWWWWW....',
-    '..WWWWWoo...',
-    '...ooBBBBo..',
-    '..oBbBBBBEo.',
-    '..obBBBBBooP',
-    '...ooooooPP.',
-    '..o.o..o.o..'], MOSQ, 'mosq'), sprite([
+    '...ww.......',
+    '..wWWw......',
+    '..wWWWw.....',
+    '...wWWw.....',
+    'oo..wwoooo..',
+    'obBbBoBBBEo.',
+    '.oobbobBBoPP',
+    '..oo.oooo..P',
+    '.o..o..o.o..'], MOSQ, 'mosq'), sprite([
     '............',
     '............',
-    '........oo..',
-    '.WWWWWBBBBo.',
-    '.WWWWbBBBEo.',
-    '..obBBBBBooP',
-    '...ooooooPP.',
-    '..o.o..o.o..'], MOSQ, 'mosq2')];
-  const CRAB = { o: '#4a1a1a', R: '#d9503a', r: '#a0342a', L: '#f28b6a', E: '#111111', H: '#ffffff' };
+    '............',
+    '.wwww.......',
+    'owWWWwoooo..',
+    'obWWWwBBBEo.',
+    '.oowwobBBoPP',
+    '..oo.oooo..P',
+    '..o.o..o..o.'], MOSQ, 'mosq2')];
+  // Cangrejo: pinzas en alto, ojos en pedúnculo, caparazón con brillo arriba a la izquierda.
+  const CRAB = { o: '#4a1a2a', R: '#e0583e', r: '#a8303a', d: '#6e2238', L: '#ffa070', E: '#1d1a26', H: '#ffffff' };
   const crabRows = [
-    '.....oo....oo.....',
-    '....oHEo..oHEo....',
-    '.oo..oo.oo.oo..oo.',
-    'oRRooRRRRRRRRooRRo',
-    'oRLRoRRLLRRRRoRLRo',
-    'oRRRRRRRRRRRRRRRRo',
-    '.oorRRRRRRRRRRroo.',
-    '..orrRRRRRRRRrro..',
-    '..oo.o.oooo.o.oo..',
+    '......oo..oo......',
+    '.....oHEooHEo.....',
+    '.ooo..oo..oo..ooo.',
+    'oLRRo.oo..oo.oLRRo',
+    'oRooRooooooooRooRo',
+    'oRRRRoLLRRRRoRRRro',
+    '.oorRLLRRRRRRRroo.',
+    '..orRRRRRRRRRRrro.',
+    '..oo.orrddrro.oo..',
     '.o..o.o....o.o..o.'];
-  const crab = [sprite(crabRows, CRAB, 'crab'), sprite(crabRows.map((r, i) => i === 8 ? '..o.oo.oooo.oo.o..' : i === 9 ? '..o..o.o..o.o..o..' : r), CRAB, 'crab2')];
+  const crab = [sprite(crabRows, CRAB, 'crab'), sprite(crabRows.map((r, i) => i === 4 ? 'oRRRRooooooooRRRRo' : i === 8 ? '..o.oorrddrroo.o..' : i === 9 ? '..o..o.o..o.o..o..' : r), CRAB, 'crab2')];
 
   // ---------------------------------------------------------------- La Garza (jefa)
-  const HERON = { o: '#1f2733', G: '#7d8fa6', g: '#5a6b82', L: '#a9b8c9', W: '#e9eef2', w: '#c2cbd5', K: '#22262e', Y: '#e2b63c', y: '#b1852a', E: '#1a1a1a', H: '#ffffff' };
-  const heronBody = sprite([
-    '..........ooooKKK...............',
-    '.........oGGGGGGKKo.............',
-    '........oGGLLGGEGGKo............',
-    'ooooooooGGLGGGGGGGGo............',
-    'YYYYYYYYoGGGGGGGGGo.............',
-    'oooooooooGGGWWGGGo..............',
-    '.........oGWWWGGo...............',
-    '..........oWWWGo................',
-    '..........oWWGGo................',
-    '..........oWWGGo................',
-    '..........oWWGGGo...............',
-    '..........oWWGGGGo..............',
-    '..........oWWWGGGGoooo..........',
-    '...........oWWWGGGGGGGoooo......',
-    '...........oWWWGGGGGGGGGGGooo...',
-    '............oWWGGGGGGGGGGGGGGoo.',
-    '............oWWGGGGGGGGGGGGGGGGo',
-    '............oWWWGGGGGgGGGGGGGGo.',
-    '.............oWWWGGGGgggGGGGGo..',
-    '.............oWWWWGGGGgggGGGo...',
-    '..............oWWWWGGGGggGoo....',
-    '...............oWWWWGGGGoo......',
-    '................ooWWWooo........',
+  // Garza real: gris azulado con sombras hacia el violeta, cuello blanco con rayas oscuras, penacho
+  // negro, ojo amarillo que no parpadea y pico largo. Mira a la izquierda.
+  const HERON = { o: '#23202e', G: '#8196b0', g: '#5a6488', L: '#b9c9da', W: '#f2efe8', w: '#c9c3cc', k: '#3a3d56', K: '#2a2638', Y: '#f0c444', y: '#b8782a', E: '#ffd23a', e: '#1d1a26' };
+  // Plumas: puntas oscuras (primarias) y vetas que siguen la forma del ala.
+  const feather = tip => (r, y) => r.replace(/G/g, (ch, x) => tip(x, y) ? 'k' : y % 3 === 2 && x % 3 !== 0 ? 'g' : 'G');
+  const heronHead = [
+    '...........ooooo................',
+    '..........oLLGGGoKKo............',
+    '.........oLLGKKGGoKKKo..........',
+    'oooooooooLGeEGGGGGooKKKo........',
+    'YYYYYYYYYoGGGGGGGGGo.oKKo.......',
+    'yyyyyyyyyoGGWWWGGGo...ooo.......',
+    'ooooooooooGWWWWGGo..............'];
+  const heronBody = sprite(heronHead.concat([
+    '..........oWkWWGGo..............',
+    '..........oWWkWGo...............',
+    '...........oWkWGo...............',
+    '...........oWWkGo...............',
+    '..........oWkWWGGo..............',
+    '..........oWWkWGGGoooo..........',
+    '...........oWWWGLLLGGGoooo......',
+    '...........oWWWGLGGLLGGGGGooo...',
+    '............oWWGLGgGGgGGGGGGGoo.',
+    '............oWWGGgGGgGGgGGGGGGGo',
+    '............oWWWGGgGGgGGgGgggGo.',
+    '.............oWWWGGgGGgGgggkko..',
+    '.............oWWWWGGgGgggkkko...',
+    '..............oWWWWGGgggkkoo....',
+    '...............owWWWGGGgoo......',
+    '................oowwWooo........',
     '..................oooo..........',
     '..................yy.y..........',
     '..................yy.y..........',
     '..................yy.y..........',
     '..................yy.y..........',
     '.................oyyoyy.........',
-    '................oyyyoyyy........'], HERON, 'heron');
-  const heronFly = sprite([
-    '..........ooooKKK...............',
-    '.........oGGGGGGKKo.............',
-    '........oGGLLGGEGGKo............',
-    'ooooooooGGLGGGGGGGGo............',
-    'YYYYYYYYoGGGGGGGGGo.............',
-    'oooooooooGGGWWGGGo..............',
-    '.........oGWWWGGGo..............',
-    '..........oWWWGGGo..............',
-    '..........oWWWGGGGoooo..........',
-    '..........oWWWGGGGGGGGoooo......',
-    '..........oWWWWGGGGGGGGGGGooo...',
-    '...........oWWWGGGGGGGGGGGGGGoo.',
-    '...........oWWWGGGGGGGGGGGGGGGGo',
-    '...........oWWWWGGGGGgGGGGGGGGo.',
-    '............oWWWWGGGGgggGGGGGo..',
-    '............oWWWWWGGGGgggGGGo...',
-    '.............oWWWWWGGGGggGoo....',
-    '..............oWWWWWGGGGoo......',
-    '...............ooWWWWooo........',
+    '................oyyyoyyy........']), HERON, 'heron');
+  const heronFly = sprite(heronHead.concat([
+    '..........oWkWGGGo..............',
+    '..........oWWkGGGGoooo..........',
+    '..........oWWWGLLLGGGGoooo......',
+    '..........oWWWWGLGGLLGGGGGooo...',
+    '...........oWWWGLGgGGgGGGGGGGoo.',
+    '...........oWWWGGgGGgGGgGGGGGGGo',
+    '...........oWWWWGGgGGgGGgGgggGo.',
+    '............oWWWWGGgGGgGgggkko..',
+    '............oWWWWWGGgGgggkkko...',
+    '.............owWWWWGGgggkkoo....',
+    '..............owwWWWGGGgoo......',
+    '...............oowwWWooo........',
     '.................ooooo..........',
     '..................yyy...........',
     '...................yyy..........',
     '....................yyy.........',
-    '.....................yyy........'], HERON, 'heron-fly');
+    '.....................yyy........']), HERON, 'heron-fly');
   const wingUp = sprite([
     '......................oo....',
     '....................ooGGo...',
@@ -277,7 +353,7 @@ const ART = (() => {
     '..ooGGGGGGGGGGGGGGGGggggo...',
     'ooGGGGGGGGGGGGGGGGGGggggo...',
     'oggggggggggggggggggggggo....',
-    '.ooooooooooooooooooooooo....'], HERON, 'wing-up');
+    '.ooooooooooooooooooooooo....'].map(feather((x, y) => y < 5)), HERON, 'wing-up');
   const wingDown = sprite([
     'ooooooooooooooooooooooo.....',
     'oGGGGGGGGGGGGGGGGGGGGGGo....',
@@ -291,7 +367,7 @@ const ART = (() => {
     '...............ooggGGGGgo...',
     '.................ooggGGgo...',
     '...................ooggo....',
-    '.....................oo.....'], HERON, 'wing-down');
+    '.....................oo.....'].map(feather((x, y) => y > 8)), HERON, 'wing-down');
   const wingMid = sprite([
     '..............................',
     '..............................',
@@ -306,8 +382,9 @@ const ART = (() => {
     '......oooooooooooooooooooo....',
     '..............................',
     '..............................',
-    '..............................'], HERON, 'wing-mid');
-  const egg = sprite(['..oo..', '.oWLo.', 'oWWLLo', 'oWLLLo', 'oLLllo', '.oLlo.', '..oo..'], { o: '#4a5a6a', W: '#fff6dc', L: '#e6d9b8', l: '#c8b890' }, 'egg');
+    '..............................'].map(feather((x, y) => x < 7)), HERON, 'wing-mid');
+  // Huevo de garza: azul verdoso pálido con motas.
+  const egg = sprite(['..oo..', '.oWLo.', 'oWWLLo', 'oWLsLo', 'oLLllo', '.olso.', '..oo..'], { o: '#34425a', W: '#eefaf4', L: '#b8dcd4', l: '#80aab0', s: '#5e8088' }, 'egg');
 
   // ---------------------------------------------------------------- Objetos
   const WOOD = { o: '#4a2e1a', W: '#c78d4e', w: '#a56f38', L: '#e0a862', P: '#6b4a30', T: '#5a3a24' };
@@ -337,31 +414,33 @@ const ART = (() => {
     '.osssssssso.',
     '..oossssoo..',
     '....oooo....'], { o: '#2e2f3a', S: '#7d8290', s: '#565a68', L: '#a6abb8' }, 'rock');
-  // Las crías de pez gato que la Garza escupió por el pantano, cada una en su burbuja.
-  const CRIA = { c: '#9ecbd8', W: '#ffffff', B: '#5f7899', b: '#43597a', w: '#d3dbe2', E: '#161a24', F: '#e79b3f' };
+  // Las crías de pez gato que la Garza escupió por el pantano, cada una en su burbuja: un Bigotes
+  // en miniatura (lomo oliva, panza crema, ojito y bigotes) dentro de una pompa con brillo.
+  const CRIA = { c: '#a8dcea', d: '#5f9ab8', W: '#ffffff', B: '#8a7d45', b: '#665a36', C: '#f4e1a4', E: '#1d1826', F: '#e0a45a' };
   const criaRows = [
-    ['..ccccc..', '.cW....c.', 'cW......c', 'c.b.BBB.c', 'c.bBBBEFc', 'c.b.wwF.c', 'c.......c', '.c.....c.', '..ccccc..'],
-    ['..ccccc..', '.c.W...c.', 'c.W.....c', 'c..bBBB.c', 'c.bBBBEFc', 'c..bwwF.c', 'c.......c', '.c.....c.', '..ccccc..'],
-    ['..ccccc..', '.c.....c.', 'c.W..BB.c', 'cW.bBBBEc', 'c.bBBBBFc', 'c..bwwF.c', 'c.......c', '.c.....c.', '..ccccc..']];
+    ['..ccccc..', '.cW....c.', 'cW......c', 'c..BBB..c', 'cbBBBBEBc', 'c.bCCCCFd', 'c.....F.d', '.c.....d.', '..cccdd..'],
+    ['..ccccc..', '.c.W...c.', 'c.W.....c', 'c..BBB..c', 'c.bBBBEBc', 'cb.CCCCFd', 'c......Fd', '.c.....d.', '..cccdd..'],
+    ['..ccccc..', '.c.....c.', 'c.W.BBB.c', 'cW.BBBEBc', 'c.bBCCCFd', 'c..bCC.Fd', 'c.......d', '.c.....d.', '..cccdd..']];
   const cria = criaRows.map((r, i) => sprite(r, CRIA, 'cria' + i));
-  const criaFree = [sprite(['.b.BBB.', 'bbBBBEF', '.b.wwF.'], CRIA, 'cria-free'), sprite(['b..BBB.', '.bBBBEF', 'b..wwF.'], CRIA, 'cria-free2')];
-  // Ruca, la tortuga vieja del pantano: concha con musgo, párpados caídos y mucha paciencia.
-  const RUCA = { o: '#1e2a1c', S: '#6a7a3a', s: '#4a5a2a', M: '#8aa84a', H: '#c9b56a', h: '#9a8a4a', K: '#9aa86a', k: '#6f7a48', E: '#161a14', W: '#f4f0dc', m: '#5a3a2a', r: '#c9463a' };
+  const criaFree = [sprite(['...BB...', 'bBBBBBE.', '.bCCCCCF', '......F.'], CRIA, 'cria-free'), sprite(['...BB...', '.bBBBBE.', 'b.CCCCCF', '.....F..'], CRIA, 'cria-free2')];
+  // Ruca, la tortuga vieja del pantano: concha con musgo y escudos marcados, cejas blancas,
+  // párpados caídos y mucha paciencia. Mira a la derecha.
+  const RUCA = { o: '#24301f', S: '#7a8a44', s: '#56663a', d: '#3c4a34', L: '#a8b85e', M: '#9ac25a', H: '#d8c47a', h: '#a8904e', K: '#a8b47a', k: '#7a8458', E: '#1d1a26', W: '#fffbe8', q: '#5a2a2a', r: '#c9463a' };
   const rucaRows = [
     '.......oooooo...........',
-    '.....ooMMsMSoo..........',
-    '....oMSSSsSSMSo....oooo.',
-    '...oSSsSSSSsSSSo..okkkKo',
-    '..oSSSsSSSSsSSSSo.oKWEKo',
-    '..oSsSSSSSSSsSSSo.oKKKKo',
-    '.oSSsSSSSSSSSsSSSooKKmmo',
-    '.oHHhHHHhHHHHhHHHHoKKoo.',
-    'oKKohHHHHhHHHHhHHooKo...',
+    '.....ooMMMMMMoo.........',
+    '....oMMLSdSSSMMo...oooo.',
+    '...oLLSSSdSSSSdSo.oWWWKo',
+    '..oLSSSSddddSSdSSooKkkKo',
+    '..oSSddSdSSSdddSSooKEEKo',
+    '.oSSSSSdSSSSSdSSSooKKqqo',
+    '.oHHHhHHHhHHHHhHHHoKKoo.',
+    'oKKohhhhhhhhhhhhhooKo...',
     'oKKKo.oKKo...oKKo.oo....',
     '.ooo..oooo...oooo.......'];
   const ruca = { idle: sprite(rucaRows, RUCA, 'ruca'),
-    blink: sprite(rucaRows.map((r, i) => i === 4 ? r.replace('KWEK', 'Kkkk') : r), RUCA, 'ruca-blink'),
-    talk: sprite(rucaRows.map((r, i) => i === 6 ? r.replace('KKmmo', 'Kmrmo') : i === 7 ? r.replace('oKKoo.', 'oKmmo.') : r), RUCA, 'ruca-talk') };
+    blink: sprite(rucaRows.map((r, i) => i === 5 ? r.replace('oKEEKo', 'oKkkKo') : r), RUCA, 'ruca-blink'),
+    talk: sprite(rucaRows.map((r, i) => i === 6 ? r.replace('KKqqo', 'Kqrqo') : i === 7 ? r.replace('oKKoo.', 'oKqro.') : r), RUCA, 'ruca-talk') };
   const bubble = sprite(['.ooooooo.', 'oWWWWWWWo', 'oWkWkWkWo', 'oWWWWWWWo', '.oooWWoo.', '....oWo..', '.....o...'], { o: '#1b2430', W: '#fff6d6', k: '#1b2430' }, 'bubble');
   const heart = sprite(['.oo...oo.', 'oRRo.oRRo', 'oRHRoRRRo', 'oRRRRRRRo', '.oRRRRRo.', '..oRRRo..', '...oRo...', '....o....'], { o: '#4a1a2a', R: '#e2445a', H: '#ffb0bd' }, 'heart');
   const heartEmpty = sprite(['.oo...oo.', 'oddo.oddo', 'oddodrddo', 'odddddddo', '.oddddDo.', '..odddo..', '...odo...', '....o....'], { o: '#2a1a24', d: '#3f2f3a', r: '#4a3644', D: '#4a3644' }, 'heart-empty');
