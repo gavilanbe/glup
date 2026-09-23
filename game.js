@@ -239,6 +239,9 @@ function updateParts() {
     p.vy += p.g; p.x += p.vx; p.y += p.vy;
     if (p.bounce && p.vy > 0 && rectSolid(p.x, p.y, 1, 1)) { p.y -= p.vy; p.vy *= -p.bounce; p.vx *= .7; }
     if (p.kind === 'amb') { p.x += Math.sin(p.life / 17 + p.ph) * .15; }
+    else if (p.kind === 'fly') { p.x += Math.sin(p.life / 23 + p.ph) * .25; p.y += Math.cos(p.life / 31 + p.ph) * .18; }
+    else if (p.kind === 'leaf') p.y += Math.sin(p.life / 6 + p.ph) * .5;
+    else if (p.kind === 'drip' && (rectSolid(p.x, p.y, 1, 1) || waterAt(p.x, p.y))) { p.life = 0; for (let k = 0; k < 2; k++) L.parts.push({ x: p.x, y: p.y - 1, vx: k ? .4 : -.4, vy: -.6, life: 6, color: '#9ac8e8', size: 1, g: .12 }); continue; }
     if (p.kind === 'rain' && (rectSolid(p.x, p.y, 1, 1) || waterAt(p.x, p.y))) { p.life = 0; if (Math.random() < .5) L.parts.push({ x: p.x, y: p.y - 1, vx: rnd(-.5, .5), vy: -rnd(.5, 1.1), life: 7, color: '#b8c8d8', size: 1, g: .15 }); continue; }
     if (p.kind === 'cria' && p.life % 5 === 0) spawnParts(1, p.x + 3, p.y + 1, { color: '#cfe8f0', speed: [0, .2], life: [10, 16], g: -.03 });
     if (p.kind === 'suck') { const m = Player.mouth(); const dx = m.x - p.x, dy = m.y - p.y, d = Math.hypot(dx, dy) || 1; p.vx = dx / d * 3.2; p.vy = dy / d * 3.2; if (d < 4) p.life = 0; }
@@ -1095,12 +1098,15 @@ const Game = {
       if (w.thunder > 0 && --w.thunder === 0) { Sound.play('thunder'); Cam.shake(2, 20); Input.rumble(300, .3, .2); }
       if (--w.next <= 0) { w.bolt = 12; w.x = rnd(40, W - 40); w.seed = (Math.random() * 1e6) | 0; w.thunder = 12 + ((Math.random() * 30) | 0); w.next = 300 + ((Math.random() * 420) | 0); }
     }
-    if ((th === 'dusk' || th === 'night') && Math.random() < .05) L.parts.push({ x, y: Cam.y + rnd(40, 170), vx: rnd(-.15, .15), vy: rnd(-.1, .05), life: 140, color: th === 'night' ? '#d8f58a' : '#e9f58a', size: 1, g: 0, kind: 'amb', ph: rnd(0, 6) });
-    if (th === 'cave' && Math.random() < .08) L.parts.push({ x, y: Cam.y - 4, vx: rnd(-.1, .1), vy: rnd(.1, .3), life: 200, color: ['#b48ad0', '#8a6aa8', '#d8c0e8'][(Math.random() * 3) | 0], size: 1, g: 0, kind: 'amb', ph: rnd(0, 6) });
+    // Fireflies that glow and wander; in the cave, spores drift down and drops fall from the roof.
+    if ((th === 'dusk' || th === 'night' || th === 'nest') && Math.random() < (th === 'nest' ? .015 : .05)) L.parts.push({ x, y: Cam.y + rnd(40, 170), vx: rnd(-.15, .15), vy: rnd(-.1, .05), life: 160, color: th === 'night' ? '#d8f58a' : '#f2f5a0', size: 1, g: 0, kind: 'fly', ph: rnd(0, 6) });
+    if (th === 'cave' && Math.random() < .08) L.parts.push({ x, y: Cam.y - 4, vx: rnd(-.1, .1), vy: rnd(.1, .3), life: 200, color: ['#8ff4e2', '#8a6aa8', '#d8c0e8'][(Math.random() * 3) | 0], size: 1, g: 0, kind: 'amb', ph: rnd(0, 6) });
+    if (th === 'cave' && Math.random() < .03) L.parts.push({ x, y: Cam.y + rnd(0, 10), vx: 0, vy: .2, life: 90, color: '#9ac8e8', size: 1, g: .12, kind: 'drip' });
+    if (th === 'storm' && Math.random() < .03) L.parts.push({ x: Cam.x + W + 4, y: Cam.y + rnd(20, 150), vx: -rnd(2.2, 3.4), vy: rnd(-.3, .4), life: 160, color: ['#5e7a3a', '#7a6a3a', '#3e5a34'][(Math.random() * 3) | 0], size: 1, g: .01, kind: 'leaf', ph: rnd(0, 6) });
     if (th === 'nest' && Math.random() < .07) L.parts.push({ x, y: Cam.y - 4, vx: rnd(-.3, .1), vy: rnd(.15, .4), life: 220, color: ['#e9eef2', '#f2c46a', '#d0684a'][(Math.random() * 3) | 0], size: 1, g: 0, kind: 'amb', ph: rnd(0, 6) });
     // Embers from any fire in view.
     const x0 = Math.max(0, Cam.x >> 4), x1 = Math.min(L.w - 1, (Cam.x + W) >> 4), y0 = Math.max(0, Cam.y >> 4), y1 = Math.min(L.h - 1, (Cam.y + H) >> 4);
-    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (L.t[ty][tx] === 'F' && Math.random() < .08) L.parts.push({ x: tx * TS + rnd(3, 13), y: ty * TS + rnd(4, 12), vx: rnd(-.2, .2), vy: rnd(-.8, -.3), life: rnd(14, 30), color: ['#ffd34a', '#f28b2a', '#fff3b0'][(Math.random() * 3) | 0], size: 1, g: -.01, kind: 'dot' });
+    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (L.t[ty][tx] === 'F' && Math.random() < .08) L.parts.push({ x: tx * TS + rnd(3, 13), y: ty * TS + rnd(2, 10), vx: rnd(-.2, .2), vy: rnd(-.7, -.25), life: rnd(16, 34), color: ['#b4f8dc', '#5ed8b8', '#f0fff6'][(Math.random() * 3) | 0], size: 1, g: -.01, kind: 'dot' });
   },
   breakCracked(tx, ty, kind = 'x') {
     const seen = new Set(), stack = [[tx, ty]]; let n = 0; Sound.play('crack'); Cam.shake(3, 8); Game.hitStop = 3; Cam.punch(1.04); Game.word('¡CRAC!', tx * TS + 8, ty * TS - 6, '#d0d6da', true); Input.rumble(120, .7, .4);
@@ -1228,27 +1234,8 @@ const Game = {
     if (Game.fade > 0) { g.fillStyle = 'rgba(8,10,16,' + Game.fade + ')'; g.fillRect(0, 0, W, H); }
   },
   drawBackground(g, camX, camY, bg) {
-    g.drawImage(bg.sky, 0, 0);
-    if (bg.clouds) { const cx = -Math.floor((camX * .08 + Game.t * .06) % bg.clouds.width); for (let x = cx - bg.clouds.width; x < W; x += bg.clouds.width) g.drawImage(bg.clouds, x, 8); }
-    const w = Game.weather; if (Game.state === 'play' && w && w.bolt > 0 && L.def.theme === 'storm') Game.drawBolt(g, w);
-    const far = bg.far, mid = bg.mid;
-    if (bg.storm) {
-      const sx = -Math.floor((camX * .1 + Game.t * .25) % bg.storm.width); for (let x = sx; x < W; x += bg.storm.width) g.drawImage(bg.storm, x, -4);
-      // The mill stands far off, one every 700 px of parallax, sails turning.
-      const px = camX * .12; for (let k = Math.floor(px / 700); k <= Math.floor((px + W) / 700) + 1; k++) {
-        const mx = Math.round(k * 700 + 180 - px), my = H - 130 - Math.floor(camY * .1); if (mx < -60 || mx > W + 60) continue;
-        g.drawImage(bg.mill, mx - 20, my); const a0 = Game.t * .02, cx = mx, cy = my + 15; g.fillStyle = '#0d1219';
-        for (let s = 0; s < 4; s++) { const a = a0 + s * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a); for (let d = 2; d < 26; d++) { g.fillRect(Math.round(cx + ca * d), Math.round(cy + sa * d), 1, 1); if (d > 8) g.fillRect(Math.round(cx + ca * d - sa * 3), Math.round(cy + sa * d + ca * 3), 2, 1); } }
-        g.fillRect(cx - 1, cy - 1, 3, 3);
-      }
-    }
-    const fx = -Math.floor((camX * .18) % far.width), fy = H - far.height + 8 - Math.floor(camY * .1);
-    for (let x = fx - far.width; x < W; x += far.width) g.drawImage(far, x, fy);
-    g.fillStyle = bg.fog; g.globalAlpha = .28; g.fillRect(0, fy + far.height - 40, W, 40); g.globalAlpha = 1;
-    const mx = -Math.floor((camX * .42) % mid.width), my = H - mid.height + 24 - Math.floor(camY * .25);
-    for (let x = mx - mid.width; x < W; x += mid.width) g.drawImage(mid, x, my);
-    const rx = -Math.floor((camX * .7) % bg.reeds.width), ry = H - bg.reeds.height + 10 - Math.floor(camY * .5);
-    for (let x = rx - bg.reeds.width; x < W; x += bg.reeds.width) g.drawImage(bg.reeds, x, ry);
+    const w = Game.weather, bolt = Game.state === 'play' && w && w.bolt > 0 && L.def && L.def.theme === 'storm' ? gg => Game.drawBolt(gg, w) : null;
+    MUNDO.drawBackground(g, camX, camY, bg, Game.t, W, H, bolt);
   },
   drawBolt(g, w) {
     g.globalAlpha = w.bolt / 12 * .5; g.fillStyle = '#cfe0f0'; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
@@ -1256,34 +1243,7 @@ const Game = {
     let r = ART.rng(w.seed), x = w.x, y = 0; g.fillStyle = '#f4f8ff';
     while (y < 120) { const ny = y + 4 + ((r() * 8) | 0), nx = x + ((r() * 9) | 0) - 4; for (let k = 0; k <= ny - y; k++) g.fillRect(Math.round(x + (nx - x) * k / (ny - y)), y + k, 1, 1); x = nx; y = ny; if (r() < .15) { let bx = x, by = y; for (let j = 0; j < 10; j++) { bx += r() < .5 ? -1 : 1; by++; g.fillRect(bx, by, 1, 1); } } }
   },
-  drawTiles(g, camX, camY, layer) {
-    const x0 = Math.max(0, camX >> 4), x1 = Math.min(L.w - 1, (camX + W) >> 4), y0 = Math.max(0, camY >> 4), y1 = Math.min(L.h - 1, (camY + H) >> 4);
-    const frame = (Game.t >> 3) % 4;
-    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
-      const ch = L.t[ty][tx]; if (ch === '.') continue; const px = tx * TS - camX, py = ty * TS - camY;
-      if (layer === 'back') {
-        switch (ch) {
-          case '#': { g.drawImage(ART.dirt[(tx * 7 + ty * 13) & 3], px, py); const up = tileAt(tx, ty - 1), dn = tileAt(tx, ty + 1); if (!solidChar(up)) g.drawImage(ART.grassCap[(tx + ty) & 1], px, py); if (!solidChar(dn) && dn !== '~') g.drawImage(ART.roots, px, py + 12); if (!solidChar(tileAt(tx - 1, ty))) g.drawImage(ART.edgeL, px, py); if (!solidChar(tileAt(tx + 1, ty))) g.drawImage(ART.edgeR, px + 15, py); break; }
-          case '=': g.drawImage(ART.plank, px, py); break;
-          case 'w': g.drawImage(ART.lily, px, py + Math.round(Math.sin((Game.t + tx * 9) / 20)) + (L.lily.has(key(tx, ty)) ? 2 : 0)); break;
-          case 'F': g.drawImage(ART.fire[((Game.t + tx * 3) >> 3) % 2], px, py); break;
-          case '^': g.drawImage(ART.thorns, px, py + 8); break;
-          case 'x': g.drawImage(ART.cracked, px, py); break;
-          case 'X': g.drawImage(ART.hard, px, py); break;
-          case 'M': g.drawImage(ART.mossWall, px, py); if (!solidChar(tileAt(tx, ty - 1))) g.drawImage(ART.grassCap[(tx + ty) & 1], px, py); break;
-          case 'G': g.drawImage(ART.gate, px, py); break;
-          case 'T': g.drawImage(L.hitTargets.has(key(tx, ty)) ? ART.target.on : ART.target.off, px, py); break;
-          case '%': { const sq = L.mush.get(key(tx, ty)); if (sq) g.drawImage(ART.mushroomSquash, px, py + 10); else g.drawImage(ART.mushroom, px, py + 6); break; }
-          case ',': g.drawImage(ART.tuft, px + 5, py + 13); break;
-          case "'": g.drawImage(ART.reed, px + 5, py + 4); break;
-          case '"': g.drawImage(ART.shroomDeco, px + 5, py + 11); break;
-          case '~': { const up = tileAt(tx, ty - 1); if (up !== '~') { g.fillStyle = ART.WATER.mid; g.fillRect(px, py + 4, 16, 12); } else g.drawImage(ART.waterDeep, px, py); break; }
-        }
-      } else if (ch === '~') {
-        const up = tileAt(tx, ty - 1); g.globalAlpha = .72; if (up !== '~') g.drawImage(ART.water[frame], px, py); else g.drawImage(ART.waterDeep, px, py); g.globalAlpha = 1;
-      }
-    }
-  },
+  drawTiles(g, camX, camY, layer) { Game.terrain = MUNDO.drawTiles(g, L, camX, camY, layer, W, H, Game.t) || Game.terrain; },
   drawPlay(g) {
     const camX = Math.round(Cam.x) + Cam.ox, camY = Math.round(Cam.y) + Cam.oy;
     const zoom = Cam.zoom > 1 ? Cam.zoom : 1;
@@ -1309,9 +1269,10 @@ const Game = {
   },
   // Darkness with pools of light: the cave is lit by Nila, lanterns, fire, pearls and glowing mushrooms.
   drawLight(g, camX, camY) {
-    const th = L.def.theme; const dark = th === 'cave' ? .84 : th === 'night' ? .22 : 0; if (!dark) return;
+    // The cave keeps pools of light but stays readable: the dark only dims it by about half.
+    const th = L.def.theme; const dark = th === 'cave' ? .56 : th === 'night' ? .2 : 0; if (!dark) return;
     if (!Game.lightMask) { Game.lightMask = document.createElement('canvas'); Game.lightMask.width = W; Game.lightMask.height = H; }
-    const m = Game.lightMask.getContext('2d'); m.globalCompositeOperation = 'source-over'; m.clearRect(0, 0, W, H); m.fillStyle = 'rgba(6,3,12,' + dark + ')'; m.fillRect(0, 0, W, H);
+    const m = Game.lightMask.getContext('2d'); m.globalCompositeOperation = 'source-over'; m.clearRect(0, 0, W, H); m.fillStyle = th === 'cave' ? 'rgba(12,6,24,' + dark + ')' : 'rgba(4,8,24,' + dark + ')'; m.fillRect(0, 0, W, H);
     m.globalCompositeOperation = 'destination-out';
     const hole = (x, y, r, k = 1) => { for (let i = 3; i >= 1; i--) { m.fillStyle = 'rgba(0,0,0,' + (k * (i === 3 ? .35 : i === 2 ? .5 : .9)) + ')'; m.beginPath(); m.arc(Math.round(x - camX), Math.round(y - camY), r * i / 3, 0, Math.PI * 2); m.fill(); } };
     const fl = 1 + Math.sin(Game.t / 5) * .05;
@@ -1326,6 +1287,9 @@ const Game = {
       else if (e.kind === 'pinwheel' && e.spin > 0) hole(e.x + 8, e.y + 8, 18);
     }
     for (const p of L.projs) if (p.kind === 'agua') hole(p.x + 4, p.y + 4, 10);
+    if (L.bg && L.bg.glowScreen) for (const [x, y, r] of L.bg.glowScreen) hole(x + camX, y + camY, r, .55);
+    // Glowing fungi growing on the earth.
+    if (Game.terrain && Game.terrain.glow) for (const q of Game.terrain.glow) if (q.x > camX - 20 && q.x < camX + W + 20 && q.y > camY - 20 && q.y < camY + H + 20) hole(q.x, q.y, 15 + Math.sin(Game.t / 20 + q.x) * 1.5, .7);
     const x0 = Math.max(0, camX >> 4), x1 = Math.min(L.w - 1, (camX + W) >> 4), y0 = Math.max(0, camY >> 4), y1 = Math.min(L.h - 1, (camY + H) >> 4);
     for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) { const ch = L.t[ty][tx]; if (ch === 'F') hole(tx * TS + 8, ty * TS + 8, 40 * fl); else if (ch === '%') hole(tx * TS + 8, ty * TS + 10, 16, .8); else if (ch === 'T' && L.hitTargets.has(key(tx, ty))) hole(tx * TS + 8, ty * TS + 8, 14); }
     g.drawImage(Game.lightMask, 0, 0);
@@ -1372,6 +1336,9 @@ const Game = {
       if (p.kind === 'ring') { const r = (8 - p.life) * 1.6 + 2; g.strokeStyle = p.color; g.globalAlpha = p.life / 8; g.beginPath(); g.ellipse(x + 8, y, r, r * .45, 0, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1; continue; }
       if (p.kind === 'smoke') { g.globalAlpha = Math.min(1, p.life / 20) * .8; g.fillStyle = p.color; const sz = p.life > 30 ? 2 : 3; g.fillRect(x, y, sz, sz); g.globalAlpha = 1; continue; }
       if (p.kind === 'amb') { g.globalAlpha = .35 + Math.sin(p.life / 9 + p.ph) * .35; g.fillStyle = p.color; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; continue; }
+      if (p.kind === 'fly') { const a = Math.max(0, Math.sin(p.life / 11 + p.ph)) * Math.min(1, p.life / 30); if (a > .05) { g.fillStyle = p.color; g.globalAlpha = a * .3; g.fillRect(x - 1, y - 1, 3, 3); g.globalAlpha = a * .5; g.fillRect(x - 2, y, 5, 1); g.fillRect(x, y - 2, 1, 5); g.globalAlpha = Math.min(1, a * 1.4); g.fillStyle = '#ffffe0'; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; } continue; }
+      if (p.kind === 'drip') { g.fillStyle = p.color; g.fillRect(x, y, 1, 2); continue; }
+      if (p.kind === 'leaf') { g.fillStyle = p.color; g.fillRect(x, y, 2, 1); if ((p.life >> 2) & 1) g.fillRect(x + 1, y - 1, 1, 1); continue; }
       g.fillStyle = p.color; g.fillRect(x, y, p.size, p.size);
     }
   },
@@ -1419,20 +1386,8 @@ const Game = {
   // ---- title & menus
   drawScene(g, t, theme) {
     // A dock at dusk: reflections shimmer on the water and fireflies wander.
-    const bg = ART.background(theme); Game.drawBackground(g, 40 + t * .15, 0, bg);
-    g.fillStyle = ART.WATER.top; g.fillRect(0, 132, W, 48); g.fillStyle = ART.WATER.mid; g.fillRect(0, 140, W, 40); g.fillStyle = ART.WATER.deep; g.fillRect(0, 156, W, 24);
-    g.fillStyle = ART.WATER.foam; for (let x = 0; x < W; x += 2) { const y = 132 + Math.round(Math.sin((x + t * .8) / 9) * 1.2); g.fillRect(x, y, 1, 1); }
-    // Moon reflection as broken bands.
-    const p = bg.theme; g.fillStyle = p.moonLight; for (let i = 0; i < 9; i++) { const y = 138 + i * 4; const w = 18 - i * 1.5; const off = Math.round(Math.sin((t + i * 30) / 15) * 3); if (i % 2 === 0) g.fillRect(p.moon[0] - w / 2 + off, y, w, 1); }
-    for (let i = 0; i < 4; i++) { g.fillStyle = ART.WATER.glint; g.fillRect(((i * 83 + t * .6) % (W + 20)) - 10, 145 + i * 7, 5, 1); }
-    // Dock.
-    for (let x = 96; x < 224; x += 16) g.drawImage(ART.plank, x, 128);
-    g.fillStyle = '#5a3a24'; g.fillRect(100, 134, 3, 30); g.fillRect(216, 134, 3, 30); g.fillStyle = '#3a2416'; g.fillRect(103, 134, 1, 30); g.fillRect(219, 134, 1, 30);
-    g.drawImage(ART.lantern.on, 205, 110);
-    g.globalAlpha = .15 + Math.sin(t / 9) * .03; g.fillStyle = '#ffcf5a'; g.beginPath(); g.arc(210, 115, 20, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1;
-    for (let x = 0; x < 96; x += 16) { g.drawImage(ART.dirt[(x >> 4) & 3], x, 128); g.drawImage(ART.grassCap[(x >> 4) & 1], x, 128); g.drawImage(ART.dirt[(x >> 4) & 3], x, 144); g.drawImage(ART.dirt[1], x, 160); }
-    for (let x = 224; x < W; x += 16) { g.drawImage(ART.dirt[(x >> 4) & 3], x, 128); g.drawImage(ART.grassCap[(x >> 4) & 1], x, 128); g.drawImage(ART.dirt[(x >> 4) & 3], x, 144); g.drawImage(ART.dirt[1], x, 160); }
-    g.drawImage(ART.reed, 232, 108); g.drawImage(ART.reed, 240, 112); g.drawImage(ART.tuft, 60, 125); g.drawImage(ART.shroomDeco, 30, 123);
+    const bg = ART.background(theme); Game.drawBackground(g, 40 + t * .15, 44, bg);
+    MUNDO.drawScene(g, t, theme, W, H);
   },
   drawTitle(g) {
     const t = Game.titleT; Game.drawScene(g, t, 'dusk');
@@ -1442,7 +1397,7 @@ const Game = {
     const fishS = (t % 240) < 20 ? ART.fish.open : ART.fish.closed; g.drawImage(fishS, px + 5, py + 6 + ((t >> 5) % 2)); g.drawImage(ART.hand, px + 11, py + 5 + ((t >> 5) % 2));
     if ((t % 240) < 20 && t % 3 === 0) { g.fillStyle = '#cfe0e8'; g.fillRect(px + 32 + (t % 20) * 2, py + 10 + Math.round(Math.sin(t) * 4), 2, 1); }
     // Fireflies.
-    for (const f of Game.titleParts) { g.globalAlpha = .4 + Math.sin(f.t / 8) * .4; g.fillStyle = '#e9f58a'; g.fillRect(Math.round(f.x), Math.round(f.y), 1, 1); } g.globalAlpha = 1;
+    for (const f of Game.titleParts) { const a = Math.max(0, Math.sin(f.t / 8)), x = Math.round(f.x), y = Math.round(f.y); g.fillStyle = '#f2f5a0'; g.globalAlpha = a * .3; g.fillRect(x - 1, y - 1, 3, 3); g.globalAlpha = a * .5; g.fillRect(x - 2, y, 5, 1); g.fillRect(x, y - 2, 1, 5); g.globalAlpha = .3 + a * .7; g.fillStyle = '#ffffe0'; g.fillRect(x, y, 1, 1); } g.globalAlpha = 1;
     // Logo drops in and settles.
     const logo = ART.logo(); const ly = Math.round(Math.min(0, -60 + t * 3) + 18 + Math.sin(t / 40) * 1.5);
     g.drawImage(logo, (W - logo.width) / 2, ly);

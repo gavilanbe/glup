@@ -37,7 +37,7 @@
 <script>
 (function () {
   const version = location.protocol === 'file:' ? Date.now() : '7';
-  for (const src of ['art.js', 'audio.js', 'levels.js', 'story.js', 'game.js']) document.write('<script src="' + src + '?v=' + version + '"><\/script>');
+  for (const src of ['art.js', 'mundo.js', 'audio.js', 'levels.js', 'story.js', 'game.js']) document.write('<script src="' + src + '?v=' + version + '"><\/script>');
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !location.search.includes('escena')) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 })();
 </script>
