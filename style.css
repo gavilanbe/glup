@@ -27,6 +27,8 @@ body.touch #hint { display: none; }
 #touch-buttons .jump { border-color: rgba(242, 197, 61, .8); }
 #touch-buttons .aim { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
 #touch-buttons .small { width: 46px; height: 46px; }
+#touch-buttons .mid { width: 56px; height: 56px; margin-bottom: 10px; border-color: rgba(191, 224, 238, .8); }
+#touch-buttons .mid.locked { opacity: .3; }
 body.in-menu #touch-pad, body.in-menu #touch-buttons { opacity: .45; }
 
 /* Portrait: the swamp on top, the controls in their own band underneath. */
@@ -39,11 +41,13 @@ body.portrait #touch-pad button { width: 72px; height: 72px; }
 body.portrait #touch-buttons { right: max(14px, env(safe-area-inset-right)); }
 body.portrait #touch-buttons .big { width: 84px; height: 84px; }
 body.portrait #touch-buttons .small { width: 52px; height: 52px; }
+body.portrait #touch-buttons .mid { width: 62px; height: 62px; }
 
 @media (max-height: 360px) and (orientation: landscape) {
   #touch-pad button { width: 52px; height: 52px; }
   #touch-buttons .big { width: 60px; height: 60px; }
   #touch-buttons .small { width: 40px; height: 40px; }
+  #touch-buttons .mid { width: 46px; height: 46px; }
   #touch-buttons .big span { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .touch-only button { transition: none; } .touch-only button.held { transform: none; } }

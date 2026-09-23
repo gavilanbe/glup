@@ -614,22 +614,32 @@ const MUNDO = (() => {
       }
       const ox = [3, 12, 5, 11][f], oy = [2, 1, 0, 3][f]; put(b, ox, oy, WISP[4]); put(b, 15 - ox, (oy + 3) % 5, WISP[3]);
     }));
-    // Lily pads, with a water lily on some.
-    const LILY = { o: '#15261e', L: '#b8d468', G: '#6a9a3c', g: '#4a7a34', d: '#2e5030', v: '#8ab850' };
-    const lilies = [sprite([
-      '...ooooo.ooo....',
-      '.ooLLGGGoGGGoo..',
-      'oLLGvGGGGGGvGGo.',
-      'oGGGGvGGGGvGGggo',
-      '.oggggvggvgggdo.',
-      '..oooooooooooo..'], LILY, 'lily-a'), sprite([
-      '....ooo.ooooo...',
-      '..ooLLoGGGGGGoo.',
-      '.oLLGGGvGGGvGGGo',
-      'oGGvGGGGGGGGvGgo',
-      '.oggggvgggvgggdo',
-      '..oooooooooooo..'], LILY, 'lily-b')];
-    const lotus = sprite(['...w...', '.wWpWw.', 'wpWYWpw', '.opppo.', '..ooo..'], { w: '#fff4f6', W: '#ffffff', p: '#e8a0b8', Y: '#ffd860', o: '#8a4a6a' }, 'lotus');
+    // Lily pads seen at a slight angle: a round leaf with its notch, veins from the centre, a lit rim,
+    // a darker underside and a wet shine; three variants. The water lily has layered petals.
+    const lilyPad = (seed, notch) => { const c = document.createElement('canvas'); c.width = 18; c.height = 9; const g = c.getContext('2d'); const cx = 9, cy = 4, rx = 8.2, ry = 3.6;
+      const P = (x, y, col) => { g.fillStyle = col; g.fillRect(x, y, 1, 1); };
+      for (let y = 0; y < 9; y++) for (let x = 0; x < 18; x++) {
+        const dx = (x + .5 - cx) / rx, dy = (y + .5 - cy) / ry, d = dx * dx + dy * dy; if (d > 1) continue;
+        const ang = Math.atan2(dy, dx), da = Math.abs(((ang - notch + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+        if (da > Math.PI - .38 && d > .08) continue;   // the notch
+        let col = dy < -.25 ? '#8ec050' : dy < .35 ? '#6a9a3c' : '#4a7a34';
+        const vein = [0, 1, 2, 3, 4, 5].some(k => Math.abs(((ang - k * 1.047 - seed) % 1.047 + 1.047) % 1.047) < .09) && d > .12 && d < .8; if (vein) col = dy < 0 ? '#b8d468' : '#8ab850';
+        if (d > .72) col = dy < 0 ? '#c8e07a' : '#2e5030';
+        P(x, y, col);
+      }
+      // Outline underneath, and a wet glint.
+      g.globalCompositeOperation = 'destination-over'; g.fillStyle = '#15261e'; g.beginPath(); g.ellipse(cx, cy + .6, rx + .8, ry + 1, 0, 0, 7); g.fill(); g.globalCompositeOperation = 'source-over';
+      P(5 + (seed * 3 | 0) % 3, 2, '#f4ffd8'); P(6 + (seed * 3 | 0) % 3, 2, '#dff0a0');
+      return c; };
+    const lilies = [lilyPad(.2, 1.9), lilyPad(.7, 1.2), lilyPad(.45, 2.6)];
+    const lotus = sprite([
+      '....w.w....',
+      '...wWpWw...',
+      '.w.pWWWp.w.',
+      'wWpWWYWWpWw',
+      '.pWpYYYpWp.',
+      '..pppYppp..',
+      '...ooooo...'], { w: '#ffe6ee', W: '#ffffff', p: '#e89ab4', Y: '#ffd24a', o: '#6a8a3a' }, 'lotus');
     // Decorations: a grass clump, cattails, a cluster of little mushrooms.
     const tuft = paint(11, 8, b => {
       for (let k = 0; k < 9; k++) { const bx = 1 + k, h = 2 + Math.round(Math.sin(k * 1.3) * 1.5 + 2.5); const lean = k < 3 ? -1 : k > 6 ? 1 : 0; for (let s = 0; s < h; s++) put(b, bx + (s > h - 3 ? lean : 0), 7 - s, pick(MOSS, .35 + .6 * s / h, bx, s)); }
@@ -673,7 +683,10 @@ const MUNDO = (() => {
           case 'w': {
             const top = !wet(at(tx, ty - 1)); g.drawImage(A.back[top ? 0 : 1][tx & 1], px, py);
             const bob = Math.round(Math.sin((t + tx * 9) / 20)) + (L.lily.has(tx + ',' + ty) ? 2 : 0);
-            g.drawImage(S.lilies[tx & 1], px, py + bob); if (h < .4) g.drawImage(S.lotus, px + 4 + (tx & 1) * 3, py - 4 + bob); break; }
+            // A ring of water around the pad, and ripples when someone steps on it.
+            const sunk = L.lily.has(tx + ',' + ty), rr = 9 + Math.sin((t + tx * 13) / 16) * .8; g.globalAlpha = .35; g.strokeStyle = '#cfeede'; g.beginPath(); g.ellipse(px + 8, py + 5 + bob, rr, 3.2, 0, 0, 7); g.stroke(); g.globalAlpha = 1;
+            if (sunk) { const k = (t % 24) / 24; g.globalAlpha = 1 - k; g.strokeStyle = '#e8fbff'; g.beginPath(); g.ellipse(px + 8, py + 5 + bob, 9 + k * 10, 3 + k * 2, 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
+            g.drawImage(S.lilies[(tx * 7 + ty) % 3], px - 1, py + bob); if (h < .4) g.drawImage(S.lotus, px + 3 + (tx & 1) * 3, py - 5 + bob); break; }
           case 'F': g.drawImage(S.fire[((t >> 3) + tx) % 4], px, py); break;
           case '^': g.drawImage(S.thorns[tx & 1], px, py + 8); break;
           case 'x': g.drawImage(S.cracked[(tx + ty) & 1], px, py); if (!solidC(at(tx, ty - 1))) g.drawImage(S.caps[tx % 3], px, py - 4); break;

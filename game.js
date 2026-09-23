@@ -8,7 +8,7 @@ const params_debug = () => /(?:\?|&)debug=1/.test(location.search);
 const Input = {
   held: {}, pressed: {}, keyHeld: {}, padHeld: {}, touchHeld: {}, mode: 'keys', anyKey: false, padSeen: false,
   KEYS: { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
-    KeyZ: 'jump', KeyK: 'jump', Space: 'jump', KeyX: 'fish', KeyJ: 'fish', KeyC: 'fish', Enter: 'confirm', Escape: 'pause', KeyP: 'pause', KeyM: 'mute', KeyF: 'fullscreen' },
+    KeyZ: 'jump', KeyK: 'jump', Space: 'jump', KeyX: 'fish', KeyJ: 'fish', KeyC: 'puff', KeyL: 'puff', Enter: 'confirm', Escape: 'pause', KeyP: 'pause', KeyM: 'mute', KeyF: 'fullscreen' },
   init() {
     addEventListener('keydown', e => {
       const a = Input.KEYS[e.code]; if (!a) return; e.preventDefault();
@@ -27,7 +27,7 @@ const Input = {
     if (!pad) return;
     const b = i => !!(pad.buttons[i] && (pad.buttons[i].pressed || pad.buttons[i].value > .5));
     const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
-    const next = { left: b(14) || ax < -.4, right: b(15) || ax > .4, up: b(12) || ay < -.5, down: b(13) || ay > .5, jump: b(0), fish: b(2) || b(1) || b(5) || b(7), pause: b(9), confirm: b(0) };
+    const next = { left: b(14) || ax < -.4, right: b(15) || ax > .4, up: b(12) || ay < -.5, down: b(13) || ay > .5, jump: b(0), fish: b(2) || b(5) || b(7), puff: b(1) || b(4) || b(6), pause: b(9), confirm: b(0) };
     let any = false;
     for (const a in next) { if (next[a] && !Input.padHeld[a]) { Input.press(a); any = true; } Input.padHeld[a] = next[a]; if (next[a]) any = true; }
     if (any) Input.mode = 'pad';
@@ -251,7 +251,7 @@ function updateParts() {
 
 // ---------------------------------------------------------------- Lo que Bigotes aprende
 const POWERS = {
-  soplido: { name: 'Soplido', food: 'un vilano de diente de león', text: 'Con la boca vacía, un toque de {fish} es un soplido: aparta y aturde a los bichos, mueve molinillos y balsas.' },
+  soplido: { name: 'Soplido', food: 'un vilano de diente de león', text: 'Pulsa {puff} y Bigotes sopla: una ráfaga que aparta y aturde a los bichos, mueve molinillos y balsas.' },
   aleteo: { name: 'Aleteo', food: 'una luciérnaga dorada', text: 'Pulsa {jump} otra vez en el aire y Bigotes aletea: salto doble.' },
   ventosa: { name: 'Ventosa', food: 'una lapa del pantano', text: 'Bigotes se pega a los muros de raíces: empuja contra ellos, resbala y salta de pared en pared.' },
   chorro: { name: 'Trago de agua', food: 'un nenúfar azul', text: 'Bigotes traga agua: sórbela de una charca, escúpela sobre el fuego, o mantén {fish} en el aire para flotar con el chorro.' },
@@ -405,9 +405,14 @@ const Player = {
     for (const e of L.ents) if (e.enemy && !e.dead && Math.abs(e.x + e.w / 2 - (p.x + 5)) < 48 && Math.abs(e.y - p.y) < 30) { e.stun = 50; e.vy = -2.5; e.vx = Math.sign(e.x - p.x) * 1.2; if (e.armored) e.tug = 20; }
     if (hit.ch === '%') { p.vy = -11; p.jumpCut = false; p.onGround = false; Game.word('¡BOOING!', p.x + 5, p.y - 16, '#f6e6c8', true); }
   },
-  // Bigotes: hold to suck (or to charge when full), tap to puff (or to spit when full), hold in the air with water to hover, down+tap to drop.
+  // Bigotes: hold to suck (or to charge when full), tap to spit, hold in the air with water to hover, down+tap to drop.
+  // The puff has its own button, so sucking and puffing never get mixed up.
   fish() {
     const p = Player, down = Input.held.fish;
+    if (Input.pressed.puff && !p.sucking && p.puffCd === 0) {
+      if (p.held) { const m = p.mouth(); p.puffCd = 18; Sound.play('blub'); Game.word('mmf', m.x, m.y - 10, '#9fc0cc', false); p.sx = 1.06; p.sy = .95; }
+      else if (Game.has('soplido')) Player.inhale(); else Player.burp();
+    }
     if (Input.pressed.fish) { p.fishDown = true; p.fishT = 0; }
     if (down && p.fishDown) p.fishT++;
     const wasHover = p.hover; p.hover = false;
@@ -435,7 +440,7 @@ const Player = {
     } else {
       p.charge = 0;
       if (down && p.fishDown && !p.sucking && p.fishT > 4) { p.sucking = true; p.suckT = 0; p.waterT = 0; Sound.suck(true); }
-      if (!down && p.fishDown) { p.fishDown = false; if (p.sucking) { p.sucking = false; Sound.suck(false); Player.letGo(); } else if (p.fishT <= 4 && p.puffCd === 0 && Game.has('soplido')) Player.inhale(); else if (p.fishT <= 4 && p.puffCd === 0) Player.burp(); }
+      if (!down && p.fishDown) { p.fishDown = false; if (p.sucking) { p.sucking = false; Sound.suck(false); Player.letGo(); } }
       if (p.sucking) Player.suck();
     }
     if (wasHover && !p.hover) Sound.jet(false);
@@ -924,11 +929,45 @@ const Item = {
       for (const o of L.ents) if (!o.dead && (o.kind === 'crate' || o.kind === 'rock') && o.resting && overlap(top, { x: o.x, y: o.y + o.h - 2, w: o.w, h: 3 })) on = true;
       if (on !== e.pressed) { e.pressed = on; Sound.play(on ? 'switch' : 'thud'); if (on) { Game.word('CLIC', e.x + 8, e.y - 6, '#d8f0b8', false); spawnParts(6, e.x + 8, e.y, { color: ['#a6abb8', '#d0d6da'], speed: [.3, 1.2], life: [8, 16], g: .05 }); } Game.setGate(e.idx, L.ents.some(o => o.kind === 'plate' && o.idx === e.idx && o.pressed)); }
     }, draw(e, g) { g.drawImage(e.pressed ? ART.plate.on : ART.plate.off, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y)); } }; },
-  pinwheel(x, y, idx) { return { kind: 'pinwheel', x, y, w: 16, h: 16, idx, spin: 0, t: 0, open: false, update(e) {
+  pinwheel(x, y, idx) { return { kind: 'pinwheel', x, y, w: 16, h: 16, idx, spin: 0, t: 0, open: false, ang: 0, vel: 0, update(e) {
       e.t++; if (e.spin > 0) e.spin--; const open = e.spin > 0; if (open !== e.open) { e.open = open; Game.setGate(e.idx, open); if (!open) Game.word('...', e.x + 8, e.y - 4, '#9fc0cc', false); }
-      if (e.spin > 0 && e.t % 4 === 0) spawnParts(1, e.x + 8 + rnd(-6, 6), e.y + 6 + rnd(-6, 6), { color: ['#e8f0c8', '#cfe0e8'], speed: [.2, .6], life: [6, 12], g: 0 });
-    }, blow(e, dir) { const fresh = e.spin === 0; e.spin = 300; Sound.play('switch'); Game.word(fresh ? '¡GIRA!' : '¡MÁS!', e.x + 8, e.y - 6, '#e8f0c8', true); spawnParts(10, e.x + 8, e.y + 6, { color: ['#d95a4a', '#f2c53d', '#5fae5a', '#e8f0c8'], speed: [.5, 2], life: [10, 20], g: .02 }); },
-    draw(e, g) { const f = e.spin > 0 ? (e.t >> (e.spin < 60 ? 2 : 1)) % 2 : 0; g.drawImage(ART.pinwheel[f], Math.round(e.x - Cam.x), Math.round(e.y - Cam.y)); if (e.spin > 0 && e.spin < 60 && (e.t >> 2) % 2) g.drawImage(ART.tint(ART.pinwheel[f], '#fff6d6'), Math.round(e.x - Cam.x), Math.round(e.y - Cam.y)); } }; },
+      // Spinning fast while blown, slowing down over the last second; idle it rocks in the breeze.
+      const target = e.spin > 60 ? .42 : e.spin > 0 ? .42 * e.spin / 60 : Math.sin(e.t / 50) * .012;
+      e.vel += (target - e.vel) * .08; e.ang += e.vel;
+      if (e.spin > 0 && e.t % 4 === 0) spawnParts(1, e.x + 8 + rnd(-7, 7), e.y + 2 + rnd(-7, 7), { color: ['#e8f0c8', '#cfe0e8'], speed: [.2, .6], life: [6, 12], g: 0 });
+    }, blow(e, dir) { const fresh = e.spin === 0; e.spin = 300; e.vel += .2; Sound.play('switch'); Game.word(fresh ? '¡GIRA!' : '¡MÁS!', e.x + 8, e.y - 10, '#e8f0c8', true); spawnParts(10, e.x + 8, e.y + 2, { color: ['#d95a4a', '#f2c53d', '#4a8ad0', '#5fae5a'], speed: [.5, 2], life: [10, 20], g: .02 }); },
+    draw(e, g) { Item.pinwheelDraw(g, Math.round(e.x - Cam.x) + 8, Math.round(e.y - Cam.y) + 2, e.ang, Math.abs(e.vel), e.spin > 0 && e.spin < 60 && (e.t >> 2) % 2); } }; },
+  // A paper pinwheel: four folded blades (lit face, crease, shaded face) on a brass pin, a wooden stick with a bow.
+  pinwheelDraw(g, cx, cy, ang, speed, flash) {
+    const O = '#1a1420';
+    // Stick with grain, bow of twine and a little mound of earth.
+    g.fillStyle = O; g.fillRect(cx - 2, cy, 4, 16); g.fillStyle = '#8a5a34'; g.fillRect(cx - 1, cy, 2, 15); g.fillStyle = '#c08a50'; g.fillRect(cx - 1, cy, 1, 15);
+    g.fillStyle = '#d8c090'; g.fillRect(cx - 3, cy + 7, 6, 1); g.fillRect(cx - 4, cy + 8, 2, 2); g.fillRect(cx + 2, cy + 8, 2, 2);
+    g.fillStyle = O; g.fillRect(cx - 5, cy + 14, 10, 3); g.fillStyle = '#4a3226'; g.fillRect(cx - 4, cy + 14, 8, 2); g.fillStyle = '#7fb040'; g.fillRect(cx - 5, cy + 13, 2, 1); g.fillRect(cx + 3, cy + 13, 2, 1);
+    const COLS = [['#f06a5a', '#c8403a', '#8a2a2a'], ['#ffd860', '#e0a830', '#9a6a20'], ['#6aa8f0', '#3a70c0', '#264a8a'], ['#80d070', '#4a9a4a', '#2e6a36']];
+    const blades = (a0, alpha) => {
+      g.globalAlpha = alpha;
+      for (let i = 0; i < 4; i++) {
+        const a = a0 + i * Math.PI / 2, c = COLS[i], R = 9;
+        // Each blade: a triangle from the centre to the tip and back along the fold.
+        const pt = (an, r) => ({ x: cx + Math.cos(an) * r, y: cy + Math.sin(an) * r });
+        const tip = pt(a, R), mid = pt(a + .42, R * .82), side = pt(a + .98, R * .62);
+        const tri = (p1, p2, p3, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(p1.x, p1.y); g.lineTo(p2.x, p2.y); g.lineTo(p3.x, p3.y); g.closePath(); g.fill(); };
+        // A 1-px dark rim around each face, then the lit face and the shaded face of the fold.
+        const grow = q => ({ x: cx + (q.x - cx) * 1.14, y: cy + (q.y - cy) * 1.14 });
+        tri({ x: cx, y: cy }, grow(tip), grow(mid), O); tri({ x: cx, y: cy }, grow(mid), grow(side), O);
+        tri({ x: cx, y: cy }, tip, mid, c[0]); tri({ x: cx, y: cy }, mid, side, c[1]);
+        g.fillStyle = c[2]; g.beginPath(); g.moveTo(cx, cy); g.lineTo(mid.x, mid.y); g.lineTo(cx + (mid.x - cx) * .9 + (side.x - mid.x) * .15, cy + (mid.y - cy) * .9 + (side.y - mid.y) * .15); g.fill();
+        g.fillStyle = c[2]; g.fillRect(Math.round(side.x), Math.round(side.y), 1, 1); g.fillStyle = '#ffffff'; g.fillRect(Math.round(cx + Math.cos(a + .2) * 5), Math.round(cy + Math.sin(a + .2) * 5), 1, 1);
+      }
+      g.globalAlpha = 1;
+    };
+    // Motion blur: fainter copies trailing behind when it spins fast.
+    if (speed > .15) { blades(ang - speed * 1.4, .25); blades(ang - speed * .7, .45); }
+    blades(ang, 1);
+    if (flash) { g.globalAlpha = .5; g.fillStyle = '#fff6d6'; g.beginPath(); g.arc(cx, cy, 9, 0, 7); g.fill(); g.globalAlpha = 1; }
+    g.fillStyle = O; g.fillRect(cx - 2, cy - 2, 4, 4); g.fillStyle = '#e2b63c'; g.fillRect(cx - 1, cy - 1, 2, 2); g.fillStyle = '#fff3b0'; g.fillRect(cx - 1, cy - 1, 1, 1);
+  },
   raft(x, y) { const r = { kind: 'raft', x, y, w: 24, h: 6, vx: 0, t: 0, platform: true, resting: true, solid: false, update(e) {
       e.t++; e.vx *= .975; if (Math.abs(e.vx) < .02) e.vx = 0;
       if (e.vx) { const ox = e.x; if (moveX(e, e.vx)) e.vx = 0; const ahead = e.vx > 0 ? e.x + e.w + 2 : e.x - 2; if (!waterAt(ahead, e.y + 10)) { e.x = ox; e.vx = -e.vx * .3; } }
@@ -1361,6 +1400,7 @@ const Game = {
       case 'cine': if (!Game.frozen) Cine.update(); break;
     }
     Touch.updateButtons && Touch.updateButtons();
+    const pb = Touch.buttons.find(b => b.dataset.act === 'puff'); if (pb) pb.classList.toggle('locked', !Game.has('soplido'));
     Game.updateShell();
   },
   updateShell() {
@@ -1539,7 +1579,7 @@ const Game = {
   noteRaw(e) { return (e.kind === 'ruca' ? L.def.ruca : L.def.signs)[e.idx] || ''; },
   signText(idx, rawText) {
     const def = L.def; const raw = rawText !== undefined && rawText !== null ? rawText : (def.signs[idx] || ''); const m = Input.mode;
-    const map = m === 'touch' ? { move: 'La cruceta', jump: 'SALTO', fish: 'BIGOTES', up: '▲', down: '▼' } : m === 'pad' ? { move: 'El stick', jump: 'A', fish: 'X', up: 'arriba', down: 'abajo' } : { move: 'Flechas', jump: 'Z o espacio', fish: 'X', up: '↑', down: '↓' };
+    const map = m === 'touch' ? { move: 'La cruceta', jump: 'SALTO', fish: 'BIGOTES', puff: 'SOPLO', up: '▲', down: '▼' } : m === 'pad' ? { move: 'El stick', jump: 'A', fish: 'X', puff: 'B', up: 'arriba', down: 'abajo' } : { move: 'Flechas', jump: 'Z o espacio', fish: 'X', puff: 'C', up: '↑', down: '↓' };
     return raw.replace(/\{(\w+)\}/g, (_, k) => map[k] || k).replace('▲', '↑').replace('▼', '↓');
   },
   // ---------------------------------------------------------------- Dibujo

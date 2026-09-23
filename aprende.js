@@ -5,7 +5,7 @@
 const Aprende = (() => {
   const ABSORB = 34, RAISE = 36, NAME = 80, DEMO = 118, READY = 150, EXIT = 22;
   const KEYS = {
-    aleteo: '{jump} otra vez en el aire', soplido: 'Toca {fish} con la boca vacía', ventosa: '{jump} pegada al muro de raíces',
+    aleteo: '{jump} otra vez en el aire', soplido: 'Pulsa {puff} para soplar', ventosa: '{jump} pegada al muro de raíces',
     chorro: 'Con agua, mantén {fish} en el aire', mordisco: '{up} y mantén {fish} hacia el aro', panzazo: '{down} y {jump} en el aire',
     guindilla: 'Mantén {fish} con la boca llena y suelta', resbalon: '{down} mientras corres' };
   const hash = i => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -30,7 +30,7 @@ const Aprende = (() => {
 
   // ---------------------------------------------------------------- Dibujo
   function keycaps(g, text, cx, y) {
-    const m = Input.mode, map = m === 'touch' ? { jump: 'SALTO', fish: 'BIGOTES', up: '▲', down: '▼' } : m === 'pad' ? { jump: 'A', fish: 'X', up: '↑', down: '↓' } : { jump: 'Z', fish: 'X', up: '↑', down: '↓' };
+    const m = Input.mode, map = m === 'touch' ? { jump: 'SALTO', fish: 'BIGOTES', puff: 'SOPLO', up: '▲', down: '▼' } : m === 'pad' ? { jump: 'A', fish: 'X', puff: 'B', up: '↑', down: '↓' } : { jump: 'Z', fish: 'X', puff: 'C', up: '↑', down: '↓' };
     const parts = text.split(/(\{\w+\})/).filter(Boolean).map(s => { const k = /^\{(\w+)\}$/.exec(s); return k ? { cap: map[k[1]] || k[1] } : { txt: s }; });
     const wOf = p => p.cap ? ART.textWidth(p.cap) + 8 : ART.textWidth(p.txt);
     let x = Math.round(cx - parts.reduce((a, p) => a + wOf(p), 0) / 2);

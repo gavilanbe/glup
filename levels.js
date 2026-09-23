@@ -491,7 +491,7 @@ const LEVELS = (() => {
         'La Garza se posó en el molino viejo. Toma la barca; yo voy por mis atajos.'],
       signs: [
         'Dale a la diana con algo escupido y la compuerta se abrirá para siempre.',
-        'Súbete a la balsa, mira hacia atrás y sopla con {fish}: Bigotes la empuja.',
+        'Súbete a la balsa, mira hacia atrás y sopla con {puff}: Bigotes la empuja.',
         'Mantén {up} al escupir y Bigotes lanza hacia arriba.'] },
     { name: 'El molino anegado', theme: 'storm', music: 'storm', rows: molino, powers: ['chorro', 'panzazo'],
       intro: 'La tormenta obligó a la Garza a pasar la noche en el molino.',
@@ -508,7 +508,7 @@ const LEVELS = (() => {
         'Al otro lado del río está el ciprés muerto. El nido. Ve con cuidado, Nila.'],
       signs: [
         'Esa charca da para apagar el fuego. O salta con ganas.',
-        'Sopla al molinillo y corre: el túnel es largo. Corriendo, {down} y Nila se desliza sobre Bigotes.',
+        'Sopla al molinillo con {puff} y corre: el túnel es largo. Corriendo, {down} y Nila se desliza sobre Bigotes.',
         'Aros hacia arriba: sorbe con {up} y, desde cada aro, busca el siguiente.'] },
     { name: 'El nido de la Garza', theme: 'nest', music: 'heron', rows: nido, boss: true,
       intro: 'En lo alto del ciprés muerto, la Garza espera.',

@@ -18,7 +18,7 @@ Como en Rayman, las habilidades se van consiguiendo, y aquí todas las da el pez
 
 | Bocado | Truco | Qué permite |
 |---|---|---|
-| Vilano de diente de león | **Soplido** | Toque de BIGOTES con la boca vacía: aparta y aturde bichos, mueve molinillos y balsas |
+| Vilano de diente de león | **Soplido** | Botón SOPLO (C en teclado, B en mando): aparta y aturde bichos, mueve molinillos y balsas |
 | Luciérnaga dorada | **Aleteo** | Salto otra vez en el aire: Bigotes aletea (salto doble) |
 | Lapa del pantano | **Ventosa** | Bigotes se pega a los muros de raíces: resbalar y saltar de pared en pared |
 | Nenúfar azul | **Trago de agua** | Sorber agua, apagar hogueras, chorro para flotar |
@@ -37,7 +37,7 @@ El agua es agua: el escupitajo es una columna gruesa y continua atada a la boca 
 
 - **Sorber** (mantén BIGOTES con la boca vacía): lo que entra en el cono se acerca hasta que hace *glup*. Caracoles, ranas, mosquitos, cajas, piedras… y **agua** de cualquier charca o río. Con ↑ apunta hacia arriba.
 - **Izarse** (sorbe un **aro** apuntando arriba): Bigotes se agarra y tira de Nila hasta dejarla colgando bajo el aro. Desde ahí, salta para soltarte o sigue sorbiendo hacia el siguiente aro. Así se suben pozos y salientes.
-- **Soplido** (toque con la boca vacía): Bigotes toma aire con los mofletes hinchados y suelta una ráfaga que viaja (remolinos, frente de viento, espirales, hojas y polvo levantados) y empuja y aturde a los bichos, hace girar los **molinillos** (abren su compuerta mientras giran) y, encima de una **balsa**, la impulsa hacia el lado contrario.
+- **Soplido** (botón propio, SOPLO): Bigotes toma aire con los mofletes hinchados y suelta una ráfaga que viaja (remolinos, frente de viento, espirales, hojas y polvo levantados) y empuja y aturde a los bichos, hace girar los **molinillos** (abren su compuerta mientras giran) y, encima de una **balsa**, la impulsa hacia el lado contrario.
 - **Escupir** (toque con la boca llena): las **piedras** rompen muros agrietados, rebotan y se quedan; las **cajas** vuelan en arco corto y se quedan donde caen; los **bichos** se llevan por delante a otros bichos (¡DOBLE!); el **agua** apaga hogueras y empuja enemigos.
 - **Soltar** (↓ y BIGOTES en el suelo): deja lo que lleves a los pies de Nila. Es la forma de poner una caja sobre una **placa de presión**, que mantiene abierta su compuerta mientras algo pese encima.
 - **Escupitajo cargado** (mantén con la boca llena y suelta): sale recto y rápido, atraviesa enemigos, voltea cangrejos de lejos, hace doble daño a la Garza y es lo único que rompe la **piedra reforzada**.
@@ -69,11 +69,11 @@ Cada acción responde de forma proporcional y nada falla en silencio. Lo que se 
 
 ## Controles
 
-**Teclado:** flechas o WASD mover · Z, K o espacio saltar (otra vez en el aire: aleteo; ↓ y salto: planchazo) · X, J o C Bigotes · ↑ apunta arriba · ↓ agacha, desliza o suelta · Esc o P pausa · M sonido · F pantalla completa.
+**Teclado:** flechas o WASD mover · Z, K o espacio saltar (otra vez en el aire: aleteo; ↓ y salto: planchazo) · X o J Bigotes (sorber, escupir) · C o L soplar · ↑ apunta arriba · ↓ agacha, desliza o suelta · Esc o P pausa · M sonido · F pantalla completa.
 
-**Mando:** stick o cruceta · A saltar · X, B o gatillos Bigotes · Start pausa.
+**Mando:** stick o cruceta · A saltar · X, RB o RT Bigotes · B, LB o LT soplar · Start pausa.
 
-**Móvil:** en horizontal los mandos flotan sobre el juego (cruceta a la izquierda; ▲, ▼, BIGOTES y SALTO a la derecha); en vertical el juego queda arriba y los mandos debajo. Se puede deslizar el pulgar entre ◀ y ▶ sin levantarlo. Los carteles del juego cambian sus textos según juegues con teclado, mando o pantalla táctil. La barra superior tiene pausa, sonido y pantalla completa; se respetan las zonas seguras del teléfono y al pasar la página a segundo plano el juego se pausa solo.
+**Móvil:** en horizontal los mandos flotan sobre el juego (cruceta a la izquierda; ▲, ▼, SOPLO, BIGOTES y SALTO a la derecha; SOPLO se enciende al aprender el soplido); en vertical el juego queda arriba y los mandos debajo. Se puede deslizar el pulgar entre ◀ y ▶ sin levantarlo. Los carteles del juego cambian sus textos según juegues con teclado, mando o pantalla táctil. La barra superior tiene pausa, sonido y pantalla completa; se respetan las zonas seguras del teléfono y al pasar la página a segundo plano el juego se pausa solo.
 
 Progreso y sonido se guardan en el navegador. El selector de niveles muestra las crías rescatadas y el mejor tiempo de cada uno.
 

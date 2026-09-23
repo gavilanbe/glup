@@ -102,7 +102,7 @@ const RAFT = DO('balsa', g => {
     if (!P.onGround) { const t = raft.x + 7; g.frame(Object.assign({ jump: 1 }, P.x < t - 1 ? { right: 1 } : P.x > t + 1 ? { left: 1 } : {})); continue; }
     const cria = g.L.ents.find(e => e.kind === 'pearl' && e.y < P.y && Math.abs(e.x + 4 - (P.x + 5 + raft.vx * 12)) < 9);
     if (cria) { g.frame({ jump: 1 }); continue; }
-    if (raft.vx < .6) { g.frame({ left: 1 }); g.run({}, 3); g.frame({ fish: 1 }); g.run({}, 2); continue; }
+    if (raft.vx < .6) { g.frame({ left: 1 }); g.run({}, 3); g.frame({ puff: 1 }); g.run({}, 8); continue; }
     g.frame({});
   }
   return 'la balsa no llegó';

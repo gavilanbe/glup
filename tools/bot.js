@@ -64,7 +64,7 @@ const A = {
   suck(n = 40, up = false) { g.run(up ? { fish: 1, up: 1 } : { fish: 1 }, n); g.run({}, 2); },
   spit(dir, up = false) { if (dir) g.run(dir < 0 ? { left: 1 } : { right: 1 }, 2); g.run({}, 1); g.run(up ? { fish: 1, up: 1 } : { fish: 1 }, 2); g.run({}, 10); },
   charge(dir, up = false) { if (dir) g.run(dir < 0 ? { left: 1 } : { right: 1 }, 2); g.run({}, 1); g.run(up ? { fish: 1, up: 1 } : { fish: 1 }, 50); g.run({}, 10); },
-  puff(dir) { if (dir) g.run(dir < 0 ? { left: 1 } : { right: 1 }, 2); g.run({}, 1); g.run({ fish: 1 }, 2); g.run({}, 20); },
+  puff(dir) { if (dir) g.run(dir < 0 ? { left: 1 } : { right: 1 }, 2); g.run({}, 1); g.run({ puff: 1 }, 2); g.run({}, 20); },
   drop() { g.run({}, 1); g.run({ down: 1, fish: 1 }, 2); g.run({}, 10); },
   face(dir) { g.run(dir < 0 ? { left: 1 } : { right: 1 }, 1); g.run({}, 4); }
 };
