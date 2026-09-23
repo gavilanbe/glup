@@ -733,7 +733,7 @@ const Player = {
         Player.drawFishLife(g, at, fs, t);
         if (p.grapple) { const hd = Player.fishHead, a = p.grapple, top = Math.round(a.top - Cam.y), cx = Math.round(a.x + 5 - Cam.x), vib = p.hanging ? 0 : Math.sin(t * 2.3) * .6;
           g.fillStyle = '#e8f0f8'; const n = Math.max(1, Math.round(Math.hypot(hd.x - cx, hd.y - top))); for (let i = 0; i <= n; i++) { const k = i / n; g.fillRect(Math.round(cx + (hd.x - cx) * k + Math.sin(k * Math.PI) * vib), Math.round(top + 2 + (hd.y - 2 - top) * k), 1, 1); }
-          Item.hookShape(g, Math.round(hd.x), Math.round(hd.y) - 4, false, t, p.dir); }
+          Item.hookShape(g, Math.round(hd.x), Math.round(hd.y) - 10, false, t, p.dir); }
         // Nila's hand comes down over his flank, just under her chin.
         const hs = p.dir > 0 ? ART.hand : ART.flip(ART.hand);
         g.drawImage(hs, HX - (p.dir > 0 ? 3 : hs.width - 4), HY - 3);
@@ -948,13 +948,16 @@ const Item = {
     if (e.tied) { g.fillStyle = '#1a1420'; g.fillRect(cx - 4, top, 9, 3); g.fillStyle = '#6b4a30'; g.fillRect(cx - 3, top, 7, 2); g.fillStyle = '#8a6a4a'; g.fillRect(cx - 3, top, 7, 1); g.fillStyle = '#5e8a2e'; g.fillRect(cx + 3, top + 2, 2, 1); }
     if (held) return;   // the hook is in Bigotes' mouth; the fish draws it and the taut line.
     // The line, a slight curve, and the float on it (it ducks under when something bites).
-    g.fillStyle = '#d8e0e8'; const fy = hy - 14; for (let y = top + 2; y < hy - 5; y++) { const k = (y - top) / Math.max(1, hy - top); g.fillRect(Math.round(cx + sway * k), y, 1, 1); }
-    const fx = Math.round(cx + sway * (fy - top) / Math.max(1, hy - top)); g.fillStyle = '#1a1420'; g.fillRect(fx - 2, fy - 3, 5, 7); g.fillStyle = '#e8403a'; g.fillRect(fx - 1, fy - 2, 3, 3); g.fillStyle = '#ffffff'; g.fillRect(fx - 1, fy + 1, 3, 2); g.fillStyle = '#ff9a8a'; g.fillRect(fx - 1, fy - 2, 1, 1); g.fillStyle = '#1a1420'; g.fillRect(fx, fy - 5, 1, 2);
+    g.fillStyle = '#d8e0e8'; const fy = hy - 20; for (let y = top + 2; y < hy - 11; y++) { const k = (y - top) / Math.max(1, hy - top); g.fillRect(Math.round(cx + sway * k), y, 1, 1); }
+    const fx = Math.round(cx + sway * (fy - top) / Math.max(1, hy - top)); g.fillStyle = '#1a1420'; g.fillRect(fx - 3, fy - 4, 7, 10); g.fillStyle = '#e8403a'; g.fillRect(fx - 2, fy - 3, 5, 4); g.fillStyle = '#ffffff'; g.fillRect(fx - 2, fy + 1, 5, 4); g.fillStyle = '#ff9a8a'; g.fillRect(fx - 2, fy - 3, 2, 1); g.fillStyle = '#c8c0b0'; g.fillRect(fx + 1, fy + 3, 1, 2); g.fillStyle = '#1a1420'; g.fillRect(fx, fy - 7, 1, 3); g.fillStyle = '#d8e0e8'; g.fillRect(fx, fy + 6, 1, hy - 5 - (fy + 6));
+    // A soft halo and a glint every so often, so the hook reads even in the dark.
+    g.globalAlpha = .18 + Math.sin(e.t / 12) * .06; g.fillStyle = Game.has('mordisco') ? '#fff3b8' : '#cfe0e8'; g.beginPath(); g.arc(hx + 3, hy + 4, 11, 0, 7); g.fill(); g.globalAlpha = 1;
     Item.hookShape(g, hx, hy, e.bait, e.t);
+    if ((e.t % 90) < 8) { const k = e.t % 90, r = k < 4 ? k : 8 - k; g.fillStyle = '#ffffff'; g.fillRect(hx + 9 - r, hy + 2, r * 2 + 1, 1); g.fillRect(hx + 9, hy + 2 - r, 1, r * 2 + 1); }
   },
   // The hook itself: an eye, a shank, the bend and a barbed point, in steel with a highlight; a worm curls on the bend.
-  hookShape(g, hx, hy, bait, t, flip = 1) {
-    const P = (x, y, c) => { g.fillStyle = c; g.fillRect(hx + x * flip, hy + y, 1, 1); };
+  hookShape(g, hx, hy, bait, t, flip = 1, s = 2) {
+    const P = (x, y, c) => { g.fillStyle = c; g.fillRect(hx + (flip > 0 ? x * s : -x * s - s + 1), hy + y * s, s, s); };
     const O = '#1a1420', S = '#b8c4d0', Sh = '#6a7480', Hi = '#ffffff';
     for (const [x, y] of [[-1, -5], [1, -5], [-1, -4], [1, -4], [0, -6], [0, -3]]) P(x, y, O);  // eye outline
     P(0, -5, '#2a3040'); P(0, -4, '#2a3040');
