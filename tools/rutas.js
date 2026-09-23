@@ -59,39 +59,117 @@ const SLIDE_AT = (px, dir = 1, n = 200) => DO('resbalón en x=' + px, g => {
 });
 // Stand still until `cond(g)` holds (at most `n` frames).
 const UNTIL = (label, cond, n = 3000) => DO(label, g => { for (let k = 0; k < n && !cond(g); k++) g.frame({}); return cond(g) || 'nunca: ' + label; });
-// The heron fight, played frame by frame: fetch a rock, stand with Bigotes' mouth under her and spit it up;
-// when she shrieks and dives, run out from under her.
+// The heron fight, played frame by frame with real inputs. The bot reads her state (it is allowed to know
+// what the telegraphs say) and, every frame: gets out of any marked danger (the dive's shadow, the stab's
+// reach, the darts' crosses, the falling rocks), counters the wing gust with a puff, and otherwise fetches a
+// stone and returns it: up at her when she flies, a charged spit when her beak is stuck or she is dizzy.
 const HERON = DO('pelea con la Garza', g => {
-  const side = d => d < 0 ? { left: 1 } : { right: 1 };
-  for (let n = 0; n < 12000; n++) {
-    const b = g.L.boss, P = g.P;
-    if (g.L.boatSpawned) return true;
-    if (P.dead) return 'Nila murió';
-    if (!b || g.Game.hitStop > 0 || ['dying', 'leave'].includes(b.state)) { g.frame({}); continue; }
-    const px = P.x + 5, bc = b.x + b.w / 2, mx = P.x + 5 + P.dir * 2; // aiming up, the shot leaves from over her head
-    const threat = b.state === 'dive' || (b.state === 'aim' && b.st > 25);
-    if (threat) { let away = px < bc ? -1 : 1; if (px < 40) away = 1; if (px > g.L.w * 16 - 40) away = -1; g.frame(side(away)); continue; }
-    if (P.held) {
-      if (['hover', 'aim', 'rise'].includes(b.state) && Math.abs(bc - mx) < 8) { g.frame({ fish: 1, up: 1 }); g.frame({ up: 1 }); continue; }
-      g.frame(Math.abs(bc - mx) > 4 ? side(bc - mx) : {}); continue;
+  const side = d => d < 0 ? { left: 1 } : d > 0 ? { right: 1 } : {};
+  const VULN = { hover: 1, aim: 1, rise: 1, rainUp: 1, fanAir: 1, lock: 1 }, OPEN = { stuck: 1, stagger: 1, land: 1 };
+  let charging = 0, sucking = 0, stuckT = 0, lastX = 0, deaths = 0, wasDead = false;
+  const log = [];
+  for (let n = 0; n < 40000; n++) {
+    const b = g.L.boss, P = g.P, L = g.L;
+    if (L.boatSpawned) return deaths ? 'Nila murió ' + deaths + ' veces' : true;
+    if (P.dead) { if (!wasDead) { deaths++; wasDead = true; log.push('muerte en ' + (b && b.state) + ' fase ' + (b && b.phase)); } charging = 0; sucking = 0; g.frame({}); continue; }
+    wasDead = false;
+    if (!b || b.dead || !b.fight || b.lock || g.Game.fadeTo || ['intro', 'final', 'dying', 'leave', 'return'].includes(b.state)) { charging = 0; sucking = 0; g.frame({}); continue; }
+    const c0 = L.w - 24, floor = (L.h - 3) * 16, wet = b.phase >= 3 || L.bossCk >= 3;
+    const lo = (c0 + (wet ? 3 : 1)) * 16 + 12, hi = (L.w - (wet ? 4 : 2)) * 16 - 12;
+    const px = P.x + 5, bc = b.x + 15, st = b.state, onFloor = b.y + 30 >= floor - 2;
+    // ---- Danger: intervals of x where Nila's centre must not be.
+    const zones = [];
+    if (st === 'lock' || st === 'plunge') zones.push([b.tx - 32, b.tx + 32]);
+    if (st === 'aim' && b.dive === 2) zones.push([bc - 34, bc + 34]);
+    if (onFloor && !['stuck', 'stagger', 'reel2'].includes(st)) zones.push([b.x - 10, b.x + 40]);
+    if (st === 'windup' || st === 'stab') { const d = b.sdir || b.dir; zones.push(d < 0 ? [b.x - 62, b.x + 40] : [b.x - 10, b.x + 92]); }
+    if (st === 'walk' && P2(b) === 'stab') zones.push([bc - 40, bc + 40]);
+    if (b.aims) for (const q of b.aims) zones.push([q.sx - 18, q.sx + 18]);
+    for (const e of L.ents) if (!e.dead && ((e.kind === 'plume' && !e.stuck) || e.hazard)) { const x = e.kind === 'plume' ? e.sx : e.x + 6, r = e.kind === 'plume' ? 18 : 16; zones.push([x - r, x + r]); }
+    if (b.rain) for (const x of b.rain) zones.push([x - 16, x + 16]);
+    if (st === 'rainUp' && b.st < 30) zones.push([px - 20, px + 20]);
+    const bad = x => zones.some(([a, c]) => x > a && x < c) || x < lo || x > hi;
+    const safeNear = x => { x = Math.max(lo, Math.min(hi, x)); if (!bad(x)) return x; for (let d = 2; d < 400; d += 2) { if (!bad(x + d)) return x + d; if (!bad(x - d)) return x - d; } return x; };
+    const go = (x, extra = {}) => {
+      const d = x - px; const inp = Object.assign({}, Math.abs(d) > 2 ? side(d) : {}, extra);
+      // Blocked by a crate: hop onto it.
+      if (Math.abs(d) > 6 && P.onGround && Math.abs(P.x - lastX) < .05 && !P.crouch) { if (++stuckT > 3) { inp.jump = 1; stuckT = 0; } } else stuckT = 0;
+      lastX = P.x; g.frame(inp);
+    };
+    // ---- A charge in progress: keep holding, let go when full (or when the window closes).
+    if (charging) {
+      charging++;
+      const open = OPEN[st] || VULN[st];
+      if (P.charge >= 40 || !open || charging > 70 || !P.held) { charging = 0; g.frame({}); g.frame({}); continue; }
+      if (bad(px)) { charging = 0; g.frame({}); continue; }
+      g.frame({ fish: 1 }); continue;
     }
-    const rocks = g.L.ents.filter(e => !e.dead && e.kind === 'rock').sort((a, c) => Math.abs(a.x - P.x) - Math.abs(c.x - P.x));
-    if (!rocks.length) { g.frame(Math.abs(bc - px) < 60 ? side(px < bc ? -1 : 1) : {}); continue; }
-    const r = rocks[0], d = r.x + r.w / 2 - px;
-    if (r.resting && r.y + r.h < P.y - 8) {
-      // A rock left on a branch: stand under it, jump, flap and sip upwards.
-      if (Math.abs(d) > 4) { g.frame(side(d)); continue; }
-      if (!P.onGround) { g.frame({}); continue; }
-      g.run({ jump: 1 }, 16); g.frame({}); g.run({ jump: 1 }, 8);
-      for (let k = 0; k < 40 && !P.held && !P.onGround; k++) g.frame({ fish: 1, up: 1 });
+    // ---- The wing gust: empty the mouth, face her and puff back.
+    if ((st === 'gustWind' && b.st > 14) || st === 'gust') {
+      const toward = bc > px ? 1 : -1;
+      if (P.held && P.onGround) { g.frame({}); g.frame({ down: 1, fish: 1 }); g.frame({}); continue; }
+      if (!P.held && P.puffCd === 0 && !(P.puffWind > 0)) { if (P.dir !== toward) { g.frame(side(toward)); continue; } g.frame({ puff: 1 }); continue; }
       g.frame({}); continue;
     }
-    if (Math.abs(d) > 56) { g.frame(side(d)); continue; }
-    if (Math.abs(d) < 26) { g.frame(side(-d)); continue; }
-    if (P.dir !== Math.sign(d)) { g.frame(side(d)); continue; }
+    // ---- Out of harm's way first.
+    if (bad(px)) { sucking = 0; go(safeNear(px)); continue; }
+    // ---- A stone in the mouth: return it.
+    if (P.held) {
+      // In the air she sidesteps a stone unless she is committed (aiming, shaking the nest, throwing darts),
+      // or has not been hit yet at all.
+      const open = OPEN[st] && b.inv === 0, fly = b.inv === 0 && !onFloor && (['aim', 'rainUp', 'fanAir'].includes(st) || (st === 'hover' && b.hp === b.maxHp) || (VULN[st] && b.dodgeCd > 0));
+      if (open) {
+        const left = st === 'stuck' ? (b.phase === 2 ? 110 : 80) - b.st : st === 'stagger' ? 140 - b.st : 30 - b.st;
+        const want = bc + (px < bc ? -52 : 52), dist = Math.abs(px - bc);
+        if (dist > 72 || dist < 30) { go(safeNear(want)); continue; }
+        const toward = bc > px ? 1 : -1;
+        if (P.dir !== toward) { g.frame(side(toward)); continue; }
+        if (left > 56 && g.Save.has('guindilla')) { charging = 1; g.frame({ fish: 1 }); continue; }
+        g.frame({ fish: 1 }); g.frame({}); continue;
+      }
+      if (fly) {
+        const mx = px + P.dir * 2;
+        if (Math.abs(bc - mx) < 7) { g.frame({ fish: 1, up: 1 }); g.frame({ up: 1 }); continue; }
+        go(safeNear(bc - P.dir * 2)); continue;
+      }
+      // She parries now: wait at a distance, baiting the stab when it is due.
+      idle(b, P, px, bc, go, safeNear, lo, hi); continue;
+    }
+    // ---- Empty mouth: fetch the nearest stone.
+    const rocks = L.ents.filter(e => !e.dead && e.kind === 'rock' && !e.hazard && e.x + 6 > lo - 10 && e.x + 6 < hi + 10 && !bad(e.x + 6)).sort((a, c) => Math.abs(a.x - P.x) - Math.abs(c.x - P.x));
+    if (!rocks.length) { sucking = 0; idle(b, P, px, bc, go, safeNear, lo, hi); continue; }
+    const r = rocks[0], rx = r.x + 6;
+    if (r.y + r.h < P.y) {
+      // Up on a branch or the pile: stand under it and sip upwards.
+      const want = rx - P.dir * 2;
+      if (Math.abs(want - px) > 4 && !sucking) { go(safeNear(want)); continue; }
+      if (++sucking > 50) { sucking = 0; g.frame({}); continue; }
+      g.frame({ fish: 1, up: 1 }); continue;
+    }
+    const d = rx - px, dist = Math.abs(d), toward = Math.sign(d) || 1;
+    if (!sucking && (dist > 50 || dist < 28)) { go(safeNear(rx - toward * 40)); continue; }
+    if (!sucking && P.dir !== toward) { g.frame(side(toward)); continue; }
+    if (++sucking > 50) { sucking = 0; g.frame({}); g.frame({}); continue; }
     g.frame({ fish: 1 });
   }
-  return 'la pelea no acabó';
+  return 'la pelea no acabó: ' + log.join('; ');
+  // Phase II plan (mirrors garza.js): what she will do next.
+  function P2(b) { return ['stab', 'fan', 'stab', 'gust'][b.pat % 4]; }
+  // Nothing to shoot yet: in phase II keep just inside her stab range when a stab is due (so she stabs and
+  // misses), hop over her if cornered; otherwise wait at a safe distance.
+  function idle(b, P, px, bc, go, safeNear, lo, hi) {
+    if (b.phase === 2 && b.state === 'walk') {
+      const away = px < bc ? -1 : 1, room = away < 0 ? px - lo : hi - px;
+      if (room < 70 && Math.abs(px - bc) < 90) {
+        // Cornered: jump over her.
+        if (P.onGround && Math.abs(px - bc) < 58) { g.frame(Object.assign({ jump: 1 }, side(-away))); for (let k = 0; k < 14; k++) g.frame(Object.assign({ jump: 1 }, side(-away))); g.frame(side(-away)); for (let k = 0; k < 12; k++) g.frame(Object.assign({ jump: 1 }, side(-away))); for (let k = 0; k < 40 && !P.onGround; k++) g.frame(side(-away)); return; }
+        go(bc - away * 40); return;
+      }
+      if (P2(b) === 'stab') { go(safeNear(bc + away * 50)); return; }
+      go(safeNear(bc + away * 96)); return;
+    }
+    go(safeNear(px));
+  }
 });
 // Ride the raft to the right, puffing backwards, and hop up for any cría that passes overhead.
 const RAFT = DO('balsa', g => {
@@ -163,5 +241,5 @@ module.exports = [
     { hold: { fish: 1 }, n: 44 }, { wait: 30 }, { check: g => g.L.hitTargets.size === 1 || 'la diana no se abrió' },
     R(139, 11), near('rock', -2), D('face', 1), D('suck', 40), R(143, 11), { wait: 24 }, D('charge', 1), { wait: 40 }, R(157, 11), R(167, 11), R(172, 10, { tol: 2 }), { hold: { right: 1 }, n: 30 }] },
   { powers: ['aleteo', 'soplido', 'ventosa', 'mordisco', 'chorro', 'panzazo', 'guindilla', 'resbalon'], steps: [
-    R(8, 9), R(18, 11), HERON, R(57, 12, { tol: 3 }), { wait: 60 }] },
+    R(8, 9), R(18, 11), R(27, 8), R(39, 11), HERON, R(57, 12, { tol: 3 }), { wait: 60 }] },
 ];

@@ -73,6 +73,16 @@ const Sound = (() => {
     heron() { const t = ctx.currentTime; osc('sawtooth', 900, t, .3, .14, sfxBus, 400, .02, .1); osc('square', 1200, t + .05, .2, .06, sfxBus, 500, .02, .1); },
     heronHit() { const t = ctx.currentTime; noise(t, .3, .35, 'lowpass', 1800, 200); osc('sawtooth', 700, t, .35, .16, sfxBus, 150, .01, .15); },
     swoop() { const t = ctx.currentTime; noise(t, .5, .25, 'bandpass', 300, 1800, 2); },
+    // The heron's fight: a scream in layers, the wind of her wings, feathers, the stab into the mud...
+    shriek(k = 1) { const t = ctx.currentTime; for (let i = 0; i < 3; i++) osc('sawtooth', (1250 - i * 180) * (.9 + k * .1), t + i * .04, .32 + k * .3, .1 + k * .05, sfxBus, 420 - i * 60, .01, .2); osc('square', 1600, t + .06, .18 + k * .2, .05, sfxBus, 700, .01, .12); noise(t, .3 + k * .3, .12 + k * .1, 'bandpass', 2600, 900, 2); },
+    gustWind() { const t = ctx.currentTime; noise(t, 1.9, .34, 'bandpass', 380, 1500, 1.2); noise(t + .2, 1.5, .18, 'lowpass', 600, 200); },
+    ruffle() { const t = ctx.currentTime; for (let i = 0; i < 7; i++) noise(t + i * .045, .05, .12, 'bandpass', 2400 + i * 200, 1500, 3); },
+    feathers() { const t = ctx.currentTime; for (let i = 0; i < 4; i++) noise(t + i * .03, .16, .2, 'bandpass', 900 + i * 400, 3200, 2); osc('square', 900, t, .08, .06, sfxBus, 1800); },
+    stab() { const t = ctx.currentTime; noise(t, .14, .3, 'bandpass', 1500, 400, 1.5); osc('triangle', 300, t, .1, .14, sfxBus, 90); },
+    squelch() { const t = ctx.currentTime; noise(t, .22, .3, 'lowpass', 700, 150, 2); osc('sine', 180, t, .16, .18, sfxBus, 60, .005, .08); osc('sine', 260, t + .1, .08, .1, sfxBus, 120); },
+    rumble() { const t = ctx.currentTime; noise(t, 1.3, .5, 'lowpass', 260, 60, .8); osc('sine', 46, t, 1, .32, sfxBus, 32, .02, .5); },
+    whistle() { const t = ctx.currentTime; osc('sine', 1500, t, .65, .06, sfxBus, 420, .05, .1); },
+    bossDown() { const t = ctx.currentTime; noise(t, 1.2, .55, 'lowpass', 3000, 90, .7); osc('sine', 70, t, 1, .4, sfxBus, 30, .01, .6); ['E4', 'B4', 'E5', 'G5'].forEach((n, i) => osc('triangle', freq(n), t + .25 + i * .09, .9, .09, sfxBus, null, .01, .6)); },
     stun() { const t = ctx.currentTime; [0, .1, .2, .3, .4].forEach((d, i) => osc('sine', 900 + Math.sin(i) * 300, t + d, .08, .1, sfxBus, 700 + i * 50)); },
     select() { const t = ctx.currentTime; osc('square', 660, t, .05, .1, sfxBus, null, .003, .03); },
     confirm() { const t = ctx.currentTime; osc('square', 523, t, .07, .12, sfxBus, null, .003, .04); osc('square', 784, t + .07, .12, .12, sfxBus, null, .003, .08); },
@@ -197,6 +207,41 @@ const Sound = (() => {
       { inst: 'kick', vol: .45, steps: P(`
         x . . . x . . . x . . . x . . .   x . . . x . . . x . . . x . x .
         x . . . x . . . x . . . x . . .   x . . . x . . . x . x . x . x .`) } ] },
+    heron2: { bpm: 148, swing: 0, tracks: [
+      { inst: 'bass', vol: .55, steps: P(`
+        E2 E2 . E2 E3 . E2 . E2 E2 . E2 G2 . A2 .   C2 C2 . C2 C3 . C2 . C2 C2 . C2 D2 . E2 .
+        E2 E2 . E2 E3 . E2 . E2 E2 . E2 G2 . A2 .   B1 B1 . B1 B2 . B1 . D2 D2 . D2 F#2 . B1 .`) },
+      { inst: 'lead', vol: .17, steps: P(`
+        E4 - B4 - . . G4 - A4 . B4 - C5 - B4 .   C5 - - - B4 - A4 - G4 - - . E4 - - .
+        E4 - B4 - . . G4 - A4 . B4 - D5 - B4 .   D5 - - - C5 - B4 - A4 - F#4 - - - . .`) },
+      { inst: 'pluck', vol: .2, steps: P(`
+        E3 G3 B3 G3 E3 G3 B3 G3 E3 G3 B3 G3 E3 G3 B3 E4   C3 E3 G3 E3 C3 E3 G3 E3 C3 E3 G3 E3 C3 E3 G3 C4
+        E3 G3 B3 G3 E3 G3 B3 G3 E3 G3 B3 G3 E3 G3 B3 E4   B2 D3 F#3 D3 B2 D3 F#3 D3 B2 D3 F#3 D3 B2 D3 F#3 B3`) },
+      { inst: 'hat', vol: .13, steps: P(`
+        x x x . x x x x x x x . x x x x   x x x . x x x x x x x . x x x x`) },
+      { inst: 'snare', vol: .16, steps: P(`
+        . . . . x . . . . . . . x . . .   . . . . x . . . . . . . x . x x`) },
+      { inst: 'kick', vol: .46, steps: P(`
+        x . . . x . . x x . . . x . . .   x . . . x . . x x . . . x . x .`) } ] },
+    heron3: { bpm: 162, swing: 0, tracks: [
+      { inst: 'bass', vol: .58, steps: P(`
+        F2 F3 F2 F3 F2 F3 F2 F3 F2 F3 F2 F3 Ab2 Ab3 Bb2 Bb3   Db2 Db3 Db2 Db3 Db2 Db3 Db2 Db3 Db2 Db3 Db2 Db3 Eb2 Eb3 F2 F3
+        F2 F3 F2 F3 F2 F3 F2 F3 F2 F3 F2 F3 Ab2 Ab3 Bb2 Bb3   C2 C3 C2 C3 C2 C3 C2 C3 E2 E3 E2 E3 G2 G3 C2 C3`) },
+      { inst: 'lead', vol: .18, steps: P(`
+        F5 - . F5 . . Ab5 - Bb5 - . C6 - . Bb5 .   Db6 - - - C6 - Bb5 - Ab5 - - . F5 - - .
+        F5 - . F5 . . Ab5 - Bb5 - . C6 - . Eb6 .   E5 - - - G5 - - - C6 - - - Bb5 - G5 -`) },
+      { inst: 'pluck', vol: .19, steps: P(`
+        F3 Ab3 C4 Ab3 F3 Ab3 C4 Ab3 F3 Ab3 C4 Ab3 F3 Ab3 C4 F4   Db3 F3 Ab3 F3 Db3 F3 Ab3 F3 Db3 F3 Ab3 F3 Db3 F3 Ab3 Db4
+        F3 Ab3 C4 Ab3 F3 Ab3 C4 Ab3 F3 Ab3 C4 Ab3 F3 Ab3 C4 F4   C3 E3 G3 E3 C3 E3 G3 E3 C3 E3 G3 E3 C3 E3 G3 C4`) },
+      { inst: 'hat', vol: .14, steps: P(`
+        x x x x x x x x x x x x x x x x`) },
+      { inst: 'snare', vol: .2, steps: P(`
+        . . . . x . . . . . . . x . . .   . . . . x . . . . . . . x . x x
+        . . . . x . . . . . . . x . . .   . . . . x . . x . . x . x x x x`) },
+      { inst: 'drip', vol: .1, steps: P(`
+        x . . . . . . . x . . . . . . .`) },
+      { inst: 'kick', vol: .5, steps: P(`
+        x . . x x . . . x . . x x . . .   x . . x x . . . x . x . x . x .`) } ] },
     storm: { bpm: 100, swing: .1, rain: true, tracks: [
       { inst: 'bass', vol: .5, steps: P(`
         A1 . . A1 . . A1 . . . A1 . C2 . E2 .   F1 . . F1 . . F1 . . . F1 . A1 . C2 .
@@ -276,6 +321,7 @@ const Sound = (() => {
       case 'lead': { const o = ctx.createOscillator(), g = ctx.createGain(), v = ctx.createOscillator(), vg = ctx.createGain(); o.type = 'square'; o.frequency.value = f; v.frequency.value = 5.5; vg.gain.value = f * .012; v.connect(vg); vg.connect(o.frequency); const fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 2200; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .03); g.gain.setValueAtTime(vol, t + dur - .04); g.gain.linearRampToValueAtTime(0, t + dur); o.connect(fl); fl.connect(g); g.connect(musicBus); o.start(t); v.start(t); o.stop(t + dur + .01); v.stop(t + dur + .01); break; }
       case 'hat': noise(t, .04, vol, 'highpass', 6000, null, 1, musicBus); break;
       case 'kick': osc('sine', 120, t, .12, vol, musicBus, 40, .002, .06); break;
+      case 'snare': noise(t, .1, vol, 'bandpass', 1900, 900, .8, musicBus); osc('triangle', 190, t, .06, vol * .5, musicBus, 120, .002, .04); break;
       case 'drip': osc('sine', 1800 + Math.random() * 600, t, .08, vol, musicBus, 700, .002, .1); break;
     }
   }
