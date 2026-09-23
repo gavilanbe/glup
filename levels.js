@@ -453,6 +453,9 @@ const LEVELS = (() => {
       '####################'));
 
   // ---------------------------------------------------------------- 5 · El nido de la Garza
+  // La orilla, un paso por debajo del tronco (la compuerta de la izquierda del ruedo cae al entrar) y el ruedo:
+  // dos ramas, el nido arriba (se rompe en la fase II y cae como un montón de palos) y zarzas al fondo.
+  // La pelea la monta garza.js sobre las 24 últimas columnas.
   const nido = join(
     screen(
       '....................',
@@ -460,21 +463,29 @@ const LEVELS = (() => {
       '.......===..........',
       '..@..N.......L....H.', ...G3),
     screen(
-      '.................===',
+      '..............##....',
+      '..............##....',
+      '..............##....',
+      '..............##....',
       '....................',
-      '....====............',
       '....................',
       '....................',
+      '.......*............',
+      '......===..........=',
       '....................',
-      '.....B...r..........', ...G3),
+      '..................,.', ...G3),
     screen(
-      '===.................',
-      '....................',
-      '............====....',
       '....................',
       '....................',
       '....................',
-      '....................', ...G3));
+      '....................',
+      '.....======.........',
+      '....................',
+      '....................',
+      '....................',
+      '===..........====...',
+      '....................',
+      '.......B.r........^^', ...G3));
 
   return [
     { name: 'El embarcadero', theme: 'dusk', music: 'marsh', rows: embarcadero, powers: ['aleteo', 'soplido'],
@@ -510,8 +521,8 @@ const LEVELS = (() => {
         'Esa charca da para apagar el fuego. O salta con ganas.',
         'Sopla al molinillo con {puff} y corre: el túnel es largo. Corriendo, {down} y Nila se desliza sobre Bigotes.',
         'Anzuelos hacia arriba: sorbe con {up}, Bigotes pica y el sedal os sube; desde cada uno, busca el siguiente.'] },
-    { name: 'El nido de la Garza', theme: 'nest', music: 'heron', rows: nido, boss: true,
+    { name: 'El nido de la Garza', theme: 'nest', music: 'omen', rows: nido, boss: true,
       intro: 'En lo alto del ciprés muerto, la Garza espera.',
-      ruca: ['Tiene a las últimas crías en el buche. Cuando suelte piedras, sórbelas y devuélveselas. Si se atasca en el barro, ¡es tu momento!'],
+      ruca: ['Tiene a las últimas crías en el buche. Devuélvele sus piedras hacia arriba. Si clava el pico en el barro, ¡dale fuerte! Y si bate las alas, sóplale tú con {puff}.'],
       signs: [] }];
 })();

@@ -171,14 +171,14 @@ function loadLevel(index) {
   L.def = def; L.index = index; L.rows = def.rows; L.h = def.rows.length; L.w = def.rows[0].length;
   L.t = def.rows.map(r => r.split(''));
   L.ents = []; L.projs = []; L.parts = []; L.solids = []; L.signs = []; L.broken = new Set(); L.targets = new Map(); L.gates = []; L.gateOpen = new Set();
-  L.lit = new Set(); L.taken = new Set(); L.pearlsTotal = 0; L.pearls = 0; L.time = 0; L.boss = null; L.breakQueue = []; L.gateQueue = []; L.mush = new Map(); L.hitTargets = new Set(); L.boatSpawned = false; L.exit = null; L.words = []; L.ghosts = []; L.lily = new Map(); L.triggerIdx = new Map(); L.gusts = [];
+  L.lit = new Set(); L.taken = new Set(); L.pearlsTotal = 0; L.pearls = 0; L.time = 0; L.boss = null; L.breakQueue = []; L.gateQueue = []; L.mush = new Map(); L.hitTargets = new Set(); L.boatSpawned = false; L.exit = null; L.words = []; L.ghosts = []; L.lily = new Map(); L.triggerIdx = new Map(); L.gusts = []; L.bossCk = 0; L.bossFreed = 0; L.bossSlow = 0; L.bossGustHint = false; L.bossDodgeHint = false;
   L.bg = ART.background(def.theme); L.spawn = [];
   // Gates are grouped by adjacency and paired with targets in reading order.
   const targets = [], gateTiles = [], seen = new Set();
   for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) {
     const ch = L.t[y][x];
     if (ch === '@') { L.start = { x: x * TS + 3, y: y * TS - 4 }; L.t[y][x] = '.'; }
-    else if ('sfmKcr*HL?EBOR!N'.includes(ch)) { L.spawn.push({ ch, x, y }); L.t[y][x] = '.'; if (ch === '*') L.pearlsTotal++; if (ch === 'B') L.pearlsTotal += 5; /* the crías in her crop, one per blow */ }
+    else if ('sfmKcr*HL?EBOR!N'.includes(ch)) { L.spawn.push({ ch, x, y }); L.t[y][x] = '.'; if (ch === '*') L.pearlsTotal++; if (ch === 'B') L.pearlsTotal += Boss.CRIAS; /* the crías in her crop: one per blow, the rest at the end */ }
     else if (ch === 'T') targets.push({ x, y, ch });
     else if (ch === 'P' || ch === 'V') { targets.push({ x, y, ch }); L.spawn.push({ ch, x, y }); L.t[y][x] = '.'; }
     else if (ch === 'G') gateTiles.push({ x, y });
@@ -1285,86 +1285,6 @@ const Proj = {
   }
 };
 
-// ---------------------------------------------------------------- La Garza
-const Boss = {
-  create(x, y) { return { kind: 'heron', boss: true, x, y, w: 30, h: 28, vx: 0, vy: 0, dir: -1, t: 0, state: 'enter', st: 0, hp: 5, maxHp: 5, hover: 0, drops: 0, targetX: x, targetY: y, flash: 0, wing: 0, dive: null, update: Boss.update, draw: Boss.draw, dead: false, sprite: ART.heronBody, shriek: 0 }; },
-  arena() { return { x0: (L.w - 40) * TS + 20, x1: L.w * TS - 40, y: 34 }; },
-  update(b) {
-    b.t++; b.st++; if (b.flash > 0) b.flash--;
-    const a = Boss.arena(); const px = Player.x + 5;
-    b.dir = px < b.x + b.w / 2 ? -1 : 1;
-    switch (b.state) {
-      case 'enter': { b.y = lerp(b.y, a.y, .05); b.x = lerp(b.x, px + 90 * (px < (a.x0 + a.x1) / 2 ? 1 : -1), .03); if (b.st === 30) { Sound.play('heron'); Game.toast('¡La Garza!', 120); } if (b.st > 110) Boss.setState(b, 'hover'); break; }
-      case 'hover': {
-        b.targetX = clamp(px + [80, 0, -80][b.hover % 3], a.x0, a.x1); b.x = lerp(b.x, b.targetX, .035); b.y = a.y + Math.sin(b.t / 22) * 5;
-        if (b.st % 150 === 100) { Boss.dropRock(b); b.drops++; }
-        if (b.st > 260) { b.hover++; Boss.setState(b, b.drops >= 1 ? 'aim' : 'hover'); if (b.state === 'hover') b.st = 0; }
-        break; }
-      case 'aim': { b.x += Math.sin(b.st / 2) * .6; if (b.st === 1) { Sound.play('heron'); b.shriek = 30; Game.word('¡KRAAA!', b.x + b.w / 2, b.y - 8, '#f2c46a', true); Cam.shake(1, 8); } if (b.st > 45) { const dx = px - (b.x + b.w / 2), dy = Player.y - b.y - 10; const d = Math.hypot(dx, dy) || 1; b.dive = { vx: dx / d * 5, vy: dy / d * 5 }; Boss.setState(b, 'dive'); Sound.play('swoop'); } break; }
-      case 'dive': {
-        b.x += b.dive.vx; b.y += b.dive.vy;
-        if (b.y + b.h > (L.h - 3) * TS - 2 || b.st > 40) { Boss.setState(b, 'rise'); spawnParts(10, b.x + b.w / 2, b.y + b.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.5, speed: [.5, 2], life: [10, 20] }); }
-        if (b.x < a.x0 - 30) b.x = a.x0 - 30; if (b.x > a.x1 + 30) b.x = a.x1 + 30;
-        break; }
-      case 'rise': { b.y -= 2.4; b.x += b.dive.vx * .3; if (b.y <= a.y) { b.y = a.y; b.drops = 0; Boss.setState(b, 'hover'); } break; }
-      case 'stunned': {
-        b.vy = Math.min(b.vy + .3, 5); const hit = moveY(b, b.vy); if (hit) { if (b.vy > 2) { Cam.shake(4, 10); Sound.play('thud'); spawnParts(12, b.x + b.w / 2, b.y + b.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.6, speed: [.6, 2.4], life: [10, 24] }); } b.vy = 0; }
-        if (b.st > 150) { Boss.setState(b, 'rise'); b.dive = { vx: 0, vy: 0 }; }
-        break; }
-      case 'dying': {
-        b.vy = Math.min(b.vy + .25, 4); const hit = moveY(b, b.vy); if (hit) b.vy = 0;
-        if (b.st % 6 === 0) spawnParts(3, b.x + rnd(0, b.w), b.y + rnd(0, b.h), { color: ['#e9eef2', '#a9b8c9', '#7d8fa6'], speed: [.3, 1.5], life: [20, 50], g: .02, kind: 'feather' });
-        if (b.st > 140) { Boss.setState(b, 'leave'); Sound.play('heron'); }
-        break; }
-      case 'leave': { b.y -= 1.6 + b.st * .04; b.x += b.dir * -1.2; if (b.st > 120) { b.dead = true; Boss.won(); } break; }
-    }
-    if (!['stunned', 'dying', 'leave'].includes(b.state) && Player.inv === 0 && !Player.dead && !Player.win && overlap({ x: b.x + 4, y: b.y + 6, w: b.w - 8, h: b.h - 8 }, Player.rect())) Player.hurt(px < b.x + b.w / 2 ? 1 : -1);
-  },
-  setState(b, s) { b.state = s; b.st = 0; },
-  dropRock(b) {
-    let rocks = 0; for (const e of L.ents) if (!e.dead && e.kind === 'rock') rocks++; for (const p of L.projs) if (!p.dead && p.kind === 'rock') rocks++; if (Player.held && Player.held.kind === 'rock') rocks++;
-    if (rocks >= 3) return;
-    const r = Item.rock(b.x + b.w / 2 - 6, b.y + b.h); r.vy = 1; L.ents.push(r); Sound.play('puff');
-    spawnParts(4, b.x + b.w / 2, b.y + b.h, { color: ['#e9eef2', '#a9b8c9'], speed: [.2, 1], life: [20, 40], g: .02, kind: 'feather' });
-  },
-  hit(b, p, dmg = 1) {
-    if (['stunned', 'dying', 'leave', 'enter'].includes(b.state)) return false;
-    const hp0 = b.hp; b.hp = Math.max(0, b.hp - dmg); b.flash = 12; Cam.punch(dmg > 1 ? 1.08 : 1.04); Input.rumble(220, 1, .5); Game.word(dmg > 1 ? '¡ZAS!' : '¡PAF!', b.x + b.w / 2, b.y - 6, '#fff6d6', true); Sound.play('heronHit'); Cam.shake(5, 14); Game.stop(6);
-    spawnParts(14, b.x + b.w / 2, b.y + b.h / 2, { color: ['#e9eef2', '#a9b8c9', '#7d8fa6'], speed: [.5, 2.5], life: [20, 50], g: .03, kind: 'feather' });
-    // Every blow makes her cough up the crías in her crop; they splash down and swim home.
-    for (let k = 0; k < hp0 - b.hp; k++) { L.pearls++; Game.pearlPop = 12; L.parts.push({ x: b.x + (b.dir < 0 ? 0 : b.w - 6), y: b.y + 8, vx: (b.dir < 0 ? -1 : 1) * rnd(.8, 1.6), vy: -rnd(2, 3), life: 70, color: '#fff', size: 1, g: .1, kind: 'cria' }); }
-    Game.word('¡PLOP!', b.x + b.w / 2, b.y + b.h + 4, '#e8fbff', false);
-    if (b.hp <= 0) { Boss.setState(b, 'dying'); b.vy = -2; Sound.play('heron'); Sound.duck(true); }
-    else { Boss.setState(b, 'stunned'); b.vy = -2; }
-    return true;
-  },
-  won() {
-    Sound.duck(false); Sound.play('clear'); Game.toast('¡La Garza se ha ido!', 150);
-    const a = Boss.arena(); const bx = a.x1 - 16, by = (L.h - 3) * TS - 8;
-    // The boat pulls up on the shore; the last stretch of ground becomes water for it.
-    for (let x = L.w - 5; x < L.w; x++) { setTile(x, L.h - 3, '~'); setTile(x, L.h - 2, '~'); }
-    L.ents.push(Item.boat((L.w - 5) * TS + 4, (L.h - 3) * TS + 14)); L.boatSpawned = true;
-    spawnParts(16, bx, by, { color: ['#8fd9d0', '#c8f2ea'], angle: -Math.PI / 2, spread: 1.2, speed: [1, 3], life: [14, 30] });
-  },
-  draw(b, g) {
-    const x = Math.round(b.x - Cam.x), y = Math.round(b.y - Cam.y);
-    const flying = !['stunned', 'dying'].includes(b.state);
-    const body = flying ? ART.heronFly : ART.heronBody;
-    const wingF = b.state === 'dive' ? 2 : b.state === 'aim' ? 0 : ((b.t >> 3) % 4);
-    const wings = [ART.wingUp, ART.wingMid, ART.wingDown, ART.wingMid];
-    const faceLeft = b.dir < 0;
-    const draw = (s, dx, dy) => { const sp = faceLeft ? s : ART.flip(s); const ox = faceLeft ? dx : (body.width - dx - s.width); const img = b.flash > 0 && (b.flash >> 1) % 2 ? ART.tint(sp, '#ffffff') : sp; g.drawImage(img, x + ox, y + dy); };
-    g.save();
-    if (b.state === 'stunned' || b.state === 'dying') { g.translate(x + 16, y + 30); g.rotate(Math.sin(b.t / 6) * .06 * (b.state === 'dying' ? 3 : 1)); g.translate(-(x + 16), -(y + 30)); }
-    if (flying) { draw(wings[wingF], 6, wingF === 0 ? -10 : wingF === 2 ? 8 : 2); }
-    draw(body, 0, 0);
-    if (!flying) { draw(ART.wingMid, 4, 6); }
-    g.restore();
-    if (b.state === 'stunned' && (b.t >> 3) % 2) for (let i = 0; i < 3; i++) g.drawImage(ART.star, x + 4 + i * 8 + Math.round(Math.sin(b.t / 5 + i) * 3), y - 6 + Math.round(Math.cos(b.t / 5 + i) * 2));
-    if (b.shriek > 0) { b.shriek--; g.fillStyle = '#fff'; const bx = faceLeft ? x - 4 : x + body.width + 2; for (let i = 0; i < 3; i++) g.fillRect(bx + (faceLeft ? -i * 3 : i * 3), y + 2 + i * 3 - 4, 2, 1); }
-  }
-};
-
 // ---------------------------------------------------------------- Cámara
 const Cam = {
   x: 0, y: 0, look: 0, lookY: 0, fallT: 0, shakeT: 0, shakeA: 0, ox: 0, oy: 0, zoom: 1,
@@ -1377,8 +1297,10 @@ const Cam = {
     p.vy > 3.5 && !p.onGround && !p.hover ? Cam.fallT++ : Cam.fallT = 0;
     const wantY = (p.aimUp || p.hanging || (p.grapple && !p.hanging)) ? -30 : Cam.fallT > 10 || p.pound ? 44 : 0;
     Cam.lookY = lerp(Cam.lookY, wantY, wantY > 0 ? .08 : .05);
-    const tx = clamp(p.x + 5 - W / 2 + Cam.look, 0, Math.max(0, L.w * TS - W));
-    const ty = clamp(p.y + 9 - H / 2 + 10 + Cam.lookY, 0, Math.max(0, L.h * TS - H));
+    let tx = clamp(p.x + 5 - W / 2 + Cam.look, 0, Math.max(0, L.w * TS - W));
+    let ty = clamp(p.y + 9 - H / 2 + 10 + Cam.lookY, 0, Math.max(0, L.h * TS - H));
+    // In the heron's arena the fight frames the shot.
+    const bc = L.boss && Boss.cam(L.boss); if (bc) { tx = bc.x; ty = clamp(bc.y, 0, Math.max(0, L.h * TS - H)); }
     // Falling fast, the camera must keep up or Nila leaves the bottom of the screen.
     Cam.x = lerp(Cam.x, tx, .1); Cam.y = lerp(Cam.y, ty, p.vy > 4 ? .16 : .08); Cam.zoom = lerp(Cam.zoom, 1, .14); if (Cam.zoom < 1.003) Cam.zoom = 1;
     Cam.shakeOnly();
@@ -1482,7 +1404,7 @@ const Game = {
   },
   // ---- play
   startLevel(i) { Game.level = i; Game.hitStop = 0; Game.heldPresses = {}; loadLevel(i); Game.state = 'play'; Game.paused = false; Game.banner = 190; Sound.playMusic(LEVELS[i].music); Game.toastT = 0; Game.weather = { bolt: 0, next: 200, x: 0, seed: 1, thunder: 0 }; },
-  respawn() { Game.transition(() => { Player.reset(L.checkpoint.x, L.checkpoint.y, true); if (L.def.boss) { loadLevel(Game.level); Game.banner = 60; } else { spawnEntities(); } Cam.snap(); Sound.playMusic(L.def.music); }); },
+  respawn() { Game.transition(() => { Player.reset(L.checkpoint.x, L.checkpoint.y, true); if (L.def.boss) { if (!Boss.restart()) { loadLevel(Game.level); Game.banner = 60; } } else { spawnEntities(); } Cam.snap(); Sound.playMusic(L.def.boss ? Boss.song() : L.def.music); }); },
   drown(fell) {
     const p = Player; if (p.dead) return;
     if (!fell) { Sound.play('splash'); spawnParts(14, p.x + 5, p.y + p.h, { color: ['#8fd9d0', '#c8f2ea', '#2f7f88'], angle: -Math.PI / 2, spread: 1.2, speed: [1, 3.5], life: [16, 30] }); for (let i = 0; i < 2; i++) L.parts.push({ x: p.x + 5, y: Math.floor((p.y + p.h) / TS) * TS + 2, vx: 0, vy: 0, life: 16 - i * 5, color: '#c8f2ea', size: 1, g: 0, kind: 'ripple' }); }
@@ -1501,10 +1423,16 @@ const Game = {
     if (Game.learning) { Aprende.update(); return; }
     // A hit-stop freezes the world, not the hands: presses made during it are kept and land on the first live frame.
     if (Game.hitStop > 0) { Game.hitStop--; for (const k in Input.pressed) if (Input.pressed[k] && k !== 'pause') Game.heldPresses[k] = true; Cam.shakeOnly(); return; }
+    // The heron's last blow plays in slow motion; presses are kept the same way.
+    if (L.boss && Boss.skip()) { for (const k in Input.pressed) if (Input.pressed[k] && k !== 'pause') Game.heldPresses[k] = true; Cam.shakeOnly(); return; }
     for (const k in Game.heldPresses) Input.pressed[k] = true; Game.heldPresses = {};
     L.time++;
     if (Game.banner > 0) Game.banner--;
+    // During the heron's entrance Nila stands and watches (the keys stay held for afterwards).
+    const lock = L.boss && L.boss.lock && !L.boss.dead, keep = lock && [Input.held, Input.pressed];
+    if (lock) { Input.held = {}; Input.pressed = {}; }
     Player.update();
+    if (lock) { Input.held = keep[0]; Input.pressed = keep[1]; }
     for (const e of L.ents) if (!e.dead) e.update(e);
     if (L.gusts) { for (const q of L.gusts) Player.gustUpdate(q); L.gusts = L.gusts.filter(q => !q.dead); }
     Hud.update();
@@ -1678,6 +1606,7 @@ const Game = {
     Game.drawParts(g);
     Game.drawGusts(g);
     Game.drawTiles(g, camX, camY, 'front');
+    if (L.boss) Boss.drawFront(g);
     if (Game.weather && Game.weather.bolt > 8 && L.def.theme === 'storm' && !Game.still) { g.globalAlpha = (Game.weather.bolt - 8) / 4 * .35; g.fillStyle = '#e8f0ff'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
     Game.drawLight(g, camX, camY);
     Game.drawWords(g);

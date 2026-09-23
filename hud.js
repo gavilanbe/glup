@@ -135,16 +135,37 @@ const Hud = (() => {
     ART.text(g, txt, 0, 0, S.pop ? '#ffffff' : done ? '#f2c46a' : '#e8fbff', 'left', '#1b2430'); g.restore();
     if (done) { g.fillStyle = '#fff6d6'; const k = (t % 90) / 90; g.globalAlpha = 1 - k; g.fillRect(Math.round(c.x + 12 + k * tw), c.y, 1, 7); g.globalAlpha = 1; }
   }
+  // The heron's bar: six blows in three phases, with gold notches between phases and a pip per phase
+  // (spent, current, still to come). Hidden until her entrance is over; her name card slides in over it.
   function drawBoss(g, t) {
-    const b = L.boss; if (!b || b.dead || b.state === 'enter' || b.state === 'leave') return;
-    const bw = 84, x = Math.round(W / 2 - bw / 2 + (S.bossShake ? (Math.random() - .5) * 3 : 0)), y = 6, max = b.maxHp;
-    g.fillStyle = '#120c18'; g.fillRect(x - 2, y - 2, bw + 4, 9); g.fillStyle = '#2a1a24'; g.fillRect(x, y, bw, 5);
+    const b = L.boss; if (!b || !b.fight) return;
+    if (b.card) drawCard(g, b.card);
+    if (b.dead || b.lock || ['leave', 'intro', 'trans1', 'trans2'].includes(b.state)) return;
+    const bw = 96, max = b.maxHp, x = Math.round(W / 2 - bw / 2 + (S.bossShake ? (Math.random() - .5) * 3 : 0)), y = 6;
+    const bounds = Boss.PHASE_HP.slice(1), phase = b.phase || 1, rage = phase >= 3;
+    g.fillStyle = '#120c18'; g.fillRect(x - 2, y - 2, bw + 4, 9); g.fillStyle = rage && (t >> 3) % 2 ? '#3a1420' : '#2a1a24'; g.fillRect(x, y, bw, 5);
     g.fillStyle = '#fff6d6'; g.fillRect(x, y, Math.round(bw * S.bossLag / max), 5);
-    g.fillStyle = S.bossShake > 8 ? '#ffffff' : '#d9503a'; g.fillRect(x, y, Math.round(bw * b.hp / max), 5); g.fillStyle = '#f28b6a'; g.fillRect(x, y, Math.round(bw * b.hp / max), 1);
-    g.fillStyle = '#120c18'; for (let i = 1; i < max; i++) g.fillRect(x + Math.round(bw * i / max), y, 1, 5);
-    // Her head at the left end.
-    const hx = x - 12, hy = y - 3; g.fillStyle = '#120c18'; g.fillRect(hx - 1, hy - 1, 10, 10); g.fillStyle = '#e9eef2'; g.fillRect(hx, hy, 8, 8); g.fillStyle = '#22262e'; g.fillRect(hx, hy, 8, 2); g.fillStyle = '#e2b63c'; g.fillRect(hx - 6, hy + 4, 6, 2); g.fillStyle = '#1a1a1a'; g.fillRect(hx + 2, hy + 3, 2, 2);
-    ART.text(g, 'La Garza', W / 2, y + 7, '#f2c46a', 'center', '#1b2430');
+    g.fillStyle = S.bossShake > 8 ? '#ffffff' : rage ? '#ff4a2a' : '#d9503a'; g.fillRect(x, y, Math.round(bw * b.hp / max), 5); g.fillStyle = rage ? '#ffb070' : '#f28b6a'; g.fillRect(x, y, Math.round(bw * b.hp / max), 1);
+    for (let i = 1; i < max; i++) { const nx = x + Math.round(bw * i / max); if (bounds.includes(max - i)) { g.fillStyle = '#120c18'; g.fillRect(nx - 1, y - 2, 3, 9); g.fillStyle = '#f2c46a'; g.fillRect(nx, y - 3, 1, 11); } else { g.fillStyle = '#120c18'; g.fillRect(nx, y, 1, 5); } }
+    // Her head at the left end (the eye turns red in phase III).
+    const hx = x - 12, hy = y - 3; g.fillStyle = '#120c18'; g.fillRect(hx - 1, hy - 1, 10, 10); g.fillStyle = '#e9eef2'; g.fillRect(hx, hy, 8, 8); g.fillStyle = '#22262e'; g.fillRect(hx, hy, 8, 2); g.fillStyle = '#e2b63c'; g.fillRect(hx - 6, hy + 4, 6, 2); g.fillStyle = rage ? '#ff3a2a' : '#1a1a1a'; g.fillRect(hx + 2, hy + 3, 2, 2);
+    const nw = ART.text(g, 'La Garza', W / 2 - 12, y + 8, rage ? '#ff9a6a' : '#f2c46a', 'center', '#1b2430');
+    // Phase pips: spent (dim), current (bright, pulsing), still to come (hollow).
+    for (let i = 0; i < 3; i++) {
+      const cx = W / 2 - 12 + nw / 2 + 8 + i * 8, cy = y + 11, cur = i + 1 === phase, done = i + 1 < phase;
+      const r = cur && (t >> 4) % 2 ? 3 : 2; g.fillStyle = '#120c18'; for (let d = -r - 1; d <= r + 1; d++) g.fillRect(cx - (r + 1 - Math.abs(d)), cy + d, (r + 1 - Math.abs(d)) * 2 + 1, 1);
+      g.fillStyle = done ? '#4a3440' : cur ? (rage ? '#ff5a3a' : '#f2c46a') : '#2a1a24'; for (let d = -r; d <= r; d++) g.fillRect(cx - (r - Math.abs(d)), cy + d, (r - Math.abs(d)) * 2 + 1, 1);
+      if (!done && !cur) { g.fillStyle = '#8a6a3a'; g.fillRect(cx, cy - r, 1, 1); g.fillRect(cx, cy + r, 1, 1); g.fillRect(cx - r, cy, 1, 1); g.fillRect(cx + r, cy, 1, 1); }
+    }
+  }
+  // A title card that slides in over a dark band: her name at the entrance, the phase at each change.
+  function drawCard(g, c) {
+    const k = c.t, a = k < 14 ? k / 14 : k > c.life - 30 ? Math.max(0, (c.life - k) / 30) : 1, slide = k < 14 ? Math.round((1 - ease(k / 14)) * -60) : 0, big = c.title.length < 12;
+    const by = big ? 112 : 120, bh = big ? 34 : 26;
+    g.globalAlpha = a * .8; g.fillStyle = '#0c0810'; g.fillRect(0, by, W, bh); g.globalAlpha = a; g.fillStyle = '#e79b3f'; g.fillRect(0, by, W, 1); g.fillRect(0, by + bh - 1, W, 1);
+    if (big) { g.save(); g.translate(W / 2 + slide, by + 4); g.scale(2, 2); ART.text(g, c.title, 0, 0, '#fff6d6', 'center', '#7a2a2a'); g.restore(); ART.text(g, c.sub, W / 2 - slide, by + 22, '#e79b3f', 'center', '#1b2430'); }
+    else { ART.text(g, c.title, W / 2 + slide, by + 5, '#fff6d6', 'center', '#7a2a2a'); ART.text(g, c.sub, W / 2 - slide, by + 15, '#e79b3f', 'center', '#1b2430'); }
+    g.globalAlpha = 1;
   }
   function drawFly(g, t) {
     for (const f of S.fly) {
