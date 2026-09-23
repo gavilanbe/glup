@@ -719,6 +719,43 @@ const Player = {
         g.drawImage(hs, HX - (p.dir > 0 ? 3 : hs.width - 4), HY - 3);
       } };
   },
+  // Bigotes' eye and its moods, drawn at (ex, ey): open with a pupil looking along (lx, ly), closed
+  // when blinking, a happy arc with blush and hearts, a sleepy line with z's, brows, dizzy stars.
+  drawEye(g, ex, ey, lx, ly, st, t) {
+    const d = st.dir || 1;
+    if (st.happy || st.sleep || st.blink) {
+      g.fillStyle = '#88863a'; g.fillRect(ex - 2, ey - 1, 4, 3);
+      g.fillStyle = '#1d1826'; if (st.happy) { g.fillRect(ex - 2, ey, 1, 1); g.fillRect(ex - 1, ey - 1, 3, 1); g.fillRect(ex + 2, ey, 1, 1); g.fillStyle = '#f07080'; g.fillRect(ex - 2, ey + 2, 2, 1); g.fillRect(ex + 2, ey + 2, 1, 1); }
+      else g.fillRect(ex - 2, ey, 5, 1);
+    } else {
+      // A 4×3 white with a 2×2 pupil that shifts toward what he looks at (a wider eye when startled).
+      const shock = st.shock, ew = shock ? 5 : 4, eh = shock ? 4 : 3, x0 = ex - (ew >> 1), y0 = ey - (eh >> 1);
+      g.fillStyle = '#1d1826'; g.fillRect(x0 - 1, y0 - 1, ew + 2, 1); g.fillRect(x0 - 1, y0, 1, eh); g.fillRect(x0 + ew, y0, 1, eh);
+      g.fillStyle = '#fbf6e0'; g.fillRect(x0, y0, ew, eh);
+      const pxo = lx > .35 ? ew - 2 : lx < -.35 ? 0 : (ew - 2) >> 1, pyo = ly > .35 ? eh - 2 : ly < -.35 ? 0 : (eh - 2) >> 1;
+      g.fillStyle = '#1d1826'; g.fillRect(x0 + pxo, y0 + pyo, shock ? 1 : 2, shock ? 1 : 2);
+      if (!shock) { g.fillStyle = '#ffffff'; g.fillRect(x0 + pxo, y0 + pyo, 1, 1); }
+    }
+    if (st.mad || st.sad) { g.fillStyle = '#1d1826'; const top = ey - (st.shock ? 4 : 3); for (let i = -2; i <= 2; i++) g.fillRect(ex + i, top + Math.round((st.mad ? i * d : -i * d) * .4), 1, 1); }
+    if (st.sleep) for (let i = 0; i < 3; i++) { const k = ((t + i * 40) % 120) / 120; g.globalAlpha = 1 - k; ART.text(g, 'z', Math.round(ex + 4 + k * 8 + i * 2), Math.round(ey - 6 - k * 16), '#dfe8ff', 'left'); g.globalAlpha = 1; }
+    if (st.happy) for (let i = 0; i < 2; i++) { const k = (st.happyK !== undefined ? st.happyK : ((t % 60) / 60)) + i * .36; if (k > 1) continue; const hx = ex + (i ? 6 : -2) + Math.sin(k * 8 + i) * 2, hy = ey - 6 - k * 14; g.globalAlpha = 1 - k; g.fillStyle = '#f05070'; g.fillRect(Math.round(hx), Math.round(hy), 1, 1); g.fillRect(Math.round(hx) + 2, Math.round(hy), 1, 1); g.fillRect(Math.round(hx), Math.round(hy) + 1, 3, 1); g.fillRect(Math.round(hx) + 1, Math.round(hy) + 2, 1, 1); g.globalAlpha = 1; }
+    if (st.dizzy) for (let i = 0; i < 3; i++) { const a = t * .18 + i * 2.1, sx = ex + Math.cos(a) * 7, sy = ey - 7 + Math.sin(a) * 2.5; g.fillStyle = Math.sin(a) > 0 ? '#fff3b8' : '#c8a850'; g.fillRect(Math.round(sx), Math.round(sy) - 1, 1, 3); g.fillRect(Math.round(sx) - 1, Math.round(sy), 3, 1); }
+  },
+  // The same life for Bigotes anywhere outside play (title, cinematic, HUD, map, screens): drawn on an
+  // unbent sprite whose top-left is (ox, oy) in the current transform, the head facing +x.
+  fishOverlay(g, spr, ox, oy, t, o = {}) {
+    if (!spr || spr.width !== 22) return;
+    const F = ART.fish, P = (x, y, c, w = 1, h = 1) => { g.fillStyle = c; g.fillRect(Math.round(ox + x), Math.round(oy + y), w, h); };
+    // Far whisker behind is skipped; the near ones sway from the jaw.
+    if (!o.noWhiskers) for (const [c, r, n, base, col, tip] of [[20, 7.5, 7, .7, '#e0a45a', '#8a5a34'], [18, 8, 5, 1.1, '#9a6a3a', '#5a3e2a']]) {
+      let x = c, y = r, a = base; for (let i = 0; i < n; i++) { a += .22 + Math.sin(t / 18 + i * .5 + c) * .07; x += Math.cos(a) * 1.2; y += Math.sin(a) * 1.2; P(x, y, i > n - 3 ? tip : col); }
+    }
+    P(12, 5.5, '#3e3a24'); P(12, 7.5, '#3e3a24'); P(11.5, 8.5, '#3e3a24'); if (Math.sin(t / 22) > .3) P(13, 7, '#d0604e');
+    const fa = Math.sin(t * .22) * .6; for (let i = 0; i < 4; i++) P(13 - i * .9 + Math.cos(Math.PI / 2 + fa) * i * .3, 9.5 + Math.sin(Math.PI / 2 + fa) * i * .8, i < 2 ? '#c8944a' : '#7a5630');
+    const sk = (t % 170) / 22; if (sk < 1) P(6 + sk * 13, 4.2, '#fffbe0', 2, 1);
+    const baked = spr === F.blink || spr === F.squint || spr === F.spit || spr === F.swallow, eye = Player.eyeOf(spr);
+    if (eye && !baked && !o.noEye) Player.drawEye(g, Math.round(ox + eye.c), Math.round(oy + eye.r), o.lx !== undefined ? o.lx : 1, o.ly || 0, { blink: (t % 230) < 5, happy: o.mood === 'happy', mad: o.mood === 'mad', sad: o.mood === 'sad', shock: o.mood === 'shock', sleep: o.mood === 'sleep', dir: 1 }, t);
+  },
   // Where the eye is in each fish sprite, found once by its colours (white, shine and pupil).
   eyeOf(spr) {
     const E = Player._eyes || (Player._eyes = new Map()); if (E.has(spr)) return E.get(spr);
@@ -755,28 +792,7 @@ const Player = {
         if (best) { const dx = best.x + best.w / 2 - (e.x + Cam.x), dy = best.y + best.h / 2 - (e.y + Cam.y), dd = Math.hypot(dx, dy) || 1; lx = dx / dd; ly = dy / dd; }
         else if (p.idleT > 60) { const ph = Math.floor(t / 90) % 4; lx = [p.dir, -p.dir, 0, p.dir][ph]; ly = [0, -1, -1, 0][ph]; }
       }
-      const happy = p.happyT > 0, sleep = p.idleT > 900, shock = !p.onGround && p.vy > 4.5 || p.hurtT > 10, blinkNow = (t % 230) < 5;
-      if (happy || sleep || blinkNow) {
-        // Closed: a happy arc, or a sleepy line.
-        g.fillStyle = '#1d1826'; if (happy) { g.fillRect(ex - 2, ey, 1, 1); g.fillRect(ex - 1, ey - 1, 3, 1); g.fillRect(ex + 2, ey, 1, 1); px(ex - 2, ey + 2, '#f07080', 2, 1); px(ex + 2, ey + 2, '#f07080', 1, 1); }
-        else g.fillRect(ex - 2, ey, 5, 1);
-      } else {
-        // A 4×3 white with a 2×2 pupil that shifts toward what he looks at (a wider eye when startled).
-        const ew = shock ? 5 : 4, eh = shock ? 4 : 3, x0 = ex - (ew >> 1), y0 = ey - (eh >> 1);
-        g.fillStyle = '#1d1826'; g.fillRect(x0 - 1, y0 - 1, ew + 2, 1); g.fillRect(x0 - 1, y0, 1, eh); g.fillRect(x0 + ew, y0, 1, eh);
-        g.fillStyle = '#fbf6e0'; g.fillRect(x0, y0, ew, eh);
-        const pxo = lx > .35 ? ew - 2 : lx < -.35 ? 0 : (ew - 2) >> 1, pyo = ly > .35 ? eh - 2 : ly < -.35 ? 0 : (eh - 2) >> 1;
-        g.fillStyle = '#1d1826'; g.fillRect(x0 + pxo, y0 + pyo, shock ? 1 : 2, shock ? 1 : 2);
-        g.fillStyle = '#ffffff'; if (!shock) g.fillRect(x0 + pxo, y0 + pyo, 1, 1);
-      }
-      // Brows: determined when sucking or charging, worried when hurt or dizzy.
-      const mad = p.sucking || p.charge > 8, sad = p.hurtT > 0 || p.dizzyT > 40 || p.dead; if (mad || sad) { g.fillStyle = '#1d1826'; const d = p.dir, top = ey - (shock ? 4 : 3); for (let i = -2; i <= 2; i++) g.fillRect(ex + i, top + Math.round((mad ? i * d : -i * d) * .4), 1, 1); }
-      // Sleep: little z's drifting up.
-      if (sleep) for (let i = 0; i < 3; i++) { const k = ((t + i * 40) % 120) / 120, zx = ex + 4 + k * 8 + i * 2, zy = ey - 6 - k * 16; g.globalAlpha = 1 - k; ART.text(g, 'z', Math.round(zx), Math.round(zy), '#dfe8ff', 'left'); g.globalAlpha = 1; }
-      // Hearts for a rescued cría.
-      if (happy) for (let i = 0; i < 2; i++) { const k = ((70 - p.happyT) + i * 18) / 50; if (k > 1) continue; const hx = ex + (i ? 6 : -2) + Math.sin(k * 8 + i) * 2, hy = ey - 6 - k * 14; g.globalAlpha = 1 - k; g.fillStyle = '#f05070'; g.fillRect(Math.round(hx), Math.round(hy), 1, 1); g.fillRect(Math.round(hx) + 2, Math.round(hy), 1, 1); g.fillRect(Math.round(hx), Math.round(hy) + 1, 3, 1); g.fillRect(Math.round(hx) + 1, Math.round(hy) + 2, 1, 1); g.globalAlpha = 1; }
-      // Dizzy: stars circling his head.
-      if (p.dizzyT > 0) for (let i = 0; i < 3; i++) { const a = t * .18 + i * 2.1, sx = ex + Math.cos(a) * 7, sy = ey - 7 + Math.sin(a) * 2.5; g.fillStyle = Math.sin(a) > 0 ? '#fff3b8' : '#c8a850'; g.fillRect(Math.round(sx), Math.round(sy) - 1, 1, 3); g.fillRect(Math.round(sx) - 1, Math.round(sy), 3, 1); }
+      Player.drawEye(g, ex, ey, lx, ly, { happy: p.happyT > 0, happyK: (70 - p.happyT) / 50, sleep: p.idleT > 900, shock: !p.onGround && p.vy > 4.5 || p.hurtT > 10, blink: (t % 230) < 5, mad: p.sucking || p.charge > 8, sad: p.hurtT > 0 || p.dizzyT > 40 || p.dead, dizzy: p.dizzyT > 0, dir: p.dir }, t);
     }
     // Bored: he blows a bubble that grows at his lips and pops.
     if (p.idleT > 150 && p.idleT < 900) { const k = (p.idleT - 150) % 160; if (k < 60) { const m = at(21.5, 7), r = k / 60 * 3.5; g.globalAlpha = .85; g.strokeStyle = '#cfeef8'; g.beginPath(); g.arc(m.x + p.dir * (r + 1), m.y - r * .3, Math.max(.8, r), 0, 7); g.stroke(); g.fillStyle = '#ffffff'; g.fillRect(Math.round(m.x + p.dir * (r + 1) - r * .4), Math.round(m.y - r * .3 - r * .5), 1, 1); g.globalAlpha = 1; } if (k === 60) { const m = at(21.5, 7); Sound.play('pop'); for (let i = 0; i < 6; i++) L.parts.push({ x: m.x + Cam.x + p.dir * 4, y: m.y + Cam.y - 1, vx: Math.cos(i) * .8, vy: Math.sin(i) * .8, life: 10, color: '#cfeef8', size: 1, g: 0 }); } }
@@ -829,9 +845,7 @@ const Player = {
     g.drawImage(F, 0, 0, 7, F.height, x + 5, fy, 7, F.height);
     g.drawImage(spr, x - 3, y + 18 - spr.height);
     g.drawImage(F, 7, 0, F.width - 7, F.height, x + 12, fy, F.width - 7, F.height);
-    const wh = [[20, 8], [21, 9], [21, 10], [21, 11], [20, 12], [19, 12]];
-    wh.forEach(([c, r], i) => { g.fillStyle = i > 3 ? '#8a5a34' : '#d49a52'; g.fillRect(x + 5 + c, fy + r, 1, 1); });
-    g.fillStyle = '#c9a86e'; g.fillRect(x + 5 + 19, fy + 11, 1, 2); g.fillRect(x + 5 + 17, fy + 11, 1, 1);
+    Player.fishOverlay(g, F, x + 5, fy, Game.t, Player.carryLook || {});
     g.drawImage(ART.hand, x + 9, y + 9 + bob);
   },
   // Water in motion: the hover jet down to the ground and the thread of water climbing from a pool.
@@ -1722,7 +1736,7 @@ const Game = {
     if (t > 40) ART.text(g, 'Tiempo ' + Game.fmtTime(s.secs), W / 2, 96, '#9fc0cc', 'center');
     if (t > 60 && s.pearls === s.total) ART.text(g, '★ Todas las crías a salvo ★', W / 2, 110, '#f2c46a', 'center');
     if (t > 40 && (t >> 5) % 2) ART.text(g, s.last ? 'Continuar' : 'Siguiente nivel', W / 2, 126, '#fff6d6', 'center');
-    Player.drawCarry(g, 62, 102, ART.nila.win, ART.fish.full);
+    Player.carryLook = { mood: 'happy' }; Player.drawCarry(g, 62, 102, ART.nila.win, ART.fish.full); Player.carryLook = null;
   },
   drawEnding(g) {
     const t = Game.endT; Game.drawScene(g, t, 'dusk');
@@ -1731,7 +1745,7 @@ const Game = {
     g.drawImage(ART.boat, Math.round(bx), 130 + bob);
     // The rescued crías swim in the boat's wake.
     for (let i = 0; i < 10; i++) { const fx = Math.round(bx - 12 - i * 11 + Math.sin(t / 9 + i) * 3), fy = 150 + (i % 3) * 7 + Math.round(Math.sin(t / 13 + i * 2)); if (fx > -8) g.drawImage(ART.criaFree[((t >> 3) + i) % 2], fx, fy); }
-    Player.drawCarry(g, Math.round(bx) + 10, 114 + bob, ART.nila.idle[(t % 200) < 6 ? 1 : 0], ART.fish.closed);
+    Player.carryLook = { mood: 'sleep' }; Player.drawCarry(g, Math.round(bx) + 10, 114 + bob, ART.nila.idle[(t % 200) < 6 ? 1 : 0], ART.fish.closed); Player.carryLook = null;
     g.fillStyle = 'rgba(8,10,16,.55)'; g.fillRect(0, 0, W, 100);
     const lines = ['La Garza voló lejos, a otro río,', 'y las crías volvieron nadando a casa.', '', 'Nila remó hasta el embarcadero', 'con Bigotes dormido en el regazo.', '', 'GRACIAS POR JUGAR'];
     const d = Save.data; let tot = 0, all = 0; for (const i in d.totals) { tot += d.pearls[i] || 0; all += d.totals[i]; }

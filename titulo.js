@@ -140,7 +140,7 @@ const Title = (() => {
   function drawFish(g, f, t) {
     if (!f) return;
     const spr = f.mouth === 'spit' ? ART.fish.spit : f.mouth === 'open' ? ART.fish.open : ART.fish.closed;
-    g.save(); g.translate(Math.round(f.x), Math.round(f.y)); g.rotate(f.a); g.drawImage(spr, -spr.width / 2, -spr.height / 2); g.restore();
+    g.save(); g.translate(Math.round(f.x), Math.round(f.y)); g.rotate(f.a); g.drawImage(spr, -spr.width / 2, -spr.height / 2); Player.fishOverlay(g, spr, -spr.width / 2, -spr.height / 2, t, { mood: f.mouth === 'open' ? 'mad' : null }); g.restore();
   }
   function drawSign(g, t, y) {
     const text = 'Nila y el pez gato', tw = ART.textWidth(text), w = tw + 16, x = Math.round((W - w) / 2), sway = Math.round(Math.sin(t / 50) * 1);

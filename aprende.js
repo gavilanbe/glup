@@ -126,7 +126,7 @@ const Aprende = (() => {
       g.restore();
       if (!l.exit) {
         const spr = ART.nila.win, fs = (t % 60) < 5 ? ART.fish.blink : ART.fish.full; g.drawImage(spr, px - 8, py + 10 - spr.height);
-        g.save(); g.translate(px, py - 14 - lift); g.rotate(-Math.PI / 2 + Math.sin(t / 9) * .08); g.drawImage(fs, -fs.width / 2, -fs.height / 2); g.restore();
+        g.save(); g.translate(px, py - 14 - lift); g.rotate(-Math.PI / 2 + Math.sin(t / 9) * .08); g.drawImage(fs, -fs.width / 2, -fs.height / 2); Player.fishOverlay(g, fs, -fs.width / 2, -fs.height / 2, t, { mood: t > 60 ? 'happy' : 'shock' }); g.restore();
         g.drawImage(ART.hand, px - 4, py - 10); g.drawImage(ART.hand, px + 1, py - 10);
       }
       // The morsel floats big above them.

@@ -26,7 +26,7 @@ const Cine = (() => {
     const d = (s, dx, dy) => { let sp = left ? s : ART.flip(s); if (tint) sp = ART.tint(sp, tint); const ox = left ? dx : body.width - dx - s.width; g.drawImage(sp, ox, dy); };
     d(wings[wf], 6, wf === 0 ? -10 : wf === 2 ? 8 : 2); d(body, 0, 0); g.restore();
   }
-  function fish(g, spr, x, y, a = 0, flip = false, s = 1) { g.save(); g.translate(Math.round(x), Math.round(y)); g.rotate(a); g.scale(flip ? -s : s, s); g.drawImage(spr, -spr.width / 2, -spr.height / 2); g.restore(); }
+  function fish(g, spr, x, y, a = 0, flip = false, s = 1, o) { g.save(); g.translate(Math.round(x), Math.round(y)); g.rotate(a); g.scale(flip ? -s : s, s); g.drawImage(spr, -spr.width / 2, -spr.height / 2); if (spr.width === 22) Player.fishOverlay(g, spr, -spr.width / 2, -spr.height / 2, Game.t, o || {}); g.restore(); }
   function burst(g, x, y, t0, t, n, seed, cols, spd, up = true, grav = .12) {
     const k = t - t0; if (k < 0 || k > 60) return;
     for (let i = 0; i < n; i++) {
@@ -219,10 +219,10 @@ const Cine = (() => {
         for (let i = 0; i < 3; i++) { const r = ((t + i * 40) % 120) / 4; b.globalAlpha = 1 - r / 30; b.fillStyle = '#c8f2ea'; b.fillRect(Math.round(205 - r), 131, 3, 1); b.fillRect(Math.round(205 + r), 131, 3, 1); } b.globalAlpha = 1;
         if (t < leap) {
           const kneel = t > 150; b.drawImage(kneel ? ART.nila.crouch : ART.nila.idle[(t % 150) < 6 ? 1 : 0], 147, 126 - (kneel ? ART.nila.crouch.height : ART.nila.idle[0].height));
-          const rise = clamp01((t - 80) / 30); if (rise > 0) { b.save(); b.beginPath(); b.rect(0, 0, W, 132); b.clip(); fish(b, (t % 90) < 5 ? ART.fish.blink : ART.fish.closed, 196, 138 - rise * 9, -.3, true); b.restore(); }
+          const rise = clamp01((t - 80) / 30); if (rise > 0) { b.save(); b.beginPath(); b.rect(0, 0, W, 132); b.clip(); fish(b, (t % 90) < 5 ? ART.fish.blink : ART.fish.closed, 196, 138 - rise * 9, -.3, true, 1, { mood: 'sad', lx: 1, ly: -1 }); b.restore(); }
           if (t > 180) ART.text(b, '?', 156, 94, '#9fc0cc', 'center', '#1b2430');
         } else if (t < land) { const k = (t - leap) / (land - leap); b.drawImage(ART.nila.crouch, 147, 126 - ART.nila.crouch.height); fish(b, ART.fish.open, 196 + (158 - 196) * k, 129 + (118 - 129) * k - Math.sin(k * Math.PI) * 26, -.3 - k * 6.28, true); }
-        else { const k = t - land, sq = k < 16 ? Math.exp(-k / 5) * Math.cos(k / 1.5) : 0; b.save(); b.translate(155, 126); b.scale(1 + sq * .15, 1 - sq * .15); b.translate(-155, -126); Player.drawCarry(b, 150, 108, ART.nila.idle[0], ART.fish.closed, 0); b.restore(); if (k < 60) b.drawImage(ART.heart, 162, 92 - (k >> 2)); }
+        else { const k = t - land, sq = k < 16 ? Math.exp(-k / 5) * Math.cos(k / 1.5) : 0; b.save(); b.translate(155, 126); b.scale(1 + sq * .15, 1 - sq * .15); b.translate(-155, -126); Player.carryLook = { mood: 'happy' }; Player.drawCarry(b, 150, 108, ART.nila.idle[0], ART.fish.closed, 0); Player.carryLook = null; b.restore(); if (k < 60) b.drawImage(ART.heart, 162, 92 - (k >> 2)); }
         burst(b, 196, 131, leap, t, 16, 77, ['#c8f2ea', '#ffffff'], 1.8, true);
       });
       if (t === 110) Sound.play('pop'); if (t === leap) Sound.play('splash'); if (t === land) { Sound.play('glup', 1); Sound.play('heart'); }

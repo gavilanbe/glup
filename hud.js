@@ -91,6 +91,7 @@ const Hud = (() => {
     circle(g, mx, my, MED.r + 1, '#120c18'); circle(g, mx, my, MED.r, '#1f3a3a'); circle(g, mx, my - 2, MED.r - 3, '#2a4a46');
     const face = p.spitT > 6 ? ART.fish.spit : full ? ART.fish.squint : held ? ART.fish.full : p.sucking ? ART.fish.open : (t % 200) < 6 || p.hurtT > 0 ? ART.fish.blink : ART.fish.closed;
     g.save(); g.beginPath(); g.arc(mx, my, MED.r - .5, 0, 7); g.clip(); const fw = face.width; g.drawImage(face, fw - 15, 0, 15, face.height, Math.round(mx - 8 + jit), Math.round(my - face.height / 2), 15, face.height);
+    Player.fishOverlay(g, face, Math.round(mx - 8 + jit) - (fw - 15), Math.round(my - face.height / 2), t, { noWhiskers: true, mood: p.hurtT > 0 || p.dizzyT > 40 ? 'sad' : p.happyT > 0 ? 'happy' : p.sucking || charge > 8 ? 'mad' : p.idleT > 900 ? 'sleep' : null, lx: 1 });
     if (p.sucking && !held) { g.fillStyle = '#cfe8f0'; for (let i = 0; i < 4; i++) { const k = ((t * .15 + i * .25) % 1); g.fillRect(Math.round(mx + 10 - k * 8), Math.round(my - 3 + i * 2), 2, 1); } }
     g.restore();
     ring(g, mx, my, MED.r + 1, '#f2c46a', 0, 1, 1); ring(g, mx, my, MED.r, '#8a6a3a', 0, 1, 1);
