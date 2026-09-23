@@ -533,34 +533,36 @@ const Player = {
     if (p.hp <= 0) { p.dead = true; p.deadT = 0; p.vy = -4.5; p.vx = -fromDir * 1; }
   },
   draw(g) {
-    const p = Player, cam = Cam;
+    const p = Player, cam = Cam, N = ART.nila;
     if (p.inv > 0 && (p.inv >> 2) % 2 === 0 && !p.dead) return;
     const fx = Math.round(p.x - cam.x), fy = Math.round(p.y - cam.y);
-    let spr, sy = fy - 2;
-    if (p.dead || p.hurtT > 0) spr = ART.nila.hurt;
-    else if (p.win) spr = (p.animT >> 3) % 2 ? ART.nila.win : ART.nila.idle[0];
-    else if (p.mantleT > 0) { spr = ART.nila.crouch; sy = fy - 4 + Math.round(p.mantleT * .6); }
-    else if (p.slide > 0) { spr = ART.nila.crouch; sy = fy - 4; }
-    else if (p.crouch) { spr = ART.nila.crouch; sy = fy - 4; }
-    else if (p.pound) spr = ART.nila.tuck;
-    else if (p.flap > 8) spr = ART.nila.tuck;
-    else if (p.onWall) spr = ART.nila.brace;
-    else if (p.hover || p.grapple) spr = ART.nila.dangle[(p.animT >> 3) % 2];
-    else if ((p.sucking || p.charge > 8) && p.onGround) spr = ART.nila.brace;
-    else if (p.skidT > 0 && p.onGround) spr = ART.nila.skid;
-    else if (!p.onGround) spr = p.vy < -1.5 ? ART.nila.jump : p.vy < 1.5 ? ART.nila.apex : ART.nila.fall;
-    else if (Math.abs(p.vx) > .5) spr = ART.nila.run[Math.floor(p.animT / 5) % 6];
-    else spr = p.blink > 0 ? ART.nila.idle[1] : (p.animT % 240) < 40 ? ART.nila.idle[2] : ART.nila.idle[0];
+    // Every pose is 16×22 with the boots on its last row: anchor it to the bottom of the hitbox.
+    let spr, by = fy + p.h;
+    if (p.dead || p.hurtT > 0) spr = N.hurt;
+    else if (p.win) spr = (p.animT >> 3) % 2 ? N.win : N.idle[0];
+    else if (p.mantleT > 0) { spr = N.crouch; by = fy + 12 + Math.round(p.mantleT * .6); }
+    else if (p.slide > 0) spr = N.slide;
+    else if (p.crouch) spr = N.crouch;
+    else if (p.pound || p.flap > 8) spr = N.tuck;
+    else if (p.onWall) spr = N.wall;
+    else if (p.hover || p.grapple) spr = N.dangle[(p.animT >> 3) % 2];
+    else if (p.spitT > 6 && p.onGround) spr = N.spit;
+    else if ((p.sucking || p.charge > 8) && p.onGround) spr = N.brace;
+    else if (p.skidT > 0 && p.onGround) spr = N.skid;
+    else if (!p.onGround) spr = p.vy < -1.5 ? N.jump : p.vy < 1.5 ? N.apex : N.fall;
+    else if (Math.abs(p.vx) > .5) spr = N.run[Math.floor(p.animT / 5) % 6];
+    else spr = p.blink > 0 ? N.idle[1] : (p.animT % 240) < 40 ? N.idle[2] : N.idle[0];
     if (p.dir < 0) spr = ART.flip(spr);
-    const cx = fx + 5, by = fy + p.h;
-    let lean = p.sucking && !p.aimUp && !p.grapple ? -p.dir * .1 : p.charge > 8 ? p.dir * .06 : 0;
-    if (p.slide > 0) lean = p.dir * .25; else if (p.onWall) lean = p.onWall * -.12; else if (p.onGround && Math.abs(p.vx) > 1.2 && !p.sucking) lean = p.dir * .07;
-    if (p.slide > 0) { g.save(); g.translate(cx, by); g.scale(1.25, .85); g.translate(-cx, -by); }
+    const cx = fx + 5;
+    // Shear around the boots: positive leans her back (away from where she faces).
+    let lean = p.sucking && !p.aimUp && !p.grapple ? p.dir * .05 : p.charge > 8 ? p.dir * .06 : 0;
+    if (p.slide > 0) lean = p.dir * .18; else if (p.onWall) lean = p.onWall * -.12; else if (p.onGround && Math.abs(p.vx) > 1.2 && !p.sucking) lean = -p.dir * .06;
     const recoil = p.spitT > 8 ? -p.dir * 1 : 0;
+    const fish = Player.drawFish(g, fx, fy); fish.back();
     g.save(); g.translate(cx, by); g.scale(p.sx, p.sy); if (lean) g.transform(1, 0, lean, 1, 0, 0); g.translate(-cx, -by);
-    g.drawImage(spr, fx - 2 + recoil, sy);
-    g.restore(); if (p.slide > 0) g.restore();
-    Player.drawFish(g, fx, fy);
+    g.drawImage(spr, cx - 8 + recoil, by - spr.height);
+    g.restore();
+    fish.front();
     Player.drawWater(g);
   },
   // Bigotes has a spine: the sprite is drawn in one-pixel slices from the hand outward, and each slice
@@ -569,13 +571,13 @@ const Player = {
     const p = Player, t = p.animT, ease = u => u * u * (3 - 2 * u);
     let fs = ART.fish.closed;
     if (p.swallowT > 0) fs = ART.fish.swallow; else if (p.spitT > 6) fs = ART.fish.spit; else if (p.charge >= CHARGE_FULL) fs = ART.fish.squint; else if (p.held) fs = ART.fish.full; else if (p.sucking) fs = ART.fish.open;
-    const n = fs.width, h = fs.height, PIV = 7;
+    const n = fs.width, h = fs.height, PIV = 7, MID = 6;
     const bob = p.onGround && Math.abs(p.vx) > .5 ? ((t >> 3) % 2 ? 1 : 0) : 0;
-    let hx = fx + 5 + p.dir * 7, hy = fy + (p.crouch ? 6 : 11) + bob;
-    let bend = 0, tailBend = 0, wave = .6, waveSpeed = .12, spacing = 1, headStretch = 1, lunge = 0, jitter = 0;
+    let hx = fx + 5 + p.dir * 7, hy = fy + (p.crouch ? 7 : 12) + bob;
+    let bend = 0, tailBend = 0, wave = .6, waveSpeed = .12, spacing = 1, headStretch = 1, lunge = 0, jitter = 0, rot = 0;
     if (p.hover) { hx = fx + 5 + p.dir * 5; hy = fy + 9; bend = Math.PI / 2 * .95; wave = .5; waveSpeed = .3; }
-    else if (p.grapple) { const a = p.aim(); bend = p.hanging ? -Math.PI / 2 * .9 : Math.atan2(a.y, a.x * p.dir); hx = fx + 5 + p.dir * 2; hy = fy + 5; wave = .3; }
-    else if (p.aimUp) { bend = -Math.PI / 2 * .92; hx = fx + 5 + p.dir * 3; hy = fy + 7; }
+    else if (p.grapple) { const a = p.aim(); bend = p.hanging ? -Math.PI / 2 * .9 : Math.atan2(a.y, a.x * p.dir); hx = fx + 5 + p.dir * (p.hanging ? 1 : 3); hy = fy + (p.hanging ? 1 : 5); wave = .3; }
+    else if (p.aimUp) { rot = -Math.PI / 2 * .8; bend = -Math.PI / 2 * .15; hx = fx + 5 + p.dir * 6; hy = fy + 9; }
     else if (!p.onGround && !p.sucking) bend = p.vy < -1 ? -.2 : p.vy > 2 ? .24 : 0;
     if (p.onGround && Math.abs(p.vx) > .5 && !p.sucking) { wave = 1.5; waveSpeed = .38; }
     if (p.onGround && Math.abs(p.vx) < .5 && !p.sucking && !p.held && t % 190 < 14) { wave = 2.2; waveSpeed = .5; }
@@ -596,23 +598,95 @@ const Player = {
     const water = p.held && p.held.kind === 'agua';
     const img = p.charge >= CHARGE_FULL && (t >> 1) % 3 === 0 ? ART.tint(fs, '#fff6d6') : fs;
     const tintW = water ? ART.tint(fs, '#7fd0c8') : null;
-    g.save(); g.translate(Math.round(hx), Math.round(hy)); g.scale(p.dir, 1); g.translate(lunge, 0);
     const cols = new Array(n); let px = 0, py = 0;
-    for (let c = PIV; c < n; c++) { const u = (c - PIV) / (n - 1 - PIV); const a = bend * ease(u); cols[c] = { x: px, y: py, a }; const st = spacing * (c > 14 ? headStretch : 1); px += Math.cos(a) * st; py += Math.sin(a) * st; }
+    for (let c = PIV; c < n; c++) { const u = (c - PIV) / (n - 1 - PIV); const a = rot + bend * ease(u); cols[c] = { x: px, y: py, a }; const st = spacing * (c > 14 ? headStretch : 1); px += Math.cos(a) * st; py += Math.sin(a) * st; }
     px = 0; py = 0;
-    for (let c = PIV - 1; c >= 0; c--) { const u = (PIV - 1 - c) / (PIV - 1); const a = -tailBend * ease(u) - bend * .12 * u; px -= Math.cos(a); py -= Math.sin(a); cols[c] = { x: px, y: py, a }; }
+    for (let c = PIV - 1; c >= 0; c--) { const u = (PIV - 1 - c) / (PIV - 1); const a = rot - tailBend * ease(u) - bend * .12 * u; px -= Math.cos(a); py -= Math.sin(a); cols[c] = { x: px, y: py, a }; }
     for (let c = 0; c < n; c++) {
       const sl = cols[c], u = c / (n - 1);
-      const off = Math.sin(t * waveSpeed + c * .45) * wave * (1 - u) * (1 - u) + (jitter ? (Math.random() - .5) * jitter : 0) + p.fishLag * (.15 + u * .5);
-      let sy = breath, dy = -(breath - 1) * 5; if (bulgeU > -1) { const b = Math.max(0, 1 - Math.abs(u - bulgeU) * 4); sy = 1 + b * .55; dy = -b * 2.2; }
-      g.save(); g.translate(sl.x, sl.y); g.rotate(sl.a);
-      g.drawImage(img, c, 0, 1, h, -.5, -5 + off + dy, 1.6, h * sy);
-      if (tintW) { const lv = Math.max(2, Math.min(8, 4.5 + Math.sin(t / 5 + c * .55) * 1.6 + (1 - p.held.amount) * 3)); g.globalAlpha = .55; g.drawImage(tintW, c, lv, 1, h - lv, -.5, -5 + off + dy + lv * sy, 1.6, (h - lv) * sy); g.globalAlpha = 1; }
-      g.restore();
+      sl.off = Math.sin(t * waveSpeed + c * .45) * wave * (1 - u) * (1 - u) + (jitter ? (Math.random() - .5) * jitter : 0) + p.fishLag * (.15 + u * .5);
+      sl.sy = breath; sl.dy = -(breath - 1) * MID; if (bulgeU > -1) { const b = Math.max(0, 1 - Math.abs(u - bulgeU) * 4); sl.sy = 1 + b * .55; sl.dy = -b * 2.6; }
     }
-    g.restore();
-    const head = cols[n - 1]; Player.fishHead = { x: Math.round(hx) + p.dir * (lunge + head.x), y: Math.round(hy) + head.y, a: head.a };
-    g.drawImage(ART.hand, Math.round(hx) - 2, Math.round(hy) - 6);
+    // A point of the sprite (column c, row r) on screen, following the bent spine.
+    const HX = Math.round(hx), HY = Math.round(hy);
+    const at = (c, r) => { const sl = cols[c], yy = -MID + sl.off + sl.dy + r * sl.sy; return { x: HX + p.dir * (lunge + sl.x - Math.sin(sl.a) * yy), y: HY + sl.y + Math.cos(sl.a) * yy, a: sl.a }; };
+    // Carried under her arm, his tail tucks behind Nila; when he is held out (hover, aiming, flapping...)
+    // he is drawn whole in front. The far whisker always goes behind him, the near one in front.
+    const tuck = !(p.hover || p.aimUp || p.grapple || p.pound || p.flap > 0 || p.onWall || p.dead || p.hurtT > 0);
+    const slices = (c0, c1) => {
+      g.save(); g.translate(HX, HY); g.scale(p.dir, 1); g.translate(lunge, 0);
+      for (let c = c0; c < c1; c++) {
+        const sl = cols[c], y0 = -MID + sl.off + sl.dy;
+        g.save(); g.translate(sl.x, sl.y); g.rotate(sl.a);
+        g.drawImage(img, c, 0, 1, h, -.5, y0, 1.6, h * sl.sy);
+        if (tintW) { const lv = Math.max(3, Math.min(9, 5.5 + Math.sin(t / 5 + c * .55) * 1.8 + (1 - p.held.amount) * 3.5)); g.globalAlpha = .55; g.drawImage(tintW, c, lv, 1, h - lv, -.5, y0 + lv * sl.sy, 1.6, (h - lv) * sl.sy); g.globalAlpha = 1; }
+        g.restore();
+      }
+      g.restore();
+    };
+    const head = cols[n - 1]; Player.fishHead = { x: HX + p.dir * (lunge + head.x), y: HY + head.y, a: head.a };
+    return {
+      back() { Player.drawBarbels(g, at, 'far'); if (tuck) slices(0, PIV); },
+      front() {
+        slices(tuck ? PIV : 0, n);
+        Player.drawBarbels(g, at, 'near');
+        // Nila's hand comes down over his flank, just under her chin.
+        const hs = p.dir > 0 ? ART.hand : ART.flip(ART.hand);
+        g.drawImage(hs, HX - (p.dir > 0 ? 3 : hs.width - 4), HY - 3);
+      } };
+  },
+  // Bigotes' whiskers: two long ones from the corners of the upper jaw that droop, trail behind with
+  // inertia (a little verlet chain in world space) and get dragged forward by his own suction; and two
+  // short ones under the chin that sway. `at(c, r)` maps a sprite pixel to the screen.
+  drawBarbels(g, at, layer) {
+    const p = Player, t = p.animT, dir = p.dir;
+    const specs = { near: { c: 20, r: 7.5, n: 6, seg: 1.3, base: .55, curl: .4, col: '#d49a52', tip: '#8a5a34' }, far: { c: 18, r: 7.5, n: 5, seg: 1.3, base: .9, curl: .38, col: '#7a5634', tip: '#5a3e2a' } };
+    const s = specs[layer], root = at(s.c, s.r), a = root.a;
+    let base = s.base, curl = s.curl, flutter = 0;
+    if (p.sucking) { base = .45; curl = -.12; flutter = .7; }
+    else if (p.spitT > 6) { base = 2.4; curl = .1; flutter = .3; }
+    else if (p.charge > 8) flutter = .25;
+    const wx = root.x + Cam.x, wy = root.y + Cam.y;
+    const key = layer === 'near' ? 'barbN' : 'barbF';
+    let ch = p[key];
+    const restAt = i => { let ang = base, x = wx, y = wy; for (let k = 0; k < i; k++) { const aa = ang + a; x += Math.cos(aa) * s.seg * dir; y += Math.sin(aa) * s.seg; ang += curl; } return { x, y }; };
+    if (!ch || ch.t !== t - 1 && ch.t !== t) { ch = p[key] = { t, pts: [] }; for (let i = 0; i <= s.n; i++) { const q = restAt(i); ch.pts.push({ x: q.x, y: q.y, px: q.x, py: q.y }); } }
+    if (ch.t !== t) {
+      ch.t = t;
+      const pts = ch.pts; pts[0].x = pts[0].px = wx; pts[0].y = pts[0].py = wy;
+      for (let i = 1; i < pts.length; i++) {
+        const q = pts[i], vx = (q.x - q.px) * .82, vy = (q.y - q.py) * .82; q.px = q.x; q.py = q.y;
+        q.x += vx; q.y += vy + .06;
+        const r = restAt(i), k = .16 + .1 * (1 - i / pts.length);
+        q.x += (r.x - q.x) * k; q.y += (r.y - q.y) * k;
+        if (flutter) { q.x += Math.sin(t * 1.3 + i * 1.7) * flutter * i / pts.length; q.y += Math.cos(t * 1.1 + i) * flutter * i / pts.length; }
+      }
+      for (let it = 0; it < 2; it++) for (let i = 1; i < pts.length; i++) { const A = pts[i - 1], B = pts[i], dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 1, m = s.seg / d; B.x = A.x + dx * m; B.y = A.y + dy * m; }
+    }
+    // Plot it as a one-pixel line, lighter along its length and darker at the tip.
+    const pts = ch.pts, last = pts.length - 1;
+    for (let i = 1; i < pts.length; i++) {
+      const A = pts[i - 1], B = pts[i], steps = Math.max(1, Math.ceil(Math.hypot(B.x - A.x, B.y - A.y)));
+      g.fillStyle = i >= last - 1 ? s.tip : s.col;
+      for (let k = 0; k < steps; k++) { const u = k / steps; g.fillRect(Math.round(A.x + (B.x - A.x) * u - Cam.x), Math.round(A.y + (B.y - A.y) * u - Cam.y), 1, 1); }
+    }
+    if (layer === 'near') {
+      // Chin whiskers: two short strands that hang and sway.
+      g.fillStyle = '#c9a86e';
+      for (const [c, len, ph] of [[19, 3, 0], [17, 2, 1.7]]) { const q = at(c, 10.5), sw = Math.sin(t / 9 + ph) * .6 - p.vx * .25 * dir; for (let k = 1; k <= len; k++) g.fillRect(Math.round(q.x - dir * sw * k * .5), Math.round(q.y + k - 1), 1, 1); }
+    }
+  },
+  // Nila with Bigotes under her arm for the still scenes (title, story, clear, ending); x, y is where her
+  // hitbox corner would be. His tail tucks behind her like in play, and his whiskers hang in a hook.
+  drawCarry(g, x, y, spr, fish, bob = 0) {
+    const F = fish, fy = y + 6 + bob;
+    g.drawImage(F, 0, 0, 7, F.height, x + 5, fy, 7, F.height);
+    g.drawImage(spr, x - 3, y + 18 - spr.height);
+    g.drawImage(F, 7, 0, F.width - 7, F.height, x + 12, fy, F.width - 7, F.height);
+    const wh = [[20, 8], [21, 9], [21, 10], [21, 11], [20, 12], [19, 12]];
+    wh.forEach(([c, r], i) => { g.fillStyle = i > 3 ? '#8a5a34' : '#d49a52'; g.fillRect(x + 5 + c, fy + r, 1, 1); });
+    g.fillStyle = '#c9a86e'; g.fillRect(x + 5 + 19, fy + 11, 1, 2); g.fillRect(x + 5 + 17, fy + 11, 1, 1);
+    g.drawImage(ART.hand, x + 9, y + 9 + bob);
   },
   // Water in motion: the hover jet down to the ground and the thread of water climbing from a pool.
   drawWater(g) {
@@ -1438,8 +1512,7 @@ const Game = {
     const t = Game.titleT; Game.drawScene(g, t, 'dusk');
     // Nila and Bigotes on the dock, breathing.
     const px = 150, py = 108, blink = (t % 200) < 6;
-    g.drawImage(ART.nila.idle[blink ? 1 : 0], px - 2, py - 2 + (t % 60 < 30 ? 0 : 0));
-    const fishS = (t % 240) < 20 ? ART.fish.open : ART.fish.closed; g.drawImage(fishS, px + 5, py + 6 + ((t >> 5) % 2)); g.drawImage(ART.hand, px + 11, py + 5 + ((t >> 5) % 2));
+    const fishS = (t % 240) < 20 ? ART.fish.open : ART.fish.closed; Player.drawCarry(g, px, py, ART.nila.idle[blink ? 1 : (t % 240) < 40 ? 2 : 0], fishS, (t >> 5) % 2);
     if ((t % 240) < 20 && t % 3 === 0) { g.fillStyle = '#cfe0e8'; g.fillRect(px + 32 + (t % 20) * 2, py + 10 + Math.round(Math.sin(t) * 4), 2, 1); }
     // Fireflies.
     for (const f of Game.titleParts) { g.globalAlpha = .4 + Math.sin(f.t / 8) * .4; g.fillStyle = '#e9f58a'; g.fillRect(Math.round(f.x), Math.round(f.y), 1, 1); } g.globalAlpha = 1;
@@ -1487,7 +1560,7 @@ const Game = {
     if (t > 40) ART.text(g, 'Tiempo ' + Game.fmtTime(s.secs), W / 2, 96, '#9fc0cc', 'center');
     if (t > 60 && s.pearls === s.total) ART.text(g, '★ Todas las crías a salvo ★', W / 2, 110, '#f2c46a', 'center');
     if (t > 40 && (t >> 5) % 2) ART.text(g, s.last ? 'Continuar' : 'Siguiente nivel', W / 2, 126, '#fff6d6', 'center');
-    g.drawImage(ART.nila.win, 60, 100); g.drawImage(ART.fish.full, 67, 108); g.drawImage(ART.hand, 73, 107);
+    Player.drawCarry(g, 62, 102, ART.nila.win, ART.fish.full);
   },
   drawEnding(g) {
     const t = Game.endT; Game.drawScene(g, t, 'dusk');
@@ -1496,7 +1569,7 @@ const Game = {
     g.drawImage(ART.boat, Math.round(bx), 130 + bob);
     // The rescued crías swim in the boat's wake.
     for (let i = 0; i < 10; i++) { const fx = Math.round(bx - 12 - i * 11 + Math.sin(t / 9 + i) * 3), fy = 150 + (i % 3) * 7 + Math.round(Math.sin(t / 13 + i * 2)); if (fx > -8) g.drawImage(ART.criaFree[((t >> 3) + i) % 2], fx, fy); }
-    g.drawImage(ART.nila.idle[(t % 200) < 6 ? 1 : 0], Math.round(bx) + 8, 112 + bob); g.drawImage(ART.fish.closed, Math.round(bx) + 15, 120 + bob); g.drawImage(ART.hand, Math.round(bx) + 21, 119 + bob);
+    Player.drawCarry(g, Math.round(bx) + 10, 114 + bob, ART.nila.idle[(t % 200) < 6 ? 1 : 0], ART.fish.closed);
     g.fillStyle = 'rgba(8,10,16,.55)'; g.fillRect(0, 0, W, 100);
     const lines = ['La Garza voló lejos, a otro río,', 'y las crías volvieron nadando a casa.', '', 'Nila remó hasta el embarcadero', 'con Bigotes dormido en el regazo.', '', 'GRACIAS POR JUGAR'];
     const d = Save.data; let tot = 0, all = 0; for (const i in d.totals) { tot += d.pearls[i] || 0; all += d.totals[i]; }
@@ -1515,7 +1588,7 @@ const Game = {
     y += rowH + 4; g.drawImage(ART.heronBody, 2, y); g.drawImage(ART.heronFly, 40, y); g.drawImage(ART.wingUp, 80, y); g.drawImage(ART.wingDown, 112, y); g.drawImage(ART.wingMid, 144, y);
     g.drawImage(ART.logo(), 180, y); ART.text(g, 'ÁÉÍÓÚÑ ¡HOLA! ¿QUÉ? 0123456789 ·,.:-+', 2, H - 10, '#fff');
   },
-  zoomList() { return [ART.ruca.idle, ART.ruca.blink, ART.ruca.talk, ART.bubble, ART.cria[0], ART.cria[1], ART.cria[2], ART.criaFree[0], ART.criaFree[1]]; },
+  zoomList() { const N = ART.nila; return [N.idle[0], N.run[0], N.run[2], N.jump, N.fall, N.brace, N.spit, N.tuck, N.hurt, N.win, ART.fish.closed, ART.fish.open, ART.fish.full, ART.fish.spit, ART.hand, ART.snail[0], ART.frogSit, ART.mosquito[0], ART.crab[0], ART.ruca.idle, ART.cria[0], ART.criaFree[0], ART.egg]; },
   drawIcon(g) {
     // Square badge 180×180 centred on the canvas; tools/iconos.sh crops and scales it.
     const ox = 70, S = 180; g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
@@ -1525,7 +1598,7 @@ const Game = {
     g.fillStyle = '#8fd9d0'; for (let x = 0; x < S; x += 4) g.fillRect(ox + x, 122 + (x % 8 ? 1 : 0), 3, 1);
     g.fillStyle = '#fff8e0'; for (let i = 0; i < 6; i++) g.fillRect(ox + 118 - i * 2, 128 + i * 6, 18 + i * 3, 1);
     g.save(); g.translate(ox + 90, 118); g.scale(4, 4); g.translate(-90, -118);
-    g.drawImage(ART.nila.idle[0], 68, 97); g.drawImage(ART.fish.full, 75, 105); g.drawImage(ART.hand, 81, 104);
+    Player.drawCarry(g, 70, 99, ART.nila.idle[0], ART.fish.full);
     g.restore();
   }
 

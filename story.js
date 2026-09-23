@@ -38,8 +38,9 @@ const Story = (() => {
     g.restore();
   }
   function nila(g, t, x, y, fish) {
-    g.drawImage(ART.nila.idle[(t % 180) < 6 ? 1 : 0], x - 2, y - 2);
-    if (fish) { g.drawImage((t % 150) < 5 ? ART.fish.blink : ART.fish.closed, x + 5, y + 6 + ((t >> 5) % 2)); g.drawImage(ART.hand, x + 11, y + 5 + ((t >> 5) % 2)); }
+    const spr = ART.nila.idle[(t % 180) < 6 ? 1 : 0];
+    if (fish) Player.drawCarry(g, x, y, spr, (t % 150) < 5 ? ART.fish.blink : ART.fish.closed, (t >> 5) % 2);
+    else g.drawImage(spr, x - 3, y + 18 - spr.height);
   }
   function heron(g, t, x, y, left, scale = 1, wing) {
     const body = ART.heronFly, wings = [ART.wingUp, ART.wingMid, ART.wingDown, ART.wingMid], wf = wing !== undefined ? wing : (t >> 3) % 4;
