@@ -22,6 +22,7 @@
 // Campos de un nivel (NIVEL.registrar):
 //   id        cadena estable (se usa en las partidas guardadas; no cambiarla nunca)
 //   name, theme ('dusk' 'night' 'storm' 'cave' 'nest'), music, rows (de join(screen(...), ...)), intro, par (segundos)
+//   ambiente  el paisaje sonoro (Sound.ambiente); si falta, el del theme (ver musica/LEEME.md)
 //   ruca: [...] frases de Ruca por orden de aparición de las N;  signs: [...] textos de los carteles ?
 //   maestro: { quien, poder, bocado?, dialogo: [...], despedida, encargo? }   (ver maestros.js)
 //   secretos: [{ poder, crias }]   crías escondidas que piden un truco que aún no se tiene al pasar (para el mapa)

@@ -250,7 +250,7 @@
       'w~~~~~~~####~~~~~~~~',
       '~~~~~~~~####~~~~~~~~',
       '####################'));
-  NIVEL.registrar({ id: 'rio', name: 'El río subterráneo', theme: 'cave', music: 'cave', par: 300, rows: rio,
+  NIVEL.registrar({ id: 'rio', name: 'El río subterráneo', theme: 'cave', ambiente: 'rio', music: 'cave', par: 300, rows: rio,
     intro: 'Bajo la cueva, el agua corre a oscuras hacia el ciprés muerto.',
     ruca: ['El río sale al pie del ciprés. Pero ojo: el nido está rodeado por un muro de zarzas encantado, y sólo se abre cuando cantan juntas muchas crías. Si no te llegan, vuelve a buscar las que dejaste atrás.',
       'Ahí delante está el ciprés muerto. La barca te lleva hasta el muro de zarzas... y ojalá que las crías canten fuerte.'],

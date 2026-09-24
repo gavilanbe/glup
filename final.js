@@ -320,7 +320,7 @@ const Final = (() => {
   const at = (a, b, k) => a < k && k <= b;
   const MOON = { x: 236, y: 52 };
   const SHOTS = [
-    { len: 380, fadeIn: 'black', music: 'alba', caps: [[150, 'La Garza huyó muy lejos, a otro río.', 370]], draw(g, t) {
+    { len: 380, fadeIn: 'black', music: 'alba', amb: 'alba', caps: [[150, 'La Garza huyó muy lejos, a otro río.', 370]], draw(g, t) {
       // Night. The Heron leaves the dead cypress and crosses the moon, smaller and smaller, until she is gone.
       const bgN = ART.background('night'), push = t / 1100, camY = 30 + t * .03;
       MUNDO.drawBackground(g, 40 + t * .06, camY, bgN, t, W, H, gg => {
@@ -607,7 +607,7 @@ const Final = (() => {
     const a = S.T; S.T = to; const p0 = phase(a), p1 = phase(to);
     // Sounds for the frames we went through, and the music of a shot we entered.
     if (p1.name === 'cine' && p0.name === 'cine' && p0.i === p1.i && SHOTS[p1.i].cue) SHOTS[p1.i].cue(p0.lt, p1.lt);
-    if (p1.name === 'cine' && p1.i !== S.shot) { S.shot = p1.i; const m = SHOTS[p1.i].music; if (m) Sound.playMusic(m); }
+    if (p1.name === 'cine' && p1.i !== S.shot) { S.shot = p1.i; const m = SHOTS[p1.i].music; if (m) Sound.playMusic(m); if (SHOTS[p1.i].amb !== undefined) Sound.ambiente(SHOTS[p1.i].amb); }
     if (p1.name === 'roll' && p0.name !== 'roll') Sound.playMusic('creditos');
     if (p1.name === 'fin' && p0.name !== 'fin') Sound.play('bell');
   }

@@ -1676,7 +1676,7 @@ const Game = {
     if (params.has('escena')) Game.capture = { scene: params.get('escena'), t: parseInt(params.get('t') || '0'), n: parseInt(params.get('n') || '0'), x: parseInt(params.get('x') || '-1'), guion: (params.get('guion') || '').split(';').filter(Boolean).map(s => { const [a, r] = s.split('@'); const [f0, f1] = (r || '0').split('-').map(Number); return { a, f0, f1: f1 === undefined ? f0 : f1 }; }) };
     if (params.has('z')) Game.capZoom = +params.get('z');
     if (params.has('trucos')) for (const k of params.get('trucos').split(',')) if (k === 'todos') POWER_ORDER.forEach(q => Save.data.powers[q] = true); else Save.data.powers[k] = true;
-    if (Game.capture) Game.runCapture(); else Game.state = 'gate';
+    if (params.has('gramola')) Gramola.start(); else if (Game.capture) Game.runCapture(); else Game.state = 'gate';
     Game.last = performance.now(); Game.acc = 0; requestAnimationFrame(Game.frame);
   },
   runCapture() {
@@ -1694,11 +1694,12 @@ const Game = {
     if (c.scene === 'cine') { Cine.start(() => { }); Cine.state.t = c.t; Game.frozen = true; return; }
     if (c.scene === 'titulo') { Game.title(); for (let i = 0; i < c.t; i++) Game.updateTitle(); Game.frozen = true; return; }
     if (c.scene === 'icono') { Game.state = 'icon'; return; }
+    if (c.scene === 'gramola') { Gramola.start(); return; }
     if (c.scene === 'victoria') { Victoria.capture(c); return; }
     if (c.scene === 'final') { Final.capture(c); return; }
     if (c.scene === 'nivel') { Game.startLevel(c.n); if (c.x >= 0) { Player.x = c.x; Player.y = 0; for (let i = 0; i < 60; i++) { Player.vy = Math.min(Player.vy + .28, 5.5); if (moveY(Player, Player.vy)) { Player.vy = 0; Player.onGround = true; break; } } Cam.snap(); } Game.banner = 0; for (let i = 0; i < c.t; i++) { Input.held = {}; Input.pressed = {}; for (const g of c.guion) if (i >= g.f0 && i <= g.f1) { Input.held[g.a] = true; if (i === g.f0) Input.pressed[g.a] = true; } Game.updatePlay(); } Input.held = {}; Input.pressed = {}; Game.frozen = true; if (params_debug()) console.log('ENTS', JSON.stringify(L.ents.map(e => [e.kind, Math.round(e.x), Math.round(e.y), e.dead ? 'dead' : ''])), 'PLAYER', Math.round(Player.x), Math.round(Player.y), Player.held ? Player.held.kind : '-', 'SUCK', Player.sucking, Player.waterT, Player.charge, Player.hover, Player.fishT, 'GRAP', !!Player.grapple, Player.hanging, Player.crouch, 'MOVE', Player.onWall, Player.airJumps, Player.pound, Player.slide, Player.mantleT, 'PEARLS', L.pearls, 'PROJS', JSON.stringify(L.projs.map(p => [p.kind, Math.round(p.x), Math.round(p.y)])), 'GATES', L.gates.map(g => g.map(t => tileAt(t.x, t.y)).join('')).join('|'), 'TARGETS', [...L.hitTargets].join(';')); return; }
   },
-  title() { Game.state = 'title'; Game.titleT = 0; Game.titleParts = []; Sound.playMusic('march'); },
+  title() { Game.state = 'title'; Game.titleT = 0; Game.titleParts = []; Sound.playMusic('march'); Sound.ambiente('atardecer', { vol: .8 }); },
   frame(now) {
     const dt = Math.min(100, now - Game.last); Game.last = now; Game.acc += dt;
     let steps = 0;
@@ -1722,6 +1723,7 @@ const Game = {
       case 'ending': Game.updateEnding(); break;
       case 'gate': Cine.gateUpdate(); break;
       case 'cine': if (!Game.frozen) Cine.update(); break;
+      case 'gramola': Gramola.update(); break;
     }
     Touch.updateButtons();
     Game.updateShell();
@@ -1756,7 +1758,7 @@ const Game = {
     Game.state = 'select'; Charla.stop();
     if (from !== undefined && to !== undefined && to < LEVELS.length) { Mapa.place(from); Game.sel = to; Mapa.select(to); }
     else { Game.sel = Math.min(Save.reached(), LEVELS.length - 1); Mapa.place(Game.sel); }
-    Sound.playMusic('dock');
+    Sound.playMusic('dock'); Sound.ambiente('atardecer', { vol: .6 });
   },
   updateSelect() {
     if (Charla.active()) { Charla.update(); return; }
@@ -1786,7 +1788,7 @@ const Game = {
     Charla.start({ quien: 'ruca', lines });
   },
   // ---- play
-  startLevel(i, arrive) { Maestros.reset(); Game.level = i; Game.hitStop = 0; Game.heldPresses = {}; loadLevel(i); Game.state = 'play'; Game.paused = false; Game.banner = 190; Sound.playMusic(LEVELS[i].music); Game.toastT = 0; Game.weather = { bolt: 0, next: 200, x: 0, seed: 1, thunder: 0 };  if (arrive) { Barca.start(); Game.banner = 0; } },
+  startLevel(i, arrive) { Maestros.reset(); Game.level = i; Game.hitStop = 0; Game.heldPresses = {}; loadLevel(i); Game.state = 'play'; Game.paused = false; Game.banner = 190; Sound.playMusic(LEVELS[i].music); Sound.ambiente(LEVELS[i].ambiente || LEVELS[i].theme); Game.toastT = 0; Game.weather = { bolt: 0, next: 200, x: 0, seed: 1, thunder: 0 };  if (arrive) { Barca.start(); Game.banner = 0; } },
   respawn() { Game.transition(() => { Player.reset(L.checkpoint.x, L.checkpoint.y, true); if (L.def.boss) { if (!Boss.restart()) { loadLevel(Game.level); Game.banner = 60; } } else { spawnEntities(); } Cam.snap(); Sound.playMusic(L.def.boss ? Boss.song() : L.def.music); }); },
   drown(fell) {
     const p = Player; if (p.dead) return;
@@ -1944,6 +1946,7 @@ const Game = {
     while (stack.length) { const [x, y] = stack.pop(); const k = key(x, y); if (seen.has(k) || tileAt(x, y) !== 'F') continue; seen.add(k); setTile(x, y, '.'); spawnParts(14, x * TS + 8, y * TS + 8, { color: ['#c8d0d6', '#9fa8b0', '#e8eef2'], angle: -Math.PI / 2, spread: 1, speed: [.3, 1.6], life: [30, 70], g: -.03, kind: 'smoke' }); spawnParts(4, x * TS + 8, y * TS + 12, { color: ['#8fd9d0', '#c8f2ea'], speed: [.5, 1.5], life: [10, 18], g: .08 }); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) stack.push([x + dx, y + dy]); }
   },
   tap(pt) {
+    if (Game.state === 'gramola') { Gramola.tap(pt); return; }
     if (Game.state === 'title' || Game.state === 'gate') { Game.tapped = true; return; }
     if ((Game.state === 'select' || Game.state === 'play') && Charla.active()) { Game.tapped = true; return; }
     if (Game.state === 'select') { const h = Mapa.hit(pt); if (h === 'panel') Game.tapped = true; else if (h >= 0) Game.tapSel = h; return; }
@@ -1970,6 +1973,7 @@ const Game = {
       case 'ending': Game.drawEnding(g); break;
       case 'sprites': Game.drawSprites(g); break;
       case 'icon': Game.drawIcon(g); break;
+      case 'gramola': Gramola.draw(g); break;
     }
     if (Game.fade > 0) { g.fillStyle = 'rgba(8,10,16,' + Game.fade + ')'; g.fillRect(0, 0, W, H); }
   },

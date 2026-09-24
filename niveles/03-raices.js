@@ -224,7 +224,7 @@
       '######~~~~~~~~~~~~~~',
       '######~~~~~~~~~~~~~~',
       '####################'));
-  NIVEL.registrar({ id: 'raices', name: 'El bosque de raíces', theme: 'dusk', music: 'marsh', par: 260, rows: raices,
+  NIVEL.registrar({ id: 'raices', name: 'El bosque de raíces', theme: 'dusk', ambiente: 'raices', music: 'marsh', par: 260, rows: raices,
     intro: 'Bajo los cipreses, las raíces trepan como muros.',
     ruca: ['Aquí las raíces crecen hacia arriba, como paredes, y la Garza anida más allá de ellas. Dicen que una lapa vieja, en el hueco del bosque, sabe cómo subirlas. Tú, de momento, por las ramas: ¡aletea!',
       'Ya casi estás. Esa agua lleva a la barca. Y si alguna vez vuelves con más trucos, mira bien los muros: a este bosque le sobran escondites.'],

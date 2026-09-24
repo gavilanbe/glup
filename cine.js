@@ -102,7 +102,7 @@ const Cine = (() => {
   function drawCria(g, x, y, flip, t, i, s = 2) { fish(g, ART.criaFree[((t >> 3) + i) % 2], x, y, 0, flip, s); }
 
   // ---------------------------------------------------------------- Planos
-  // Each shot: len (frames), fade in/out ('black' | 'white' | 0), music on entry, caption, draw(g, t).
+  // Each shot: len (frames), fade in/out ('black' | 'white' | 0), music and ambience (amb) on entry, caption, draw(g, t).
   const SHOTS = [
     { len: 170, music: null, draw(g, t) {
       g.fillStyle = '#05050b'; g.fillRect(0, 0, W, H);
@@ -114,7 +114,7 @@ const Cine = (() => {
       const a = clamp01((t - 60) / 30) * clamp01((165 - t) / 20);
       g.globalAlpha = a; ART.text(g, 'gavilanbe', W / 2, 84, '#fff3d0', 'center'); ART.text(g, 'presenta', W / 2, 112, '#8a86a8', 'center'); g.globalAlpha = 1;
     } },
-    { len: 380, fadeIn: 'black', music: 'dock', caption: 'El pantano de los Juncos Viejos.', capAt: 250, draw(g, t) {
+    { len: 380, fadeIn: 'black', music: 'dock', amb: 'atardecer', caption: 'El pantano de los Juncos Viejos.', capAt: 250, draw(g, t) {
       // Tilt down from the stars to the swamp at dusk.
       const k = ease(clamp01((t - 20) / 250)), top = -220 * (1 - k);
       g.drawImage(tallSky(), 0, Math.round(-240 - top));
@@ -137,7 +137,7 @@ const Cine = (() => {
         for (let i = 0; i < 6; i++) { const per = 80 + i * 13, k = ((t + i * 37) % per) / 40; if (k > 1) continue; const x = 104 + i * 19 + k * 8, y = 132 - Math.sin(k * Math.PI) * 16; drawCria(b, x, y, i % 2 === 0, t, i, 1); if (k < .08 || k > .92) { b.fillStyle = '#c8f2ea'; b.fillRect(Math.round(x) - 2, 131, 5, 1); } }
       });
     } },
-    { len: 250, fadeIn: 'black', music: 'omen', draw(g, t) {
+    { len: 250, fadeIn: 'black', music: 'omen', amb: 'noche', draw(g, t) {
       // The omen: a long-legged shadow crosses the moon.
       g.drawImage(tallSky(), 0, -60);
       for (let i = 0; i < 50; i++) { const x = hash(i + 300) * W | 0, y = hash(i + 301) * H | 0; if (Math.sin(t / 10 + i) > .3) { g.fillStyle = '#9a94c0'; g.fillRect(x, y, 1, 1); } }
@@ -201,7 +201,7 @@ const Cine = (() => {
       g.restore();
       if (t === 10 || t === 110) Sound.play('splash'); if ([30, 42, 128, 140, 150].includes(t)) Sound.play('glup', .6);
     } },
-    { len: 320, fadeIn: 'black', music: 'sad', caption: 'La Garza se las llevó a todas, río arriba...', capAt: 60, draw(g, t) {
+    { len: 320, fadeIn: 'black', music: 'sad', amb: 'noche', caption: 'La Garza se las llevó a todas, río arriba...', capAt: 60, draw(g, t) {
       // She flies off with a heavy crop, getting smaller against the dusk; a feather or two comes down.
       zoomed(g, 1, W / 2, H / 2, b => {
         Game.drawScene(b, t, 'dusk');
@@ -227,7 +227,7 @@ const Cine = (() => {
       });
       if (t === 110) Sound.play('pop'); if (t === leap) Sound.play('splash'); if (t === land) { Sound.play('glup', 1); Sound.play('heart'); }
     } },
-    { len: 200, fadeIn: 'white', music: 'march', caption: '"Vamos a buscarlas, Bigotes."', capAt: 30, draw(g, t) {
+    { len: 200, fadeIn: 'white', music: 'march', amb: 'atardecer', caption: '"Vamos a buscarlas, Bigotes."', capAt: 30, draw(g, t) {
       // Close-up with radiating lines behind: the resolve.
       zoomed(g, 3, 158, 112, b => {
         Game.drawScene(b, t, 'dusk');
@@ -273,7 +273,7 @@ const Cine = (() => {
     const go = Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Input.pressed.pause || Game.tapped; Game.tapped = false;
     if (go && S.t > 20) { finish(); return; }
     const { i } = locate(S.t);
-    if (i !== S.lastShot) { S.lastShot = i; if (SHOTS[i].music) Sound.playMusic(SHOTS[i].music); }
+    if (i !== S.lastShot) { S.lastShot = i; if (SHOTS[i].music) Sound.playMusic(SHOTS[i].music); if (SHOTS[i].amb !== undefined) Sound.ambiente(SHOTS[i].amb); }
     if (++S.t >= TOTAL) finish(true);
   }
   function draw(g) {
