@@ -93,6 +93,8 @@ const Sound = (() => {
     // The learning cinematic: the bite, the big gulp, the power rising in him and bursting out.
     chomp() { const t = ctx.currentTime; noise(t, .09, .22, 'lowpass', 2200, 300, 1); osc('square', 190, t, .09, .12, sfxBus, 70, .002, .05); },
     gulpBig() { const t = ctx.currentTime; osc('sine', 320, t, .4, .2, sfxBus, 80, .01, .15); osc('triangle', 160, t + .05, .3, .08, sfxBus, 60, .01, .1); },
+    shing() { const t = ctx.currentTime; osc('sine', 1800, t, .35, .09, sfxBus, 3600, .003, .3); osc('triangle', 2700, t + .03, .3, .05, sfxBus, 5400, .003, .25); noise(t, .12, .05, 'highpass', 5000); },
+    heartbeat() { const t = ctx.currentTime; osc('sine', 70, t, .16, .32, sfxBus, 40, .004, .1); osc('sine', 62, t + .2, .14, .24, sfxBus, 36, .004, .1); },
     powerRise() { const t = ctx.currentTime; osc('sawtooth', 70, t, 1.05, .045, sfxBus, 560, .35, .15); osc('triangle', 140, t, 1.05, .07, sfxBus, 1120, .35, .15); osc('sine', 280, t + .5, .55, .05, sfxBus, 1680, .1, .1); noise(t, 1.05, .06, 'bandpass', 250, 3200, 3); },
     powerBurst() { const t = ctx.currentTime; noise(t, .6, .24, 'lowpass', 3500, 180, 1); osc('sine', 70, t, .6, .3, sfxBus, 28, .004, .35); ['C5', 'E5', 'G5', 'C6', 'E6'].forEach((n, i) => osc('triangle', freq(n), t + .03 * i, .9, .07, sfxBus, null, .005, .45)); },
     charge() { const t = ctx.currentTime; osc('sawtooth', 120, t, .55, .08, sfxBus, 420, .05, .2); },

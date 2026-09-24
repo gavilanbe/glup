@@ -8,7 +8,7 @@
 const Aprende = (() => {
   const ABSORB = 34, RAISE = 36, NAME = 80, DEMO = 118, READY = 150, EXIT = 22;
   // The cinematic before the card: the morsel comes in, the bite, the gulp, the power rising, the burst.
-  const BITE = 46, GULPED = 92, CINE = 152, FLASH = 26;
+  const BITE = 46, GULPED = 92, EYE_END = 120, CINE = 172, FLASH = 26;   // bite · gulp · the eye close-up · the power rising · burst
   // Each trick has its colour and its sensation.
   const FEEL = {
     soplido: { col: '#bfe6f5', deep: '#3a6a8a', kind: 'wind' }, aleteo: { col: '#ffe36a', deep: '#8a6a1a', kind: 'spark' },
@@ -38,10 +38,12 @@ const Aprende = (() => {
     const t = l.t, f = FEEL[l.power] || FEEL.aleteo;
     if (t === BITE) { Sound.play('chomp'); Sound.play('glup', 2); Input.rumble(160, .9, .4); }
     if (t === BITE + 10) Sound.play('gulpBig');
-    if (t === GULPED) Sound.play('powerRise');
-    if (t > GULPED && t % 14 === 0) Input.rumble(40, .1 + (t - GULPED) / (CINE - GULPED) * .6, .3);
+    if (t === GULPED - 22 || t === GULPED - 8) Sound.play('heartbeat');
+    if (t === GULPED + 6) { Sound.play('shing'); Input.rumble(80, .5, .2); }
+    if (t === EYE_END) Sound.play('powerRise');
+    if (t > EYE_END && t % 14 === 0) Input.rumble(40, .1 + (t - EYE_END) / (CINE - EYE_END) * .6, .3);
     // Energy motes: during the rise they stream in from the edges to the fish.
-    if (t > GULPED - 10 && t < CINE) for (let i = 0; i < 2; i++) { const a = Math.random() * 6.28, r = 120 + Math.random() * 60; l.motes.push({ a, r, v: 1.5 + Math.random() * 2.5, c: Math.random() < .3 ? '#ffffff' : f.col }); }
+    if (t > EYE_END - 6 && t < CINE) for (let i = 0; i < 2; i++) { const a = Math.random() * 6.28, r = 120 + Math.random() * 60; l.motes.push({ a, r, v: 1.5 + Math.random() * 2.5, c: Math.random() < .3 ? '#ffffff' : f.col }); }
     for (let i = l.motes.length - 1; i >= 0; i--) { const m = l.motes[i]; m.r -= m.v; m.v *= 1.05; m.a += .03; if (m.r < 8) l.motes.splice(i, 1); }
   }
   function update() {
@@ -82,16 +84,32 @@ const Aprende = (() => {
   }
   function cineDraw(g, l) {
     const t = l.t, f = FEEL[l.power] || FEEL.aleteo, S = 5, spr0 = ART.fish.closed, fw = spr0.width * S;
-    const rise = clamp01((t - GULPED) / (CINE - GULPED)), shake = t > GULPED ? rise * rise * 3 : t >= BITE && t < BITE + 8 ? (BITE + 8 - t) * .8 : 0;
+    const rise = clamp01((t - EYE_END) / (CINE - EYE_END)), shake = t > EYE_END ? rise * rise * 3 : t >= BITE && t < BITE + 8 ? (BITE + 8 - t) * .8 : 0;
     const jx = (Math.random() - .5) * shake * 2, jy = (Math.random() - .5) * shake * 2;
+    if (t >= GULPED && t < EYE_END) { eyeCut(g, l, t - GULPED, f); letterbox(g, 18); return; }
     // Backdrop: the night closes in, then glows with the trick's colour as the power rises.
     const inK = smooth(t / 14);
     g.globalAlpha = inK; g.fillStyle = '#07060d'; g.fillRect(0, 0, W, H);
     const cx = W / 2 - 18 + jx, cy = H / 2 + 6 + jy, gr = g.createRadialGradient(cx, cy, 4, cx, cy, 150);
     gr.addColorStop(0, f.col); gr.addColorStop(.35, f.deep); gr.addColorStop(1, 'rgba(7,6,13,0)');
     g.globalAlpha = inK * (.18 + rise * .55 + (t >= BITE && t < BITE + 6 ? .4 : 0)); g.fillStyle = gr; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
+    // The camera: a punch-in on the bite, then a slow push while the power rises.
+    const zoom = 1 + smooth(rise) * .16 + (t >= BITE && t < BITE + 8 ? (BITE + 8 - t) * .014 : 0);
+    g.save(); g.translate(cx, cy); g.scale(zoom, zoom); g.translate(-cx, -cy);
     // Rays behind him while the power rises, turning faster and longer.
-    if (t > GULPED) { g.save(); g.translate(cx, cy); for (let i = 0; i < 18; i++) { const a = i / 18 * 6.28 + t * (.01 + rise * .05), len = 60 + rise * 140; g.globalAlpha = (.08 + rise * .22) * (i % 2 ? 1 : .5); g.fillStyle = i % 3 ? f.col : '#ffffff'; g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a - .06) * len, Math.sin(a - .06) * len); g.lineTo(Math.cos(a + .06) * len, Math.sin(a + .06) * len); g.fill(); } g.restore(); g.globalAlpha = 1; }
+    if (t > EYE_END) { g.save(); g.translate(cx, cy); for (let i = 0; i < 18; i++) { const a = i / 18 * 6.28 + t * (.01 + rise * .05), len = 60 + rise * 140; g.globalAlpha = (.08 + rise * .22) * (i % 2 ? 1 : .5); g.fillStyle = i % 3 ? f.col : '#ffffff'; g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a - .06) * len, Math.sin(a - .06) * len); g.lineTo(Math.cos(a + .06) * len, Math.sin(a + .06) * len); g.fill(); } g.restore(); g.globalAlpha = 1; }
+    // A magic circle on the floor under him, closing as the power fills him; he floats up off it.
+    if (t > EYE_END - 4) {
+      const R = 58, k = smooth(rise * 1.15), fy = cy + 36, rot = t * .012;
+      g.save(); g.translate(cx, fy);
+      g.globalAlpha = .25 + k * .35; g.fillStyle = f.col; g.beginPath(); g.ellipse(0, 0, R * k + 4, (R * k + 4) * .28, 0, 0, 7); g.fill();
+      for (let i = 0; i < 96; i++) { const a = rot + i / 96 * 6.28; if (i / 96 > k) break; g.globalAlpha = .9; g.fillStyle = i % 3 ? f.col : '#ffffff'; g.fillRect(Math.round(Math.cos(a) * R), Math.round(Math.sin(a) * R * .3), 2, 1); }
+      for (let i = 0; i < 64; i++) { const a = -rot * 2 + i / 64 * 6.28; if (i / 64 > k) break; g.globalAlpha = .6; g.fillStyle = f.col; g.fillRect(Math.round(Math.cos(a) * R * .7), Math.round(Math.sin(a) * R * .7 * .3), 1, 1); }
+      for (let i = 0; i < 6; i++) { const a = -rot * 2 + i / 6 * 6.28; if (i / 6 > k) break; g.globalAlpha = .9; g.fillStyle = '#ffffff'; g.fillRect(Math.round(Math.cos(a) * R * .85) - 1, Math.round(Math.sin(a) * R * .85 * .3) - 1, 3, 3); }
+      // Columns of light rising off the circle.
+      for (let i = 0; i < 8; i++) { const a = rot * 3 + i / 8 * 6.28, x = Math.cos(a) * R * .9, y = Math.sin(a) * R * .27, hgt = 20 + k * 60 * (.6 + .4 * Math.sin(t / 5 + i)); if (Math.sin(a) < 0) continue; g.globalAlpha = .18 * k; g.fillStyle = f.col; g.fillRect(Math.round(x) - 1, Math.round(y - hgt), 3, Math.round(hgt)); }
+      g.restore(); g.globalAlpha = 1;
+    }
     // Speed lines on the bite.
     if (t >= BITE && t < BITE + 10) { g.fillStyle = '#ffffff'; for (let i = 0; i < 26; i++) { const a = i / 26 * 6.28 + i, r0 = 50 + (i * 37) % 40, r1 = r0 + 30 + (i * 13) % 50; g.globalAlpha = (BITE + 10 - t) / 10 * .8; for (let r = r0; r < r1; r += 2) g.fillRect(Math.round(cx + fw / 2 + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * .6), 1, 1); } g.globalAlpha = 1; }
     // Energy motes streaming in.
@@ -103,24 +121,25 @@ const Aprende = (() => {
     let lump = 0, lumpAmt = 0; if (t >= BITE && t < GULPED + 4) { lump = 1 - smooth(gulpK) * .7; lumpAmt = .35 * (1 - clamp01((t - GULPED + 8) / 12)); }
     // Per-trick sensation while the power rises.
     let sxK = 1, syK = 1, dy = 0, tintC = f.col;
-    if (t > GULPED) {
+    if (t > EYE_END) {
       if (f.kind === 'wind') syK = 1 + Math.max(0, Math.sin(t / 5)) * .12 * rise;                 // cheeks puffing
       if (f.kind === 'spark') dy = Math.sin(t / 4) * 3 * rise;                                    // fins flapping him up and down
-      if (f.kind === 'rock' && t < GULPED + 12) dy = (t - GULPED) * 1.2;                          // heavy: a drop and a thud
-      if (f.kind === 'rock' && t === GULPED + 12) { Cam.shake(3, 8); Sound.play('thud'); }
+      if (f.kind === 'rock' && t < EYE_END + 12) dy = (t - EYE_END) * 1.2;                          // heavy: a drop and a thud
+      if (f.kind === 'rock' && t === EYE_END + 12) { Cam.shake(3, 8); Sound.play('thud'); }
       if (f.kind === 'slime') sxK = 1 + Math.sin(t / 6) * .06 * rise;                             // wobbly
       if (f.kind === 'fire') tintC = '#ff3a1a';
+      if (f.kind !== 'rock') dy -= smooth(rise) * 9;                                              // lifted off the ground by it
     }
     const Sx = S * sxK, Sy = S * syK, mood = t < BITE ? null : t < GULPED ? 'shock' : rise > .6 ? 'mad' : 'shock';
     // His aura, then him.
-    if (t > GULPED) { const a = .25 + rise * .5 + Math.sin(t / 3) * .08, sc = 1.08 + Math.sin(t / 4) * .03 + rise * .06; g.globalAlpha = a; g.drawImage(ART.tint(spr, f.col), Math.round(cx - fw * sc / 2), Math.round(cy + dy - spr.height * S * sc / 2), Math.round(fw * sc), Math.round(spr.height * S * sc)); g.globalAlpha = 1; }
+    if (t > EYE_END) { const a = .25 + rise * .5 + Math.sin(t / 3) * .08, sc = 1.08 + Math.sin(t / 4) * .03 + rise * .06; g.globalAlpha = a; g.drawImage(ART.tint(spr, f.col), Math.round(cx - fw * sc / 2), Math.round(cy + dy - spr.height * S * sc / 2), Math.round(fw * sc), Math.round(spr.height * S * sc)); g.globalAlpha = 1; }
     g.save(); g.translate(cx, cy + dy); g.scale(sxK, syK); g.translate(-cx, -(cy + dy));
-    bigFish(g, spr, fx, Math.round(cy + dy), S, lump, lumpAmt, mood, t, { c: t > GULPED ? tintC : '#ffffff', a: t > GULPED ? rise * rise * .75 : 0 });
+    bigFish(g, spr, fx, Math.round(cy + dy), S, lump, lumpAmt, mood, t, { c: t > EYE_END ? tintC : '#ffffff', a: t > EYE_END ? rise * rise * .75 : 0 });
     g.restore();
     // The glowing lump itself, seen through him.
     if (lumpAmt > .02) { const lx = fx + lump * fw, a = .35 + Math.sin(t / 3) * .1; g.globalAlpha = a; g.fillStyle = f.col; g.beginPath(); g.arc(Math.round(lx), Math.round(cy + dy), 9, 0, 7); g.fill(); g.globalAlpha = 1; }
     // Sensation particles around him.
-    if (t > GULPED) {
+    if (t > EYE_END) {
       const n = 2 + Math.round(rise * 6);
       for (let i = 0; i < n; i++) {
         const k = ((t * .02 + i / n) % 1), a = i * 2.4 + t * .05;
@@ -148,13 +167,60 @@ const Aprende = (() => {
     if (t === BITE) for (let i = 0; i < 18; i++) (l.trail || (l.trail = [])).push({ x: fx + fw, y: cy, vx: 1 + Math.random() * 3, vy: -2 + Math.random() * 3, life: 20 + Math.random() * 20, c: i % 2 ? f.col : '#ffffff' });
     // ¡ÑAM!
     if (t >= BITE && t < BITE + 34) { const k = t - BITE, sc = k < 5 ? 2.2 - k * .2 : 1.2, a = clamp01((BITE + 34 - t) / 8); g.save(); g.translate(Math.round(fx + fw + 26), Math.round(cy - 40)); g.rotate(-.12); g.scale(sc, sc); g.globalAlpha = a; ART.title(g, '¡ÑAM!', 0, 0, '#fff6d6', 'center'); g.restore(); g.globalAlpha = 1; }
+    g.restore();
+    // Nila's reaction, in a comic panel that slides in after the bite.
+    if (t > BITE + 12 && t < GULPED) inset(g, t - BITE - 12, GULPED - BITE - 12);
     // The bite's flash.
     if (t >= BITE && t < BITE + 6) { g.globalAlpha = (BITE + 6 - t) / 6 * .7; g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
     // Brightening into the burst.
     if (rise > .8) { g.globalAlpha = (rise - .8) / .2 * .85; g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
-    // Letterbox.
-    const bar = Math.round(18 * smooth(t / 12)); g.fillStyle = '#000000'; g.fillRect(0, 0, W, bar); g.fillRect(0, H - bar, W, bar);
+    letterbox(g, Math.round(18 * smooth(t / 12)));
     if (t > 20 && t < CINE - 10 && (t >> 4) % 2) { g.globalAlpha = .5; ART.text(g, Touch.enabled ? 'toca para saltar' : 'Z salta', W - 6, H - 13, '#8a86a8', 'right'); g.globalAlpha = 1; }
+  }
+  function letterbox(g, bar) { g.fillStyle = '#000000'; g.fillRect(0, 0, W, bar); g.fillRect(0, H - bar, W, bar); }
+  // The extreme close-up: Bigotes' eye, huge. The pupil snaps small with a glint, the iris floods with the
+  // trick's colour, the power reflected in it.
+  function eyeCut(g, l, k, f) {
+    const cx = W / 2, cy = H / 2, n = EYE_END - GULPED, open = smooth(k / 5), snap = k > 6, r = 44;
+    g.fillStyle = '#2f4a1e'; g.fillRect(0, 0, W, H);                                            // his skin, very close
+    g.fillStyle = '#3f6a28'; for (let i = 0; i < 40; i++) { const x = (i * 53) % W, y = (i * 29) % H; g.fillRect(x, y, 6, 3); }
+    g.fillStyle = '#26401a'; for (let i = 0; i < 30; i++) { const x = (i * 71 + 13) % W, y = (i * 41 + 7) % H; g.fillRect(x, y, 4, 2); }
+    // The socket and the white of the eye, opening.
+    g.fillStyle = '#1b1420'; g.beginPath(); g.ellipse(cx, cy, r + 6, (r + 6) * open, 0, 0, 7); g.fill();
+    g.fillStyle = '#f2ecdc'; g.beginPath(); g.ellipse(cx, cy, r, r * open, 0, 0, 7); g.fill();
+    g.save(); g.beginPath(); g.ellipse(cx, cy, r, r * open, 0, 0, 7); g.clip();
+    // Iris: dark at first, flooding with the colour from the rim inward.
+    const fill = smooth((k - 6) / 14), ir = 30, pr = snap ? 7 + Math.max(0, 12 - (k - 6) * 3) : 19;
+    g.fillStyle = '#3a2a1a'; g.beginPath(); g.arc(cx, cy, ir, 0, 7); g.fill();
+    if (fill > 0) { const TAU = Math.PI * 2, rin = Math.min(ir, ir * (1 - fill) + pr); g.fillStyle = f.col; g.beginPath(); g.arc(cx, cy, ir, 0, TAU); g.moveTo(cx + rin, cy); g.arc(cx, cy, rin, TAU, 0, true); g.fill('evenodd'); }
+    // Radial fibres of the iris.
+    g.fillStyle = f.deep; g.globalAlpha = .55;
+    for (let i = 0; i < 36; i++) { const a = i / 36 * Math.PI * 2 + k * .02; for (let q = pr + 2; q < ir - 2; q += 1.5) g.fillRect(Math.round(cx + Math.cos(a) * q), Math.round(cy + Math.sin(a) * q), 1, 1); }
+    g.globalAlpha = 1;
+    g.fillStyle = '#0a0610'; g.beginPath(); g.arc(cx, cy, pr, 0, 7); g.fill();
+    // Highlights, and the power reflected as a tiny star.
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(cx - 11, cy - 12, 6, 0, 7); g.fill(); g.fillRect(cx + 9, cy + 8, 3, 3);
+    if (snap) { const s = Math.max(0, 10 - (k - 6)) * 2 + 4; g.fillStyle = '#ffffff'; g.fillRect(cx - s, cy - 1, s * 2 + 1, 2); g.fillRect(cx - 1, cy - s, 2, s * 2 + 1); }
+    g.restore();
+    // The glint on the snap, and a shiver.
+    if (k >= 6 && k < 10) { g.globalAlpha = (10 - k) / 4 * .6; g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
+    // Radial lines closing in, like in an anime close-up.
+    if (snap) { g.fillStyle = f.col; for (let i = 0; i < 40; i++) { const a = i / 40 * 6.28 + i * .3, r0 = 70 + ((i * 37) % 30), len = 20 + ((i * 17) % 40); g.globalAlpha = .5; for (let q = 0; q < len; q += 2) g.fillRect(Math.round(cx + Math.cos(a) * (r0 + q)), Math.round(cy + Math.sin(a) * (r0 + q) * .7), 1, 1); } g.globalAlpha = 1; }
+    // Fade out into the rise.
+    if (k > n - 5) { g.globalAlpha = (k - (n - 5)) / 5; g.fillStyle = '#07060d'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
+  }
+  // A comic panel with Nila's face, surprised: slides in, holds, slides out.
+  function inset(g, k, n) {
+    const inK = smooth(k / 8), outK = smooth((k - (n - 8)) / 8), x = Math.round(-90 + (inK - outK) * 104), y = 26, w = 76, h = 50;
+    g.save(); g.translate(x + w / 2, y + h / 2); g.rotate(-.06); g.translate(-w / 2, -h / 2);
+    g.fillStyle = '#1b1420'; g.fillRect(-3, -3, w + 6, h + 6); g.fillStyle = '#fff6d6'; g.fillRect(-1, -1, w + 2, h + 2);
+    g.save(); g.beginPath(); g.rect(0, 0, w, h); g.clip();
+    const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#3a2a5a'); gr.addColorStop(1, '#e2905c'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.globalAlpha = .35; g.fillStyle = '#ffffff'; for (let i = 0; i < 14; i++) { const a = i / 14 * 6.28; for (let r = 16; r < 60; r += 3) g.fillRect(Math.round(w / 2 + Math.cos(a) * r), Math.round(h / 2 + 6 + Math.sin(a) * r), 1, 1); } g.globalAlpha = 1;
+    const N = ART.nila.idle[0]; g.imageSmoothingEnabled = false; g.drawImage(N, 0, 0, 16, 13, w / 2 - 32, 2 + Math.round(Math.sin(k / 3)), 64, 52);
+    g.restore();
+    ART.title(g, '!', w - 12, 2 - (k % 12 < 6 ? 1 : 0), '#f2c46a', 'center');
+    g.restore();
   }
   function spawnMote(l, x, y, c) { (l.trail || (l.trail = [])).push({ x: x + (Math.random() - .5) * 6, y: y + (Math.random() - .5) * 6, vx: .6 + Math.random() * .8, vy: -.4 + Math.random() * .6, life: 14 + Math.random() * 10, c: Math.random() < .4 ? '#ffffff' : c }); }
 
