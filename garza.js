@@ -902,6 +902,22 @@ const Boss = (() => {
   }
 
   // Just her, at a point of the screen (for tests and scenes).
+  // The same puppet outside the fight (intro, title, ending): flying, diving or gliding, at any size, facing
+  // either way, and if asked as a flat silhouette (against the moon) or a pale ghost (the dive's after-images).
+  // o = { x, y (the middle of her body on screen), t, dir, state: 'return'|'plunge'|'hover'|'leave'|..., st, scale, tint, wing (-1 up .. 1 down), beat }
+  let FIG = null;
+  function figura(g, o) {
+    const t = o.t || 0, b = { state: o.state || 'return', st: o.st || 0, t, dir: o.dir || 1, rage: o.rage ? 1 : 0, phase: o.phase || 1, air: true, x: 0, y: 0,
+      an: { fl: t * (o.beat || .22), wk: 0, mv: 0, lt: 99, vx: 0, vy: 0, trail: [] } };
+    const P = pose(b); if (o.wing !== undefined) { P.wf = o.wing; P.wl = 0; P.by = -o.wing * 1.2; }
+    figure(b, P, false, o.rage ? RAGE_INK : INK);
+    const s = o.scale || 1, dir = facing(b, P);
+    if (!o.tint && s === 1) { stamp(g, Math.round(o.x), Math.round(o.y), dir, P.rot); return; }
+    if (!FIG) { FIG = document.createElement('canvas'); FIG.width = RW; FIG.height = RH; }
+    const fg = FIG.getContext('2d'); fg.clearRect(0, 0, RW, RH); stamp(fg, AX, AY, dir, P.rot);
+    if (o.tint) { fg.globalCompositeOperation = 'source-atop'; fg.fillStyle = o.tint; fg.fillRect(0, 0, RW, RH); fg.globalCompositeOperation = 'source-over'; }
+    g.save(); g.imageSmoothingEnabled = false; g.translate(Math.round(o.x), Math.round(o.y)); g.scale(s, s); g.drawImage(FIG, -AX, -AY); g.restore();
+  }
   function puppet(g, b, x, y) { const P = pose(b); figure(b, P, false, b.rage ? RAGE_INK : INK); stamp(g, x, y, facing(b, P), P.rot); }
   function draw(b, g) {
     const A = arena(b.phase);
@@ -984,5 +1000,5 @@ const Boss = (() => {
     L.ents.push(Item.boat((L.w - 4) * TS + 2, A.floor + 14)); L.boatSpawned = true;
     spawnParts(16, A.x1 - 16, A.floor - 8, { color: ['#8fd9d0', '#c8f2ea'], angle: -Math.PI / 2, spread: 1.2, speed: [1, 3], life: [14, 30] });
   }
-  return { CRIAS, MAX_HP, PHASE_HP, create, update, draw, drawFront, puppet, hit, won, cam, skip, restart, song, arena, vulnerable };
+  return { CRIAS, MAX_HP, PHASE_HP, create, update, draw, drawFront, puppet, figura, hit, won, cam, skip, restart, song, arena, vulnerable };
 })();

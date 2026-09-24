@@ -20,12 +20,12 @@ const Cine = (() => {
   }
 
   // ---------------------------------------------------------------- Piezas
+  // La Garza: the same living puppet as in the fight (garza.js), placed where the old sprite's top left was.
   function heron(g, t, x, y, left, scale = 1, wing, tint) {
-    const body = ART.heronFly, wings = [ART.wingUp, ART.wingMid, ART.wingDown, ART.wingMid], wf = wing !== undefined ? wing : (t >> 2) % 4;
-    g.save(); g.translate(Math.round(x), Math.round(y)); g.scale(scale, scale);
-    const d = (s, dx, dy) => { let sp = left ? s : ART.flip(s); if (tint) sp = ART.tint(sp, tint); const ox = left ? dx : body.width - dx - s.width; g.drawImage(sp, ox, dy); };
-    d(wings[wf], 6, wf === 0 ? -10 : wf === 2 ? 8 : 2); d(body, 0, 0); g.restore();
+    const wf = wing === undefined ? undefined : [-1, 0, 1, 0][wing % 4];
+    Boss.figura(g, { x: x + 16 * scale, y: y + 11 * scale, t, dir: left ? -1 : 1, scale, tint, wing: wf, state: 'return' });
   }
+
   function fish(g, spr, x, y, a = 0, flip = false, s = 1, o) { g.save(); g.translate(Math.round(x), Math.round(y)); g.rotate(a); g.scale(flip ? -s : s, s); g.drawImage(spr, -spr.width / 2, -spr.height / 2); if (spr.width === 22) Player.fishOverlay(g, spr, -spr.width / 2, -spr.height / 2, Game.t, o || {}); g.restore(); }
   function burst(g, x, y, t0, t, n, seed, cols, spd, up = true, grav = .12) {
     const k = t - t0; if (k < 0 || k > 60) return;
@@ -157,8 +157,8 @@ const Cine = (() => {
         b.drawImage(nila, 147, 126 - nila.height); if (t > 30 && t < hit + 40) ART.text(b, '!', 155, 92 - ((t >> 2) % 2), '#f2c46a', 'center', '#1b2430');
         if (t < hit + 4) {
           b.fillStyle = '#fff6e0'; for (let i = 0; i < 16; i++) { const o = (hash(i + 50) - .5) * 60, len = 20 + hash(i + 51) * 30, p = ((t * 9 + i * 40) % 200) / 200; b.globalAlpha = .5; const sx = hx + 20 + o + 200 * (1 - p) * .8, sy = hy + 10 + o * .5 - 150 * (1 - p) * .8; for (let j = 0; j < len; j += 2) b.fillRect(Math.round(sx + j * .8), Math.round(sy - j * .75), 1, 1); } b.globalAlpha = 1;
-          for (let gh = 3; gh >= 1; gh--) { const kk = clamp01((t - gh * 3 - 20) / (hit - 20)); b.globalAlpha = .18 * (4 - gh); heron(b, t, 360 - kk * 200, -30 + kk * 150, true, 1.6, 2, '#fff6e0'); } b.globalAlpha = 1;
-          heron(b, t, hx, hy, true, 1.6, 2);
+          for (let gh = 3; gh >= 1; gh--) { const kk = clamp01((t - gh * 3 - 20) / (hit - 20)); b.globalAlpha = .18 * (4 - gh); Boss.figura(b, { x: 360 - kk * 200 + 26, y: -30 + kk * 150 + 18, t, dir: -1, scale: 1.6, tint: '#fff6e0', state: 'plunge' }); } b.globalAlpha = 1;
+          Boss.figura(b, { x: hx + 26, y: hy + 18, t, dir: -1, scale: 1.6, state: t < 30 ? 'lock' : 'plunge', st: t });
         }
         burst(b, 190, 132, hit, t, 60, 11, ['#c8f2ea', '#8fd9d0', '#ffffff', '#e6f6e0'], 2.6, true, .1);
         if (t > hit) for (let i = 0; i < 3; i++) { const r = (t - hit) * (1.2 + i * .5); if (r < 70) { b.fillStyle = '#c8f2ea'; b.globalAlpha = 1 - r / 70; b.fillRect(Math.round(190 - r), 131, Math.round(r * .4), 1); b.fillRect(Math.round(190 + r * .6), 131, Math.round(r * .4), 1); b.globalAlpha = 1; } }

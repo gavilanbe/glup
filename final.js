@@ -103,12 +103,12 @@ const Final = (() => {
   }
 
   // ---------------------------------------------------------------- Piezas
+  // La Garza: the same living puppet as in the fight (garza.js), placed where the old sprite's top left was.
   function heron(g, t, x, y, left, scale = 1, wing, tint) {
-    const body = ART.heronFly, wings = [ART.wingUp, ART.wingMid, ART.wingDown, ART.wingMid], wf = wing !== undefined ? wing : (t >> 2) % 4;
-    g.save(); g.translate(R(x), R(y)); g.scale(scale, scale);
-    const d = (s, dx, dy) => { let sp = left ? s : ART.flip(s); if (tint) sp = ART.tint(sp, tint); const ox = left ? dx : body.width - dx - s.width; g.drawImage(sp, ox, dy); };
-    d(wings[wf], 6, wf === 0 ? -10 : wf === 2 ? 8 : 2); d(body, 0, 0); g.restore();
+    const wf = wing === undefined ? undefined : [-1, 0, 1, 0][wing % 4];
+    Boss.figura(g, { x: x + 16 * scale, y: y + 11 * scale, t, dir: left ? -1 : 1, scale, tint, wing: wf, state: 'return' });
   }
+
   let moonBig = null;
   function bigMoon() {
     if (moonBig) return moonBig;

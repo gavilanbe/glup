@@ -141,7 +141,7 @@ const Title = (() => {
     L(bg.clouds, .08, 6, t * .05); L(bg.hills, .15, 84);
     // The dead cypress on the horizon, with the nest and the Heron circling it.
     const nest = ART.background('nest').snag;
-    if (nest) { const sx = 222, sy = 118 + cy * .2; g.save(); g.globalAlpha = .9; g.drawImage(ART.tint(nest, '#4a3050'), sx, Math.round(sy - nest.height * .45), Math.round(nest.width * .45), Math.round(nest.height * .45)); g.restore(); const a = t / 70; g.save(); g.translate(Math.round(sx + nest.width * .22 + Math.cos(a) * 22), Math.round(sy - nest.height * .45 - 6 + Math.sin(a) * 5)); g.scale(Math.cos(a) > 0 ? .22 : -.22, .22); g.drawImage(ART.tint(ART.heronFly, '#2a1830'), -16, -14); g.restore(); }
+    if (nest) { const sx = 222, sy = 118 + cy * .2; g.save(); g.globalAlpha = .9; g.drawImage(ART.tint(nest, '#4a3050'), sx, Math.round(sy - nest.height * .45), Math.round(nest.width * .45), Math.round(nest.height * .45)); g.restore(); const a = t / 70; g.save(); g.translate(Math.round(sx + nest.width * .22 + Math.cos(a) * 22), Math.round(sy - nest.height * .45 - 6 + Math.sin(a) * 5)); g.restore(); Boss.figura(g, { x: Math.round(sx + nest.width * .22 + Math.cos(a) * 22), y: Math.round(sy - nest.height * .45 - 6 + Math.sin(a) * 5), t, dir: Math.sin(a) > 0 ? -1 : 1, scale: .26, tint: '#2a1830' }); }
     L(bg.far, .22, 128 - bg.far.gy);
     // Below the far shore, the dark water that fills the gap as the camera rises.
     g.fillStyle = '#2a2038'; g.fillRect(0, Math.round(146 + cy * .3), W, H);
