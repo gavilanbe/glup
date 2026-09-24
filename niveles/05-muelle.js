@@ -247,7 +247,7 @@
       '###########~~~~~~~~~',
       '###########~~~~~~~~~',
       '####################'));
-  NIVEL.registrar({ id: 'muelle', name: 'El muelle del pescador', theme: 'dusk', music: 'dock', par: 260, rows: muelle,
+  NIVEL.registrar({ id: 'muelle', name: 'El muelle del pescador', theme: 'dusk', music: 'muelle', par: 260, rows: muelle,
     intro: 'En el muelle viejo, un pescador vio pasar a la Garza.',
     ruca: ['Don Anselmo lleva toda la vida pescando en este muelle. Si alguien sabe de anzuelos, es él. Vive en la caseta de los pilotes.',
       'La Garza cruzó la turbera hacia el cerro. Ojo allí: el suelo es blando y engaña.'],

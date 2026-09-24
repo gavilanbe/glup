@@ -181,7 +181,7 @@
       '#######==#~~~~~~~~~~',
       '......G.*#~~~~~~~~~~',
       '####################'));
-  NIVEL.registrar({ id: 'juncos', name: 'Los juncos', theme: 'night', music: 'marsh', par: 230, rows: juncos,
+  NIVEL.registrar({ id: 'juncos', name: 'Los juncos', theme: 'night', music: 'juncos', par: 230, rows: juncos,
     intro: 'Entre los juncos, de noche, mandan los cangrejos.',
     ruca: ['¿Que cómo llegué antes? Atajos de tortuga. Ojo: los cangrejos no se dejan sorber hasta que los volteas de una pedrada. Y esa piedra rajada del suelo… ésa no se rompe escupiendo de lado: habría que caerle encima con muchas ganas.',
       'La Garza se posó en el bosque de raíces. Por ese hoyo del molinillo se va a un túnel muy largo y muy bajo: agachada no llegas a tiempo. Toma la barca; yo voy por mis atajos.'],

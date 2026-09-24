@@ -256,7 +256,7 @@
       '############~~~~~~~~',
       '############~~~~~~~~',
       '####################'));
-  NIVEL.registrar({ id: 'molino', name: 'El molino anegado', theme: 'storm', music: 'storm', par: 330, rows: molino,
+  NIVEL.registrar({ id: 'molino', name: 'El molino anegado', theme: 'storm', music: 'molino', par: 330, rows: molino,
     intro: 'La tormenta obligó a la Garza a pasar la noche en el molino.',
     ruca: ['Huele a pluma mojada: la Garza durmió en el molino. Y esos fuegos fatuos... el pantano está revuelto.',
       'Cada cría que sueltas vuelve nadando a casa. La Garza ha seguido hacia el muelle del pescador.'],
