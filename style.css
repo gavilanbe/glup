@@ -2,6 +2,8 @@
    quepa en móvil; los mandos táctiles flotan sobre el lienzo en horizontal y se colocan
    debajo en vertical. */
 html, body { margin: 0; height: 100%; background: #10141c; overflow: hidden; }
+/* No double-tap zoom, no pinch, no callouts anywhere: it is a game, every touch is a control. */
+*, *::before, *::after { touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 body { font: 14px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif; color: #9fc0cc; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; overscroll-behavior: none; }
 #shell { position: fixed; inset: 0; display: grid; grid-template-rows: minmax(0, 1fr); }
 #screen { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; }
@@ -56,8 +58,15 @@ body.touch #hint { display: none; }
 @keyframes bob { 50% { transform: translateY(-3px); } }
 
 /* Outside the level (title, map, tallies, cinematics) the pads step aside: the screen is tapped instead. */
-body.in-menu #stick-zone, body.in-menu #touch-buttons { opacity: 0; pointer-events: none; transition: opacity .2s; }
-body.in-menu #touch-buttons button { pointer-events: none; }
+/* In menus and scenes the stick and the fish step aside, but the jump button stays as the "ok" button
+   (jugar, entrar, sigue); tapping anywhere on the screen works too. */
+body.in-menu #stick-zone { opacity: 0; pointer-events: none; transition: opacity .2s; }
+body.in-menu #touch-buttons .fish, body.in-menu #touch-buttons .puff, body.in-menu #touch-buttons .talk { opacity: 0; pointer-events: none; }
+body.in-menu #touch-buttons .jump { animation: hot 1.2s ease-in-out infinite; }
+/* A new version is ready: a wooden tag at the top; a tap reloads into it. */
+#update { position: fixed; left: 50%; top: max(8px, env(safe-area-inset-top)); transform: translateX(-50%); z-index: 9; appearance: none; border: 0; padding: 4px 10px; border-radius: 8px; background: #8a5a34; box-shadow: inset 0 0 0 2px #1a1420, inset 0 2px 0 #a56f38, inset 0 -3px 0 #6b4a30, 0 3px 0 rgba(0, 0, 0, .45); animation: bob 1s ease-in-out infinite; }
+#update[hidden] { display: none; }
+#update canvas { display: block; width: 256px; height: 28px; image-rendering: pixelated; background: none; }
 body.in-play #stick-zone, body.in-play #touch-buttons { transition: opacity .3s; }
 
 /* Portrait: the swamp on top, the controls on a wooden jetty underneath. */

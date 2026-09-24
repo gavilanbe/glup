@@ -181,8 +181,15 @@ const Touch = {
     g.fillStyle = '#1b1420'; g.fillRect(Math.round(x) - 1, Math.round(y) - 1, Math.round(w) + 2, Math.round(h) + 2); g.fillStyle = '#9fc0cc'; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); g.fillStyle = '#2f7f88'; g.fillRect(Math.round(x) + 1, Math.round(y) + 1, Math.round(w) - 2, Math.round(h) - 2);
     ART.text(g, 'gira el móvil', 18, 3, '#9fc0cc', 'left', '#0a0610');
   },
+  // Outside a level the jump button is the "ok": what it does, on a bouncing tag.
+  drawOk(g, t, lab) { g.clearRect(0, 0, 36, 36); const bob = Math.round(Math.abs(Math.sin(t / 12)) * -2); g.fillStyle = '#1b1420'; g.fillRect(12, 5 + bob, 13, 11); g.fillStyle = '#f2c43d'; g.fillRect(13, 6 + bob, 11, 9); g.fillStyle = '#1b1420'; g.fillRect(16, 8 + bob, 1, 5); g.fillRect(17, 9 + bob, 1, 3); g.fillRect(18, 9 + bob, 1, 3); g.fillRect(19, 10 + bob, 1, 1); g.fillRect(17, 8 + bob, 1, 5); Touch.label(g, lab, 18, 21, '#fff6d6'); },
   updateButtons() {
     if (Touch.enabled && Touch.portrait && Game.t % 3 === 0 && $('rotate-hint')) Touch.drawHint(Game.t);
+    if (Touch.enabled && Touch.btn && (Game.state !== 'play' || Game.paused)) {
+      const lab = Game.paused ? 'vale' : Game.state === 'title' || Game.state === 'gate' ? 'jugar' : Game.state === 'select' ? 'entrar' : 'sigue', k = lab + (Game.t >> 2);
+      if (Touch.keys.ok !== k) { Touch.keys.ok = k; Touch.keys.jump = null; Touch.drawOk(Touch.ctx.jump, Game.t, lab); }
+      return;
+    }
     if (!Touch.enabled || !Touch.btn || Game.state !== 'play' || !L.def) return;
     const p = Player, t = Game.t, B = Touch.btn, K = Touch.keys;
     const talk = !Charla.active() && !Game.learning && !Maestros.busy() && !p.dead && !!((L.maestro && L.maestro.near) || L.ents.some(e => e.kind === 'ruca' && e.near));
@@ -1650,6 +1657,18 @@ const Game = {
     Game.still = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const params = new URLSearchParams(location.search);
     Screen.canvas.addEventListener('pointerdown', e => { Sound.init(); Input.mode = Touch.enabled ? 'touch' : Input.mode; Game.tap(Screen.toGame(e.clientX, e.clientY)); });
+    // Off the picture (the dark side columns, the band under it in portrait) a tap still counts where a tap means "ok".
+    $('shell').addEventListener('pointerdown', e => {
+      if (e.target === Screen.canvas || e.target.closest('button, #stick-zone')) return;
+      Sound.init(); if (Touch.enabled) Input.mode = 'touch';
+      if (['gate', 'title', 'cine', 'clear', 'ending'].includes(Game.state) || (Game.state === 'play' && (Charla.active() || Game.learning)) || (Game.state === 'select' && Charla.active())) Game.tapped = true;
+    });
+    $('update').addEventListener('click', () => location.reload());
+    // Safari ignores "no zoom" in the viewport: stop the double tap and the pinch by hand.
+    let lastEnd = 0;
+    document.addEventListener('touchend', e => { const now = e.timeStamp; if (now - lastEnd < 350) e.preventDefault(); lastEnd = now; }, { passive: false });
+    document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
+    for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
     $('touch-sound').addEventListener('click', () => { Sound.init(); Game.toggleMute(); });
     $('touch-fs').addEventListener('click', () => Game.fullscreen());
     if (!document.fullscreenEnabled && !document.webkitFullscreenEnabled) $('touch-fs').hidden = true;
@@ -1706,6 +1725,11 @@ const Game = {
     }
     Touch.updateButtons();
     Game.updateShell();
+  },
+  // A new version has taken over: show the tag (drawn in the game's letters) that reloads into it.
+  updateReady() {
+    const b = $('update'); if (!b || !b.hidden) return; b.hidden = false;
+    const g = b.querySelector('canvas').getContext('2d'); g.clearRect(0, 0, 128, 14); ART.text(g, '¡Versión nueva! Toca', 64, 2, '#fff3b8', 'center', '#4a2e1a');
   },
   updateShell() {
     const inPlay = Game.state === 'play' && !Game.paused;
@@ -1919,7 +1943,7 @@ const Game = {
     while (stack.length) { const [x, y] = stack.pop(); const k = key(x, y); if (seen.has(k) || tileAt(x, y) !== 'F') continue; seen.add(k); setTile(x, y, '.'); spawnParts(14, x * TS + 8, y * TS + 8, { color: ['#c8d0d6', '#9fa8b0', '#e8eef2'], angle: -Math.PI / 2, spread: 1, speed: [.3, 1.6], life: [30, 70], g: -.03, kind: 'smoke' }); spawnParts(4, x * TS + 8, y * TS + 12, { color: ['#8fd9d0', '#c8f2ea'], speed: [.5, 1.5], life: [10, 18], g: .08 }); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) stack.push([x + dx, y + dy]); }
   },
   tap(pt) {
-    if (Game.state === 'title') { Game.tapped = true; return; }
+    if (Game.state === 'title' || Game.state === 'gate') { Game.tapped = true; return; }
     if ((Game.state === 'select' || Game.state === 'play') && Charla.active()) { Game.tapped = true; return; }
     if (Game.state === 'select') { const h = Mapa.hit(pt); if (h === 'panel') Game.tapped = true; else if (h >= 0) Game.tapSel = h; return; }
     if (Game.state === 'play' && Game.learning) { Game.tapped = true; return; }
