@@ -58,6 +58,9 @@ const Sound = (() => {
     death() { const t = ctx.currentTime; [0, .12, .24, .4].forEach((d, i) => osc('square', 400 - i * 80, t + d, .16, .14, sfxBus, 200 - i * 40)); },
     pearl() { const t = ctx.currentTime; osc('sine', 900, t, .05, .16, sfxBus, 300, .002, .04); noise(t, .04, .08, 'highpass', 3000); osc('sine', 1046, t + .06, .08, .16, sfxBus, 1400, .003, .05); osc('sine', 1568, t + .13, .14, .14, sfxBus, 1900, .003, .1); },
     thunder() { const t = ctx.currentTime; noise(t, 2.2, .5, 'lowpass', 900, 60, .7); noise(t + .05, .25, .35, 'highpass', 1500, 400); osc('sine', 48, t, 1.2, .3, sfxBus, 30, .02, .8); },
+    // The ending: a bird greeting the sun, and a soft bell for the last card.
+    chirp() { const t = ctx.currentTime; osc('sine', 2500, t, .06, .05, sfxBus, 3300, .003, .03); osc('sine', 2800, t + .09, .05, .045, sfxBus, 3700, .003, .03); osc('sine', 3100, t + .16, .08, .04, sfxBus, 2600, .003, .05); },
+    bell() { const t = ctx.currentTime; [[587, 0], [880, .005], [1175, .01]].forEach(([f, d], i) => osc('sine', f, t + d, 1.6, .12 / (i + 1), sfxBus, f * .998, .004, 1.2)); },
     learn() { const t = ctx.currentTime; ['C5', 'E5', 'G5', 'B5', 'D6', 'G6'].forEach((n, i) => osc('sine', freq(n), t + i * .05, .5 - i * .05, .1, sfxBus, null, .005, .3)); noise(t, .6, .05, 'highpass', 5000, 9000); osc('triangle', 130, t, .5, .12, sfxBus, 260, .02, .3); },
     gust() { const t = ctx.currentTime; noise(t, .45, .42, 'bandpass', 700, 2600, 1.4); noise(t + .05, .35, .2, 'lowpass', 500, 180); osc('sine', 140, t, .25, .12, sfxBus, 70, .01, .15); },
     inhale() { const t = ctx.currentTime; noise(t, .12, .12, 'bandpass', 2200, 900, 2); },
@@ -328,6 +331,42 @@ const Sound = (() => {
       { inst: 'snare', vol: .12, steps: P(`. . . . x . . . . . . . x . . .   . . . . x . . . . . . . x . x x`) },
       { inst: 'hat', vol: .09, steps: P(`x . x x x . x . x . x x x . x .`) },
       { inst: 'kick', vol: .38, steps: P(`x . . . . . x . x . . . . . . .   x . . . . . x . x . . . x . . .`) } ] },
+    // The ending: the dock's tune turned to D major, slow, for the dawn and the trip home.
+    alba: { bpm: 76, swing: .2, tracks: [
+      { inst: 'pluck', vol: .24, steps: P(`
+        D3 . A3 . D4 . F#4 . A4 . F#4 . D4 . A3 .   A2 . E3 . A3 . C#4 . E4 . C#4 . A3 . E3 .
+        B2 . F#3 . B3 . D4 . F#4 . D4 . B3 . F#3 .   G2 . D3 . G3 . B3 . D4 . B3 . G3 . D3 .`) },
+      { inst: 'bass', vol: .34, steps: P(`
+        D2 - - - - - - - - - - - - - - -   A1 - - - - - - - - - - - - - - -
+        B1 - - - - - - - - - - - - - - -   G1 - - - - - - - - - - - - - - -`) },
+      { inst: 'lead', vol: .12, steps: P(`
+        . . . . F#4 - - - A4 - - - D5 - - -   C#5 - - - - - - - A4 - - - - - - -
+        . . . . B4 - - - A4 - - - F#4 - - -   G4 - - - - - - - . . . . . . . .
+        . . . . F#4 - - - A4 - - - D5 - - -   E5 - - - - - - - C#5 - - - A4 - - -
+        . . . . D5 - - - C#5 - - - B4 - - -   A4 - - - - - - - - - - - . . . .`) },
+      { inst: 'drip', vol: .05, steps: P(`
+        . . . . . . . . . . . . . . x .   . . . . . . x . . . . . . . . .
+        . . . . . . . . . . x . . . . .   . . . . . . . . . . . . . . . .`) } ] },
+    // The credits: the march of the intro, now in major and with a spring in its step.
+    creditos: { bpm: 112, swing: .12, tracks: [
+      { inst: 'bass', vol: .45, steps: P(`
+        D2 . D2 . A1 . D2 . D2 . D2 . A1 . D2 .   G1 . G1 . D2 . G1 . G1 . G1 . D2 . G1 .
+        B1 . B1 . F#2 . B1 . A1 . A1 . E2 . A1 .   A1 . A1 . E2 . A1 . A1 . A1 . C#2 . E2 .
+        D2 . D2 . A1 . D2 . D2 . D2 . A1 . D2 .   G1 . G1 . D2 . G1 . G1 . G1 . D2 . G1 .
+        A1 . A1 . E2 . A1 . A1 . A1 . E2 . A1 .   D2 . D2 . A1 . D2 . D2 . . . . . . .`) },
+      { inst: 'lead', vol: .15, steps: P(`
+        D4 - - A3 D4 - F#4 - A4 - - - G4 - F#4 -   G4 - - - D4 - - - B3 - - - D4 - - -
+        F#4 - - - B4 - - - C#5 - - - E4 - G4 -   A4 - - - - - - - A4 . G4 . F#4 . E4 .
+        D4 - - A3 D4 - F#4 - A4 - - - B4 - A4 -   G4 - - - B4 - - - D5 - - - B4 - - -
+        A4 - - - F#4 - - - G4 - - - E4 - - -   D4 - - - - - - - . . . . . . . .`) },
+      { inst: 'pluck', vol: .17, steps: P(`
+        D3 F#3 A3 F#3 D3 F#3 A3 F#3 D3 F#3 A3 F#3 D3 F#3 A3 F#3   G2 B2 D3 B2 G2 B2 D3 B2 G2 B2 D3 B2 G2 B2 D3 B2
+        B2 D3 F#3 D3 B2 D3 F#3 D3 A2 C#3 E3 C#3 A2 C#3 E3 C#3   A2 C#3 E3 C#3 A2 C#3 E3 C#3 A2 C#3 E3 C#3 A2 C#3 E3 C#3
+        D3 F#3 A3 F#3 D3 F#3 A3 F#3 D3 F#3 A3 F#3 D3 F#3 A3 F#3   G2 B2 D3 B2 G2 B2 D3 B2 G2 B2 D3 B2 G2 B2 D3 B2
+        A2 C#3 E3 C#3 A2 C#3 E3 C#3 A2 C#3 E3 C#3 A2 C#3 E3 C#3   D3 F#3 A3 F#3 D3 F#3 A3 D4 . . . . . . . .`) },
+      { inst: 'hat', vol: .09, steps: P(`x . x . x . x . x . x . x . x x`) },
+      { inst: 'snare', vol: .1, steps: P(`. . . . x . . . . . . . x . . .`) },
+      { inst: 'kick', vol: .36, steps: P(`x . . . x . . . x . . . x . x .`) } ] },
     dock: { bpm: 72, swing: .25, tracks: [
       { inst: 'pluck', vol: .28, steps: P(`
         D3 . . . A3 . . . F3 . . . A3 . . .   Bb2 . . . F3 . . . D3 . . . F3 . . .

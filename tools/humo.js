@@ -1,5 +1,6 @@
 // GLUP — prueba de humo: dibuja cada nivel, la charla con su maestro (con el encargo cumplido a la
-// fuerza), el regalo del bocado y la ceremonia de aprenderlo, el fin de nivel y el mapa (con el muro
+// fuerza), el regalo del bocado y la ceremonia de aprenderlo, el fin de nivel, el final entero (del
+// último recuento a la cinemática, los créditos, el FIN y el mapa) y el mapa (con el muro
 // de zarzas cerrado y abierto, y la explicación de Ruca). Sólo comprueba que nada revienta.
 //   node tools/humo.js
 'use strict';
@@ -32,6 +33,27 @@ step('fin de nivel y vuelta al mapa', () => {
   for (let n = 0; n < 900 && g.Game.state !== 'select'; n++) { g.frame(n % 30 === 0 ? { confirm: 1 } : {}); if (n % 9 === 0) draw(); }
   if (g.Game.state !== 'select') throw new Error('no volvió al mapa (' + g.Game.state + ')');
   for (let n = 0; n < 60; n++) { g.frame({}); if (n % 6 === 0) draw(); }
+});
+step('final: cinemática, créditos, FIN y vuelta al mapa', () => {
+  // Enter it the way the last tally does, watch the first shot, then hold to run fast, tap through shots and credits.
+  g.start(8, g.NIVEL.poderesAntes(8));
+  g.ev("Victoria.capture({ n: 8, t: 0, x: 1 })"); g.ev('Game.frozen = false; Game.capture = null');
+  for (let n = 0; n < 3000 && g.Game.state !== 'ending'; n++) g.frame(n % 30 === 0 ? { confirm: 1 } : {});
+  if (g.Game.state !== 'ending') throw new Error('el último recuento no lleva al final (' + g.Game.state + ')');
+  for (let n = 0; n < 120; n++) { g.frame({}); if (n % 7 === 0) draw(); }
+  if (g.ev('Final.phase().name') !== 'cine') throw new Error('no empezó la cinemática');
+  for (let n = 0; n < 300; n++) { g.frame({ confirm: 1 }); if (n % 11 === 0) draw(); }
+  const t0 = g.ev('Final.state.T'); if (t0 < 900) throw new Error('mantener no acelera (' + t0 + ')');
+  g.frame({});
+  const seen = new Set();
+  for (let n = 0; n < 20000 && g.Game.state === 'ending'; n++) { g.frame(n % 9 < 3 ? { confirm: 1 } : {}); seen.add(g.ev('Final.phase().name')); if (n % 13 === 0) draw(); }
+  for (let n = 0; n < 60 && g.Game.state !== 'select'; n++) g.frame({});
+  if (!seen.has('roll') || !seen.has('fin')) throw new Error('no pasó por los créditos y el FIN: ' + [...seen]);
+  if (g.Game.state !== 'select') throw new Error('no volvió al mapa (' + g.Game.state + ')');
+  // Every frame of the film and the credits draws, one in a few.
+  g.ev("Game.state = 'ending'; Game.endT = 1; Final.start();");
+  const total = g.ev('Final.total'); for (let T = 0; T < total + 400; T += 37) { g.ev('Final.state.T = ' + T); draw(); }
+  g.ev('Game.select()');
 });
 step('mapa: muro cerrado, Ruca lo explica y no deja entrar', () => {
   g.ev("Save.data = Save.fresh(); LEVELS.forEach(d => { Save.data.abiertos[d.id] = true; }); Game.select(7, 8);");

@@ -1696,6 +1696,7 @@ const Game = {
     if (c.scene === 'titulo') { Game.title(); for (let i = 0; i < c.t; i++) Game.updateTitle(); Game.frozen = true; return; }
     if (c.scene === 'icono') { Game.state = 'icon'; return; }
     if (c.scene === 'victoria') { Victoria.capture(c); return; }
+    if (c.scene === 'final') { Final.capture(c); return; }
     if (c.scene === 'nivel') { Game.startLevel(c.n); if (c.x >= 0) { Player.x = c.x; Player.y = 0; for (let i = 0; i < 60; i++) { Player.vy = Math.min(Player.vy + .28, 5.5); if (moveY(Player, Player.vy)) { Player.vy = 0; Player.onGround = true; break; } } Cam.snap(); } Game.banner = 0; for (let i = 0; i < c.t; i++) { Input.held = {}; Input.pressed = {}; for (const g of c.guion) if (i >= g.f0 && i <= g.f1) { Input.held[g.a] = true; if (i === g.f0) Input.pressed[g.a] = true; } Game.updatePlay(); } Input.held = {}; Input.pressed = {}; Game.frozen = true; if (params_debug()) console.log('ENTS', JSON.stringify(L.ents.map(e => [e.kind, Math.round(e.x), Math.round(e.y), e.dead ? 'dead' : ''])), 'PLAYER', Math.round(Player.x), Math.round(Player.y), Player.held ? Player.held.kind : '-', 'SUCK', Player.sucking, Player.waterT, Player.charge, Player.hover, Player.fishT, 'GRAP', !!Player.grapple, Player.hanging, Player.crouch, 'MOVE', Player.onWall, Player.airJumps, Player.pound, Player.slide, Player.mantleT, 'PEARLS', L.pearls, 'PROJS', JSON.stringify(L.projs.map(p => [p.kind, Math.round(p.x), Math.round(p.y)])), 'GATES', L.gates.map(g => g.map(t => tileAt(t.x, t.y)).join('')).join('|'), 'TARGETS', [...L.hitTargets].join(';')); return; }
   },
   title() { Game.state = 'title'; Game.titleT = 0; Game.titleParts = []; Sound.playMusic('march'); },
@@ -1907,7 +1908,8 @@ const Game = {
   },
   // The tally (letters, counts, medal) and the move on to the next level or the ending: victoria.js.
   updateClear() { Victoria.updateClear(); },
-  updateEnding() { Game.endT++; if (Game.endT > 120 && (Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Game.tapped)) { Game.tapped = false; Sound.play('confirm'); Game.transition(() => Game.select()); } },
+  // The ending (the last level's tally leads here): the final cinematic and the credits live in final.js.
+  updateEnding() { if (Game.frozen) return; if (!Game.endT++) Final.start(); Final.update(); },
   pause() { if (Game.state !== 'play' || Game.paused) return; Game.paused = true; Game.pauseSel = 0; Sound.suck(false); Sound.jet(false); Sound.duck(true); Input.release(); },
   resume() { Game.paused = false; Sound.duck(false); Sound.resume(); },
   updatePause() {
@@ -2219,21 +2221,7 @@ const Game = {
   drawSelect(g) { Mapa.draw(g, Game.t, Game.sel); },
   fmtTime(s) { return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); },
   drawClear(g) { Victoria.drawClear(g); },
-  drawEnding(g) {
-    const t = Game.endT; Game.drawScene(g, t, 'dusk');
-    // The boat crosses the water with the two aboard; the credits float above.
-    const bx = -40 + Math.min(t * .5, 200); const bob = Math.round(Math.sin(t / 22) * 1.5);
-    g.drawImage(ART.boat, Math.round(bx), 130 + bob);
-    // The rescued crías swim in the boat's wake.
-    for (let i = 0; i < 10; i++) { const fx = Math.round(bx - 12 - i * 11 + Math.sin(t / 9 + i) * 3), fy = 150 + (i % 3) * 7 + Math.round(Math.sin(t / 13 + i * 2)); if (fx > -8) g.drawImage(ART.criaFree[((t >> 3) + i) % 2], fx, fy); }
-    Player.carryLook = { mood: 'sleep' }; Player.drawCarry(g, Math.round(bx) + 10, 114 + bob, ART.nila.idle[(t % 200) < 6 ? 1 : 0], ART.fish.closed); Player.carryLook = null;
-    g.fillStyle = 'rgba(8,10,16,.55)'; g.fillRect(0, 0, W, 100);
-    const lines = ['La Garza voló lejos, a otro río,', 'y las crías volvieron nadando a casa.', '', 'Nila remó hasta el embarcadero', 'con Bigotes dormido en el regazo.', '', 'GRACIAS POR JUGAR'];
-    const { got: tot, all } = Save.criasAll();
-    lines.forEach((l, i) => { if (t > 20 + i * 18) ART.text(g, l, W / 2, 14 + i * 11, i === 6 ? '#f2c46a' : '#fff6d6', 'center'); });
-    if (t > 160) ART.text(g, 'Crías rescatadas: ' + tot + '/' + all, W / 2, 168, '#9ecbd8', 'center', '#1b2430');
-    if (t > 120 && (t >> 5) % 2) ART.text(g, Touch.enabled ? 'Toca para volver' : 'Z para volver', W - 6, 104, '#9fc0cc', 'right');
-  },
+  drawEnding(g) { if (!Game.endT) { g.fillStyle = '#05050b'; g.fillRect(0, 0, W, H); return; } Final.draw(g); },
   // ---- development scenes
   drawSprites(g) {
     g.fillStyle = '#6a7a8a'; g.fillRect(0, 0, W, H);

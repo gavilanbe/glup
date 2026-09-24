@@ -2,6 +2,7 @@
 # Captures one scene at 4x with the installed Google Chrome in headless mode.
 #   tools/captura.sh sprites                     hoja de sprites
 #   tools/captura.sh titulo [t]                  título tras t fotogramas
+#   tools/captura.sh final [t]                   el final (cinemática, créditos y FIN) en el fotograma t
 #   tools/captura.sh nivel [t] [out] [n] [x]     nivel n, Nila en x píxeles, tras t fotogramas (FASE=2 empieza la Garza en esa fase)
 #   WIN=844,390 TOUCH=1 tools/captura.sh nivel ...  como un móvil en horizontal, con los mandos táctiles
 cd "$(dirname "$0")/.." || exit 1
