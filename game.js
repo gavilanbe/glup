@@ -434,7 +434,7 @@ const Player = {
   x: 0, y: 0, w: 10, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, coyote: 0, jumpBuf: 0, held: null, sucking: false, suckT: 0, hp: 3, inv: 0, animT: 0, sx: 1, sy: 1,
   dead: false, deadT: 0, spitT: 0, swallowT: 0, blink: 0, hurtT: 0, stepT: 0, dropping: false, win: false, nearSign: null, airT: 0, puffCd: 0, jumpCut: false,
   charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, prevVx: 0, prevVy: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0,
-  reset(x, y, full) { Object.assign(Player, { x, y, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, held: null, sucking: false, inv: 0, dead: false, deadT: 0, spitT: 0, swallowT: 0, sx: 1, sy: 1, win: false, airT: 0, charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0, lastSafe: null, rope: null, castTo: null, target: null, flingT: 0 }); if (full) Player.hp = 3; Sound.suck(false); Sound.jet(false); },
+  reset(x, y, full) { Object.assign(Player, { x, y, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, held: null, sucking: false, inv: 0, dead: false, deadT: 0, spitT: 0, swallowT: 0, sx: 1, sy: 1, win: false, airT: 0, charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0, lastSafe: null, rope: null, castTo: null, target: null, flingT: 0, gait: 0, moveT: 0, stopT: 0, landT: 0, fidget: null, pose: null }); if (full) Player.hp = 3; Sound.suck(false); Sound.jet(false); },
   // Is there firm ground a knock-back could land on, that way? Water or a drop within reach says no.
   safeSide(dir) {
     const p = Player, fy = p.y + p.h;
@@ -527,7 +527,7 @@ const Player = {
           if (hit.ch === 'w') L.lily.set(key(hit.tx, hit.ty), 4);
           if (!wasGround && p.airT > 8) {
             // The landing answers the fall: a hop barely dents her, a drop from high squashes, shakes and rings.
-            const k = clamp((p.vy - 1.5) / 4, 0, 1); p.sx = 1.08 + .28 * k; p.sy = .92 - .24 * k; Sound.play('land', k);
+            const k = clamp((p.vy - 1.5) / 4, 0, 1); p.sx = 1.08 + .28 * k; p.sy = .92 - .24 * k; Sound.play('land', k); p.landT = 3 + Math.round(4 * k);
             spawnParts(2 + Math.round(6 * k), p.x + 5, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.5, speed: [.4, .6 + k], life: [8, 16], g: .04 });
             if (k > .9 && p.airT > 30) { Cam.shake(2, 6); Input.rumble(70, .4, .2); L.parts.push({ x: p.x - 3, y: p.y + p.h - 2, vx: 0, vy: 0, life: 8, color: '#c9b08a', size: 1, g: 0, kind: 'ring' }); } if (hit.ch === 'w' || hit.ch === 'raft') spawnParts(6, p.x + 5, p.y + p.h + 4, { color: ['#8fd9d0', '#c8f2ea'], angle: -Math.PI / 2, spread: 1.6, speed: [.3, 1], life: [8, 14], g: .03 }); }
           p.vy = 0;
@@ -560,7 +560,15 @@ const Player = {
     if (p.spitT > 0) p.spitT--; if (p.swallowT > 0) p.swallowT--; if (p.inv > 0) p.inv--; if (p.hurtT > 0) p.hurtT--; if (p.puffCd > 0) p.puffCd--; if (p.puffT > 0) p.puffT--; if (p.puffWind > 0 && --p.puffWind === 0) Player.puff(); if (p.dropT > 0) p.dropT--;
     p.sx += (1 - p.sx) * .18; p.sy += (1 - p.sy) * .18;
     p.animT++;
-    if (p.onGround && Math.abs(p.vx) > .5 && !p.carrier) { p.stepT++; if (p.stepT % 12 === 6) { Sound.play('step'); spawnParts(1, p.x + 5 - p.dir * 3, p.y + p.h, { color: '#c9b08a', angle: -Math.PI / 2 - p.dir * .6, spread: .4, speed: [.3, .8], life: [8, 14], g: .03 }); } } else p.stepT = 0;
+    // The gait: its frame advances with the distance covered (8 frames a stride, longer strides when running,
+    // short ones crouched), so a planted boot stays put on the ground; each boot landing (frames 0 and 4)
+    // sounds and kicks up a little dust. Starting, stopping and landing get their own few frames.
+    if (p.onGround && Math.abs(p.vx) > .5 && !(p.slide > 0)) {
+      if (!p.moveT) { p.gait = 3; p.stopT = 0; }
+      const was = Math.floor(p.gait), sp = Math.abs(p.vx); p.gait = (p.gait + sp / (p.crouch ? .75 : sp > 1.25 ? 2.4 : 1.5)) % 8; p.moveT++;
+      if (Math.floor(p.gait) !== was && Math.floor(p.gait) % 4 === 0 && !p.carrier) { Sound.play('step'); spawnParts(1, p.x + 5 - p.dir * 3, p.y + p.h, { color: '#c9b08a', angle: -Math.PI / 2 - p.dir * .6, spread: .4, speed: [.3, .8], life: [8, 14], g: .03 }); }
+    } else { if (p.moveT > 12 && p.onGround && !p.crouch && !(p.slide > 0)) p.stopT = 8; p.moveT = 0; }
+    if (p.stopT > 0) p.stopT--; if (p.landT > 0) p.landT--;
     if (p.blink > 0) p.blink--; else if (Math.random() < .006) p.blink = 6;
     // Bigotes' moods: bored when nothing happens, wet after water, happy for each cría, dizzy after a hit.
     const busyIn = Input.held.left || Input.held.right || Input.held.jump || Input.held.fish || Input.held.up || Input.held.down;
@@ -568,6 +576,9 @@ const Player = {
     if (p.hover || p.sucking && p.waterSrc) p.wetT = 200; else if (p.wetT > 0) p.wetT--;
     if (L.pearls > (p.seenPearls || 0)) p.happyT = 70; p.seenPearls = L.pearls; if (p.happyT > 0) p.happyT--;
     if (p.dizzyT > 0) p.dizzyT--;
+    // Left alone a while, Nila fidgets: looks around, tugs at her hood, pats Bigotes (who loves it).
+    const fk = (p.idleT || 0) - 240; p.fidget = fk > 0 && fk % 480 < 80 ? { kind: Math.floor(fk / 480) % 3, f: fk % 480 } : null;
+    if (p.fidget && p.fidget.kind === 2 && p.fidget.f === 20) p.happyT = 60;
     p.nearSign = null; for (const e of L.ents) if (e.kind === 'sign' && Math.abs(e.x + 7 - (p.x + 5)) < 22 && Math.abs(e.y - p.y) < 30) p.nearSign = e;
   },
   wallAt(d) { const p = Player; const x = d > 0 ? p.x + p.w + 1 : p.x - 2; return tileAt(x >> 4, (p.y + 3) >> 4) === 'M' || tileAt(x >> 4, (p.y + p.h - 3) >> 4) === 'M'; },
@@ -918,20 +929,27 @@ const Player = {
     const fx = Math.round(p.x - cam.x), fy = Math.round(p.y - cam.y);
     // Every pose is 16×22 with the boots on its last row: anchor it to the bottom of the hitbox.
     let spr, by = fy + p.h;
+    const moving = Math.abs(p.vx) > .5, fr = Math.floor(p.gait) & 7;
     if (p.dead || p.hurtT > 0) spr = N.hurt;
-    else if (p.win) spr = (p.animT >> 3) % 2 ? N.win : N.idle[0];
+    else if (p.win) spr = N.cheer[(p.animT >> 3) % 2];
     else if (p.mantleT > 0) { spr = N.crouch; by = fy + 12 + Math.round(p.mantleT * .6); }
     else if (p.slide > 0) spr = N.slide;
-    else if (p.crouch) spr = N.crouch;
+    else if (p.crouch) spr = moving && p.onGround ? N.sneak[fr >> 1] : N.crouch;
     else if (p.pound || p.flap > 8) spr = N.tuck;
     else if (p.onWall) spr = N.wall;
-    else if (p.hover || p.grapple) spr = N.dangle[(p.animT >> 3) % 2];
+    // Hanging, the legs trail the swing; the taller pose lets the boots dangle under the hitbox.
+    else if (p.grapple && p.hanging && p.rope) { spr = N.hang[clamp(Math.round(2 - p.rope.w * p.dir * 30), 0, 4)]; by += 2; }
+    else if (p.hover || p.grapple) spr = N.dangle[(p.animT >> 3) % 4];
     else if (p.spitT > 6 && p.onGround) spr = N.spit;
-    else if ((p.sucking || p.charge > 8) && p.onGround) spr = N.brace;
-    else if (p.skidT > 0 && p.onGround) spr = N.skid;
-    else if (!p.onGround) spr = p.vy < -1.5 ? N.jump : p.vy < 1.5 ? N.apex : N.fall;
-    else if (Math.abs(p.vx) > .5) spr = N.run[Math.floor(p.animT / 5) % 6];
-    else spr = p.blink > 0 ? N.idle[1] : (p.animT % 240) < 40 ? N.idle[2] : N.idle[0];
+    else if ((p.sucking || p.charge > 8) && p.onGround) spr = moving ? N.heave[fr] : N.brace;
+    else if (p.skidT > 0 && p.onGround) spr = N.turn;
+    else if (!p.onGround) spr = p.vy < -1.5 ? (p.airT < 5 ? N.launch : N.jump) : p.vy < 1.5 ? N.apex : N.fall;
+    else if (p.landT > 0 && Math.abs(p.vx) < 1.2) spr = N.land;
+    else if (moving) spr = p.moveT < 5 && Math.abs(p.vx) < 1.3 ? N.start : Math.abs(p.vx) > 1.25 ? N.run8[fr] : N.walk[fr];
+    else if (p.stopT > 0) spr = N.stop[p.stopT > 4 ? 0 : 1];
+    else if (p.fidget) { const f = p.fidget.f; spr = p.fidget.kind === 0 ? N.look[f < 40 ? 0 : 1] : p.fidget.kind === 1 ? N.hood[(f >> 3) % 2] : N.pet[(f >> 3) % 2]; }
+    else spr = N.idle[((p.animT % 150) < 75 ? 0 : 2) + (p.blink > 0 ? 1 : 0)];
+    p.pose = spr;
     if (p.dir < 0) spr = ART.flip(spr);
     const cx = fx + 5;
     // Shear around the boots: positive leans her back (away from where she faces).
@@ -941,7 +959,7 @@ const Player = {
     if (p.slide > 0) { Player.drawSled(g, cx, by, spr); return; }
     const fish = Player.drawFish(g, fx, fy); fish.back();
     // On a line the body pivots from the hands up top (where the line is), so the legs trail the swing.
-    const ly = p.grapple ? by - 20 : by;
+    const ly = p.grapple ? fy - 2 : by;
     g.save(); g.translate(cx, ly); g.scale(p.sx, p.sy); if (lean) g.transform(1, 0, lean, 1, 0, 0); g.translate(-cx, -ly);
     g.drawImage(spr, cx - 8 + recoil, by - spr.height);
     g.restore();
@@ -973,7 +991,8 @@ const Player = {
     let fs = ART.fish.closed;
     if (p.puffWind > 0) fs = ART.fish.full; else if (p.swallowT > 0) fs = ART.fish.swallow; else if (p.spitT > 6) fs = ART.fish.spit; else if (p.charge >= CHARGE_FULL) fs = ART.fish.squint; else if (p.held) fs = ART.fish.full; else if (p.sucking) fs = ART.fish.open;
     const n = fs.width, h = fs.height, PIV = 7, MID = 6;
-    const bob = p.onGround && Math.abs(p.vx) > .5 ? ((t >> 3) % 2 ? 1 : 0) : 0;
+    // Her arm rides the body's bob in each pose (the gait's dips, a landing squat...).
+    const bob = p.onGround && !p.crouch && !(p.slide > 0) && p.pose ? p.pose.bob || 0 : 0;
     let hx = fx + 5 + p.dir * 7, hy = fy + (p.crouch ? 7 : 12) + bob;
     let bend = 0, tailBend = 0, wave = .6, waveSpeed = .12, spacing = 1, headStretch = 1, lunge = 0, jitter = 0, rot = 0;
     if (p.hover) { hx = fx + 5 + p.dir * 5; hy = fy + 9; bend = Math.PI / 2 * .95; wave = .5; waveSpeed = .3; }
@@ -1163,7 +1182,7 @@ const Player = {
   // Nila with Bigotes under her arm for the still scenes (title, story, clear, ending); x, y is where her
   // hitbox corner would be. His tail tucks behind her like in play, and his whiskers hang in a hook.
   drawCarry(g, x, y, spr, fish, bob = 0) {
-    const F = fish, fy = y + 6 + bob;
+    const F = fish; bob += spr.bob || 0; const fy = y + 6 + bob;
     g.drawImage(F, 0, 0, 7, F.height, x + 5, fy, 7, F.height);
     g.drawImage(spr, x - 3, y + 18 - spr.height);
     g.drawImage(F, 7, 0, F.width - 7, F.height, x + 12, fy, F.width - 7, F.height);
@@ -2230,7 +2249,7 @@ const Game = {
   drawSprites(g) {
     g.fillStyle = '#6a7a8a'; g.fillRect(0, 0, W, H);
     if (Game.capture.scene === 'maestros') { Maestros.sheet(g, Game.t); return; }
-    if (Game.capture.scene === 'zoom') { g.imageSmoothingEnabled = false; let x = 4, y = 4; for (const s of Game.zoomList()) { if (x + s.width * 3 > W) { x = 4; y += 50; } g.drawImage(s, x, y, s.width * 3, s.height * 3); x += s.width * 3 + 6; } return; }
+    if (Game.capture.scene === 'zoom') { g.imageSmoothingEnabled = false; const z = 2; let x = 4, y = 4, rh = 0; for (const s of Game.zoomList()) { if (x + s.width * z > W) { x = 4; y += rh + 4; rh = 0; } g.drawImage(s, x, y, s.width * z, s.height * z); x += s.width * z + 6; rh = Math.max(rh, s.height * z); } return; }
     const items = [ART.nila.idle[0], ART.nila.idle[1], ART.nila.run[1], ART.nila.run[2], ART.nila.jump, ART.nila.fall, ART.nila.hurt, ART.nila.win, ART.fish.closed, ART.fish.open, ART.fish.full, ART.fish.spit, ART.fish.swallow, ART.hand,
       ART.snail[0], ART.snail[1], ART.frogSit, ART.frogJump, ART.mosquito[0], ART.mosquito[1], ART.crab[0], ART.crab[1], ART.crate, ART.rock, ART.cria[0], ART.cria[1], ART.cria[2], ART.criaFree[0], ART.ruca.idle, ART.ruca.blink, ART.ruca.talk, ART.bubble, ART.heart, ART.heartEmpty, ART.lantern.off, ART.lantern.on, ART.sign, ART.boat, ART.mushroom, ART.mushroomSquash, ART.thorns, ART.gate, ART.target.off, ART.target.on, ART.lily, ART.plank, ART.cracked, ART.dirt[0], ART.dirt[1], ART.grassCap[0], ART.grassCap[1], ART.roots, ART.water[0], ART.water[2], ART.waterDeep, ART.reed, ART.tuft, ART.shroomDeco, ART.egg, ART.puff[1], ART.star];
     let x = 2, y = 2, rowH = 0;
@@ -2238,7 +2257,7 @@ const Game = {
     y += rowH + 4; g.drawImage(ART.heronBody, 2, y); g.drawImage(ART.heronFly, 40, y); g.drawImage(ART.wingUp, 80, y); g.drawImage(ART.wingDown, 112, y); g.drawImage(ART.wingMid, 144, y);
     g.drawImage(ART.logo(), 180, y); ART.text(g, 'ÁÉÍÓÚÑ ¡HOLA! ¿QUÉ? 0123456789 ·,.:-+', 2, H - 10, '#fff');
   },
-  zoomList() { const N = ART.nila; return [N.idle[0], N.run[0], N.run[2], N.jump, N.fall, N.brace, N.spit, N.tuck, N.hurt, N.win, ART.fish.closed, ART.fish.open, ART.fish.full, ART.fish.spit, ART.hand, ART.snail[0], ART.frogSit, ART.mosquito[0], ART.crab[0], ART.ruca.idle, ART.cria[0], ART.criaFree[0], ART.egg]; },
+  zoomList() { const N = ART.nila; return [N.idle[0], ...N.run8, N.walk[0], N.start, N.turn, N.land, N.launch, N.jump, N.apex, N.fall, N.brace, N.spit, N.tuck, N.hurt, N.win, N.hang[0], N.hang[4], N.crouch, N.sneak[0], N.wall, ART.fish.closed, ART.fish.open, ART.fish.full, ART.fish.spit, ART.hand, ART.snail[0], ART.frogSit, ART.mosquito[0], ART.crab[0], ART.ruca.idle, ART.cria[0], ART.criaFree[0], ART.egg]; },
   drawIcon(g) {
     // Square badge 180×180 centred on the canvas; tools/iconos.sh crops and scales it.
     const ox = 70, S = 180; g.fillStyle = '#000'; g.fillRect(0, 0, W, H);

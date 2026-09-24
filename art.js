@@ -34,120 +34,182 @@ const ART = (() => {
   function replaceRows(rows, from, to) { return rows.map(r => r.split(from).join(to)); }
 
   // ---------------------------------------------------------------- Nila
-  // Nila mira a la derecha. Cada pose es un lienzo de 16×22 con los pies en la última fila: la caja
-  // de choque (10×18) cae en las columnas 3–12 y la capucha asoma por encima. Las poses se montan
-  // por capas (piernas, abrigo, cabeza con su gesto) para que todas compartan la misma cara.
-  // Luz desde arriba a la izquierda; sombras hacia el rojo y el violeta, nunca negro puro.
+  // Nila mira a la derecha. Cada pose es un lienzo de 16×22 con las botas en la última fila: la caja
+  // de choque (10×18) cae en las columnas 3–12 y la capucha asoma por encima. Las poses no se pintan
+  // una a una: un muñeco (cabeza a mano con su gesto, abrigo, trenza, brazo libre y piernas con rodilla
+  // y bota) se monta con unos pocos números, así todas comparten proporciones y la carrera puede tener
+  // tantos fotogramas como haga falta. Cada pieza lleva su contorno, para que el brazo y las piernas se
+  // lean encima del abrigo. Bigotes va en el brazo de atrás (su mano se dibuja aparte, hacia la columna
+  // 12, fila 13); el de delante queda libre y bracea. Luz desde arriba a la izquierda; sombras hacia el
+  // rojo y el violeta, nunca negro puro.
   const NILA = { q: '#2c2a4e', o: '#3b2335', W: '#fff4a8', Y: '#f7c843', y: '#dc8a2c', z: '#9c4f33', s: '#fcdcbc', k: '#e8a37f', p: '#f2847e', e: '#2b1d3e',
-    h: '#6e3a36', n: '#a45e3e', r: '#e4473b', R: '#992c42', l: '#ff9e7a', L: '#3d3b66', m: '#a8373f', w: '#ffffff' };
+    h: '#6e3a36', n: '#a45e3e', r: '#e4473b', R: '#992c42', d: '#6a2440', l: '#ff9e7a', L: '#4a4878', N: '#6a6aa0', m: '#a8373f', w: '#ffffff' };
+  // Capucha de chubasquero: cúpula con brillo arriba a la izquierda, el borde en sombra sobre el
+  // flequillo y la cara abierta hacia delante. Las filas 8–10, columnas 7–14, son el gesto.
+  const HOOD = [
+    '.....oooooo.....',
+    '...ooWWWWYYoo...',
+    '..oWWYYYYYYYYoo.',
+    '.oWYYYYYYYYYYYyo',
+    '.oWYYYYYYyyyyyyo',
+    'oWYYYYYyzhhhhhho',
+    'oYYYYYyzhnnhhnho',
+    'oYYYYYyhhhshhsho',
+    'oYYYYyh........o',
+    'oyYYYyh........o',
+    'oyyYyyh........o',
+    '.ozzzzzooksssoo.'];
+  // Gestos: ojo de atrás en la columna 9, el de delante (con brillo) en 12–13; mejillas y boca debajo.
+  const FACES = {
+    calm: ['ssesswes', 'ssessees', 'kpssmspk'], blink: ['ssssssss', 'seessees', 'kpssmspk'],
+    happy: ['seessees', 'ssssssss', 'kpsmmmpk'], hurt: ['sesssses', 'ssessess', 'kpsmmspk'],
+    oh: ['ssesswes', 'ssessees', 'kpsmmspk'], strain: ['ssssssss', 'seessees', 'kpmwwmpk'], shut: ['ssssssss', 'seessees', 'kpsmmspk'],
+    look: ['sesswess', 'sesseess', 'kpsmsspk'], up: ['sesswess', 'ssssssss', 'kpssmspk'] };
+  const head = face => HOOD.map((r, i) => i >= 8 && i <= 10 ? r.slice(0, 7) + FACES[face][i - 8] + r.slice(15) : r);
+  // Botas de agua, ancladas arriba a la izquierda de la caña (donde acaba la pierna): plana, con la
+  // punta levantada (el talón llega primero), de puntillas (despegando) y colgando.
+  const BOOTS = { flat: ['lr..', 'rrr.', 'RRRR'], heel: ['lr..', 'rrrr', 'RRR.'], tip: ['lr..', 'rrr.', '.RRR'], point: ['lr.', 'rrr', '.rR', '..R'] };
+  const FAR = { l: 'r', r: 'R', R: 'd', L: 'q', N: 'q', Y: 'y', W: 'Y', s: 'k' };
   function paint(w, h, layers) {
     const g = []; for (let y = 0; y < h; y++) g.push(new Array(w).fill('.'));
     for (const [rows, dx, dy] of layers) rows.forEach((r, y) => { for (let x = 0; x < r.length; x++) { const ch = r[x], X = x + dx, Y = y + dy; if (ch !== '.' && X >= 0 && X < w && Y >= 0 && Y < h) g[Y][X] = ch === '_' ? '.' : ch; } });
     return g.map(r => r.join(''));
   }
-  // Capucha de chubasquero con visera, flequillo castaño asomando y la cara abierta hacia delante.
-  const HOOD = [
-    '.....oooooo.....',
-    '...ooWWWYYYoo...',
-    '..oWWYYYYYYYYoo.',
-    '.oWYYYYYYYYYYYYo',
-    '.oWYYYYYyyyyyyyo',
-    'oWYYYYyhhhhhhhho',
-    'oYYYYyhhnnhhhnho',
-    'oYYYYyhhhshhshso',
-    'oYYYYyhssessesso',
-    'oYYYyyhssessesso',
-    'oyYYyyhkpssmspko',
-    '.oyyyyyokkkkkoo.'];
-  // Gestos: filas 8–10 de la capucha (ojos, mejillas, boca), columnas 7–14.
-  const FACES = {
-    calm: ['ssessess', 'ssessess', 'kpssmspk'], blink: ['ssssssss', 'seessees', 'kpssmspk'],
-    happy: ['ssessess', 'seseeses', 'kpsmmspk'], hurt: ['sesssses', 'ssessess', 'kesmmsek'],
-    oh: ['ssessess', 'ssessess', 'kpsmmspk'], strain: ['ssssssss', 'seessees', 'kpmwwmpk'], shut: ['ssssssss', 'seessees', 'kpsmmspk'] };
-  function head(face) { const f = FACES[face]; return HOOD.map((r, i) => i >= 8 && i <= 10 ? r.slice(0, 7) + f[i - 8] + r.slice(15) : r); }
-  // Abrigo (filas 12–18) con el brazo de atrás; el de delante sostiene a Bigotes (la mano va aparte).
-  const COAT = {
-    stand: [
-      '....oyyyyyyyo...',
-      '...oWYYYYYYYYo..',
-      '..oWYoYYYzYYyyo.',
-      '.oYYyoYYYYYYyyyo',
-      '.oyyyoYYYzYyyyzo',
-      'ozzzoskzzzzzzzzo'],
-    back: [
-      '....oyyyyyyyo...',
-      '...oWYYYYYYYYo..',
-      '..oWYYYYYzYYyyo.',
-      '.ooYYYYYYYYYyyyo',
-      'oyYoyYYYYzYyyyzo',
-      'oskozzzzzzzzzzzo'],
-    fwd: [
-      '....oyyyyyyyo...',
-      '...oWYYYYYYYYo..',
-      '..oWYYoYYzYYyyo.',
-      '.oYYYYyoYYYYyyyo',
-      '.oyyyyyoYzYyyyzo',
-      'ozzzzzzoskzzzzzo'],
-    flare: [
-      '....oyyyyyyyo...',
-      '...oWYYYYYYYYo..',
-      '..oWYoYYYzYYyyo.',
-      '.oYYyoYYYYYYyyyo',
-      'oyyyyoskyzyyyyzo',
-      'ozzzzzoozzzzzzzo'],
-    reach: [
-      '....oyyyyyyyo...',
-      '...oWYYYYYYYYo..',
-      '..oWYYYYYzYYyyo.',
-      '..oYYYYYYYYYyyyo',
-      '.oyyyyYYYzYyyyzo',
-      '.ozzzzzzzzzzzzzo'] };
-  // Piernas con botas de agua rojas; la de atrás, más oscura. Cada una: [x de la bota, cuánto se levanta].
-  function legs(back, front) {
-    const g = []; for (let y = 0; y < 22; y++) g.push(new Array(16).fill('.'));
-    const put = (x, y, ch, soft) => { if (x >= 0 && x < 16 && y >= 0 && y < 22 && (!soft || g[y][x] === '.')) g[y][x] = ch; };
-    [[back, 5, true], [front, 9, false]].forEach(([[bx, lift], hip, far]) => {
-      const by = 20 - lift, L = far ? 'q' : 'L';
-      for (let r = 17; r < by; r++) { const t = (r - 17) / Math.max(1, by - 17), x = Math.round(hip + (bx + 1 - hip) * t); put(x - 1, r, 'o', true); put(x, r, L); put(x + 1, r, L); put(x + 2, r, 'o', true); }
-      const top = far ? 'oRrRo' : 'olrro';
-      for (let i = 0; i < 5; i++) put(bx + i, by, top[i]); for (let i = 0; i < 6; i++) put(bx + i, by + 1, 'oRRRRo'[i]);
-      if (lift) for (let i = 1; i < 5; i++) put(bx + i, by + 2, 'o', true);
-    });
-    return g.map(r => r.join(''));
+  const blank = h => Array.from({ length: h }, () => new Array(16).fill('.'));
+  const put = (g, x, y, ch) => { x = Math.round(x); y = Math.round(y); if (y >= 0 && y < g.length && x >= 0 && x < 16) g[y][x] = ch; };
+  const stamp = (g, rows, dx, dy, map) => rows.forEach((r, y) => { for (let x = 0; x < r.length; x++) if (r[x] !== '.') put(g, x + dx, y + dy, map && map[r[x]] || r[x]); });
+  // A stroke of 1 or 2 pixels wide from (x0, y0) to (x1, y1).
+  function stroke(g, x0, y0, x1, y1, ch, w = 1) {
+    const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2));
+    for (let i = 0; i <= n; i++) { const t = i / n, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t; put(g, x, y, ch); if (w > 1) put(g, x + 1, y, ch); }
   }
-  // Mano de atrás apoyada en la pared.
-  const PALM = ['.oo', 'osk', 'oYo', 'oYo'];
-  // pose(gesto, abrigo, piernas, opciones): hx/hy mueven la cabeza, cx/cy el abrigo (inclinación, rebote);
-  // low pone las botas por delante del abrigo (agachada, deslizándose).
-  function pose(face, coat, lg, o = {}) {
-    const c = [COAT[coat], o.cx || 0, 12 + (o.cy || 0)], layers = o.low ? [c, [lg, 0, 0], [head(face), o.hx || 0, 1 + (o.hy || 0)]] : [[lg, 0, 0], c, [head(face), o.hx || 0, 1 + (o.hy || 0)]];
-    if (o.extra) layers.push(...o.extra);
-    return sprite(paint(16, 22, layers), NILA, 'nila-' + face + '-' + coat);
+  // Lays a part over the figure: first its contour (with rim 'soft', a warm line where it crosses the
+  // figure and the dark one only outside), then its colours.
+  function lay(dst, src, rim = true) {
+    const h = dst.length, at = (x, y) => y >= 0 && y < h && x >= 0 && x < 16 && src[y][x] !== '.';
+    if (rim) for (let y = 0; y < h; y++) for (let x = 0; x < 16; x++) if (!at(x, y) && (at(x - 1, y) || at(x + 1, y) || at(x, y - 1) || at(x, y + 1))) dst[y][x] = rim === 'soft' && dst[y][x] !== '.' && dst[y][x] !== 'o' ? 'y' : 'o';
+    for (let y = 0; y < h; y++) for (let x = 0; x < 16; x++) if (src[y][x] !== '.') dst[y][x] = src[y][x];
   }
-  const STAND = legs([3, 0], [8, 0]);
+  // A leg from the hip to the ankle with the knee bending forward, and its boot.
+  function leg(h, hx, hy, [ax, ay, boot = 'flat'], far) {
+    const g = blank(h), S = 3.3, dx = ax - hx, dy = ay - hy, d = Math.hypot(dx, dy) || 1, k = Math.sqrt(Math.max(0, S * S - Math.min(d, 2 * S) ** 2 / 4));
+    let px = -dy / d, py = dx / d; if (px < 0) { px = -px; py = -py; }
+    const kx = hx + dx / 2 + px * k, ky = hy + dy / 2 + py * k, c = far ? 'q' : 'L';
+    stroke(g, hx, hy, kx, ky, c, 2); stroke(g, kx, ky, ax, ay, c, 2); if (!far) put(g, kx, ky, 'N');
+    stamp(g, BOOTS[boot], Math.round(ax), Math.round(ay), far ? FAR : null);
+    return g;
+  }
+  // The raincoat: an A-line from the collar (row 11) to the hem (row 17), lit on its back edge, a
+  // darker band along the hem and two toggles. fb/ff flare the hem back/forward, lift shortens it.
+  function coat(h, x, y, fb = 0, ff = 0, lift = 0) {
+    const g = blank(h), L0 = [5, 4, 3, 3, 2, 2], R0 = [10, 11, 11, 12, 12, 12], n = 5 - lift;
+    for (let r = 0; r <= n; r++) {
+      let l = L0[r] + x, rr = R0[r] + x; if (r >= 4 || r === n) { const f = Math.max(1, r - 3) / 2; l -= Math.round(fb * f); rr += Math.round(ff * f); }
+      for (let c = l; c <= rr; c++) put(g, c, 11 + y + r, r === 0 ? 'y' : r === n ? (c >= rr - 1 ? 'z' : c === l ? 'Y' : 'y') : c === l ? 'W' : c >= rr - 1 ? 'y' : c === l + 1 && r < 3 ? 'W' : 'Y');
+    }
+    put(g, 9 + x, 13 + y, 'z');
+    return g;
+  }
+  // The free arm: shoulder angle a (0 hangs, + swings forward), elbow e (+ bends forward), a mitten hand.
+  function arm(h, sx, sy, a, e = .4, len = 2.6) {
+    const g = blank(h), ex = sx + Math.sin(a) * len, ey = sy + Math.cos(a) * len, hx = ex + Math.sin(a + e) * len, hy = ey + Math.cos(a + e) * len;
+    stroke(g, sx, sy, ex, ey, 'Y', 2); stroke(g, ex, ey, hx, hy, 'Y', 2); stroke(g, sx, sy, ex, ey, 'W'); put(g, hx, hy, 's'); put(g, hx + 1, hy, 'k');
+    return g;
+  }
+  // The pose itself. o: face; cx/cy move the body (lean, bob), hx/hy the head on top of that; near/far
+  // are [ankle x, ankle y, boot] (planted: y 19); a/e the free arm; fb/ff/lift the hem; bx/by the braid;
+  // fa where the sleeve holding Bigotes goes (null: hidden); low puts the legs in front of the coat.
+  function rig(o) {
+    const H = o.h || 22, g = blank(H), cx = o.cx || 0, cy = o.cy || 0, top = H - 22;
+    const legs = () => { lay(g, leg(H, 6 + cx, 14 + cy + top, shift(o.far, top), true)); lay(g, leg(H, 8 + cx, 14 + cy + top, shift(o.near, top), false)); };
+    if (!o.low) legs();
+    const braid = blank(H); stamp(braid, ['hn', 'nh', 'hn', 'rr', 'h.'], Math.max(0, (o.bx || 0) + 1) + cx, 10 + cy + top + (o.by || 0)); lay(g, braid);
+    lay(g, coat(H, cx, cy + top, o.fb, o.ff, o.lift));
+    if (o.low) legs();
+        const hd = blank(H); stamp(hd, head(o.face || 'calm'), cx + (o.hx || 0), cy + top + (o.hy || 0)); lay(g, hd, false);
+    if (o.fa) { const f = blank(H), [fx, fy] = o.fa; stroke(f, 9 + cx, 12 + cy + top, fx, fy + top, 'y'); lay(g, f, 'soft'); }
+    if (o.a !== undefined) lay(g, arm(H, 7 + cx, 12 + cy + top, o.a, o.e === undefined ? .4 : o.e, o.len));
+    if (o.palm) stamp(g, ['.oo', 'osk', 'oso', '.o.'], 0, 7 + cy + top);
+    const c = sprite(g.map(r => r.join('')), NILA, 'nila-' + (o.face || 'calm')); c.bob = o.low ? 0 : cy; return c;
+  }
+  const shift = ([x, y, b], d) => [x, y + d, b];
+  // Gaits: keyframes over one stride (two steps), sampled at any number of frames. Frame 0 is the near
+  // boot landing heel first; the far one lands halfway. A planted boot slides back the same distance
+  // each frame, so tying the frame to the distance travelled keeps it still on the ground.
+  const lerp = (a, b, t) => a + (b - a) * t;
+  function gait(keys, n, extra = {}) {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const u = i / n * keys.length, k0 = Math.floor(u), k1 = (k0 + 1) % keys.length, t = u - k0, A = keys[k0], B = keys[k1], o = Object.assign({}, A);
+      for (const key of ['cy', 'hx', 'hy', 'a', 'e', 'fb', 'ff', 'bx', 'by', 'cx']) if (typeof A[key] === 'number') o[key] = Math.round(lerp(A[key], B[key] !== undefined ? B[key] : A[key], t) * (key === 'a' || key === 'e' ? 100 : 1)) / (key === 'a' || key === 'e' ? 100 : 1);
+      for (const key of ['near', 'far']) o[key] = [Math.round(lerp(A[key][0], B[key][0], t)), Math.round(lerp(A[key][1], B[key][1], t)), t < .5 ? A[key][2] : B[key][2]];
+      out.push(rig(Object.assign(o, extra)));
+    }
+    return out;
+  }
+  const mirror = keys => keys.concat(keys.map(k => Object.assign({}, k, { near: k.far, far: k.near, a: -k.a * .9 })));
+  // Run: contact, down, passing, up (both boots off the ground), then the other leg. The arm swings
+  // against the near leg; the head, the braid and the hem answer a frame late.
+  const RUN = mirror([
+    { near: [11, 19, 'heel'], far: [2, 18, 'tip'], cy: 0, hx: 1, hy: -1, a: -1.0, e: .5, fb: 2, bx: -1, by: -1 },
+    { near: [9, 19, 'flat'], far: [3, 17, 'tip'], cy: 1, hx: 1, hy: -1, a: -.7, e: .6, fb: 1, bx: -1, by: 0 },
+    { near: [6, 19, 'flat'], far: [5, 16, 'tip'], cy: 0, hx: 1, hy: 1, a: -.1, e: .9, fb: 1, bx: -1, by: 1 },
+    { near: [4, 18, 'tip'], far: [9, 17, 'flat'], cy: -1, hx: 1, hy: 1, a: .6, e: 1.2, fb: 2, bx: -1, by: 0 }]);
+  // Walk: never both boots in the air, a small bob, a gentle swing.
+  const WALK = mirror([
+    { near: [10, 19, 'heel'], far: [4, 19, 'tip'], cy: 0, hy: 0, a: -.5, e: .3, fb: 1, by: 0 },
+    { near: [9, 19, 'flat'], far: [5, 18, 'tip'], cy: 1, hy: 0, a: -.35, e: .3, fb: 0, by: 0 },
+    { near: [7, 19, 'flat'], far: [7, 18, 'flat'], cy: 0, hy: 1, a: 0, e: .4, fb: 0, by: 1 },
+    { near: [6, 19, 'flat'], far: [9, 18, 'flat'], cy: 0, hy: 0, a: .3, e: .5, fb: 1, by: 0 }]);
+  // Crouched shuffle: short steps under the bunched-up coat.
+  const SNEAK = [
+    { near: [10, 19, 'flat'], far: [6, 18, 'tip'], cy: 5, hy: 0, a: .6, e: .8 },
+    { near: [8, 19, 'flat'], far: [8, 18, 'flat'], cy: 5, hy: 1, a: .5, e: .8 },
+    { near: [6, 18, 'tip'], far: [10, 19, 'flat'], cy: 5, hy: 0, a: .6, e: .8 },
+    { near: [8, 18, 'flat'], far: [8, 19, 'flat'], cy: 5, hy: 1, a: .5, e: .8 }];
+  const STAND = { near: [8, 19], far: [4, 19], a: .15, e: .3 };
+  const st = o => rig(Object.assign({}, STAND, o));
+  // Hanging from a hook: the arms go up behind the hood to Bigotes, who bites the hook; the legs trail
+  // the swing (0 far behind … 4 far ahead). 24 rows: the boots dangle two pixels under the hitbox.
+  const HANG = [-2, -1, 0, 1, 2].map(k => { const up = Math.abs(k) > 1 ? 1 : 0; return rig({ h: 24, hy: 1, face: k ? 'strain' : 'calm', near: [8 + 2 * k, 19 - up, 'point'], far: [6 + 2 * k - (k > 0 ? 1 : 0), 18 - up, 'point'], fb: k > 0 ? 1 : 0, ff: k < 0 ? 1 : 0, bx: k < 0 ? 1 : -1, by: -Math.abs(k) >> 1 }); });
   const nila = {
-    idle: [pose('calm', 'stand', STAND), pose('blink', 'stand', STAND), pose('calm', 'stand', STAND, { hy: 1 })],
-    // Carrera: contacto, recepción (baja), paso (sube); dos veces con las piernas cambiadas.
-    run: [
-      pose('calm', 'back', legs([0, 0], [10, 0])),
-      pose('calm', 'stand', legs([2, 1], [8, 0]), { hy: 1, cy: 1 }),
-      pose('calm', 'fwd', legs([6, 3], [7, 0]), { hy: -1, cy: -1 }),
-      pose('calm', 'fwd', legs([10, 0], [0, 0])),
-      pose('calm', 'stand', legs([8, 0], [2, 1]), { hy: 1, cy: 1 }),
-      pose('calm', 'back', legs([7, 0], [5, 3]), { hy: -1, cy: -1 })],
-    jump: pose('oh', 'fwd', legs([4, 3], [8, 2]), { hy: -1, cy: -1 }),
-    apex: pose('oh', 'flare', legs([3, 2], [9, 1])),
-    fall: pose('oh', 'flare', legs([2, 0], [10, 1]), { hy: 1 }),
-    tuck: pose('shut', 'flare', legs([3, 5], [9, 5]), { hy: 4, cy: 2, low: true }),
-    skid: pose('strain', 'reach', legs([3, 0], [11, 0]), { hx: -1, cx: -1 }),
-    hurt: pose('hurt', 'flare', legs([1, 1], [10, 0]), { hx: -1 }),
-    win: pose('happy', 'stand', STAND, { hy: 1 }),
-    brace: pose('strain', 'reach', legs([0, 0], [10, 0]), { hx: -1, cx: -1 }),
-    spit: pose('shut', 'reach', legs([1, 0], [9, 0]), { hx: -1 }),
-    wall: pose('strain', 'back', legs([2, 1], [9, 3]), { extra: [[PALM, 0, 7]] }),
-    dangle: [pose('calm', 'flare', legs([3, 0], [8, 1])), pose('calm', 'flare', legs([4, 1], [9, 0]))],
-    crouch: pose('calm', 'flare', legs([1, 0], [10, 0]), { hy: 6, cy: 4, low: true }),
-    slide: pose('strain', 'flare', legs([0, 0], [11, 1]), { hx: -1, hy: 7, cy: 5, low: true }) };
+    // Standing: breathing (the head sinks a pixel on the out-breath) and blinking over both.
+    idle: [st({}), st({ face: 'blink' }), st({ hy: 1, a: .1 }), st({ face: 'blink', hy: 1, a: .1 })],
+    run: gait(RUN, 6), run8: gait(RUN, 8), walk: gait(WALK, 8),
+    // Sucking and still moving: the walk leaning back, straining.
+    heave: gait(WALK, 8, { face: 'strain', hx: -1, a: -1.2, e: .3, fb: 0, ff: 1 }),
+    start: rig({ near: [5, 19, 'tip'], far: [9, 19, 'flat'], cy: 1, hx: 1, a: -.9, e: .4, fb: 2, bx: -1 }),
+    stop: [rig({ near: [10, 19, 'flat'], far: [5, 19, 'flat'], cy: 1, hy: 1, a: .8, e: .5, ff: 2, bx: 1 }), rig({ near: [9, 19, 'flat'], far: [4, 19, 'flat'], cy: 0, a: .4, e: .4, ff: 1, bx: 1 })],
+    skid: rig({ face: 'strain', near: [12, 19, 'heel'], far: [5, 19, 'flat'], cy: 1, hx: -1, a: 1.6, e: -.3, ff: 2, bx: 1, by: -1 }),
+    // Turning round: already facing the new way, the boots still skid the old one behind her.
+    turn: rig({ face: 'strain', near: [7, 19, 'flat'], far: [1, 19, 'heel'], cy: 1, hx: 1, a: -1.5, e: -.2, fb: 2, bx: -1, by: -1 }),
+    land: rig({ face: 'shut', near: [10, 19, 'flat'], far: [3, 19, 'flat'], cy: 2, hy: 0, a: 1.2, e: .3, fb: 1, ff: 1, by: -1 }),
+    launch: rig({ face: 'oh', near: [8, 18, 'point'], far: [5, 19, 'point'], cy: -1, hy: 0, a: -1.3, e: -.5, by: 1 }),
+    jump: rig({ face: 'oh', near: [10, 16, 'flat'], far: [5, 18, 'point'], cy: -1, hy: -1, a: -1.5, e: -.4, fb: 1, by: 1 }),
+    apex: rig({ face: 'oh', near: [10, 16, 'flat'], far: [5, 16, 'tip'], cy: 0, a: -1.6, e: -.2, fb: 1, ff: 1 }),
+    fall: rig({ face: 'oh', near: [9, 18, 'point'], far: [4, 17, 'point'], cy: 0, hy: 1, a: -1.3, e: -.9, fb: 2, ff: 1, lift: 1, by: -2 }),
+    tuck: rig({ face: 'shut', near: [9, 16, 'flat'], far: [6, 17, 'flat'], cy: 3, hy: 1, a: 1.4, e: 1.4, low: true, lift: 1 }),
+    hurt: rig({ face: 'hurt', near: [11, 16, 'point'], far: [3, 17, 'point'], cy: -1, hx: -1, hy: -1, a: -1.4, e: -.8, fb: 1, ff: 1, lift: 1, by: -1 }),
+    win: st({ face: 'happy', hy: 1, a: .3 }),
+    cheer: [st({ face: 'happy', a: 1.8, e: .9 }), rig({ face: 'happy', near: [8, 18, 'tip'], far: [4, 18, 'tip'], cy: -1, a: 2.0, e: .7, by: 1 })],
+    brace: rig({ face: 'strain', near: [11, 19, 'heel'], far: [3, 19, 'flat'], cy: 1, hx: -1, a: -1.2, e: .3, ff: 1 }),
+    spit: rig({ face: 'shut', near: [10, 19, 'flat'], far: [2, 19, 'flat'], cy: 0, hx: -1, a: -1.5, e: .2, ff: 1, bx: 1 }),
+    wall: rig({ face: 'strain', near: [7, 18, 'point'], far: [2, 17, 'tip'], cy: 0, a: -1.7, e: 0, palm: true, fb: 0, ff: 1 }),
+    // Hovering on the jet: both hands on Bigotes out in front, the boots treading air.
+    dangle: gait([
+      { near: [9, 18, 'point'], far: [5, 19, 'point'], cy: 0, a: 1.5, e: .3, fb: 1, by: 0 },
+      { near: [8, 19, 'point'], far: [6, 18, 'point'], cy: 0, a: 1.5, e: .3, fb: 1, by: 1 },
+      { near: [7, 18, 'point'], far: [7, 19, 'point'], cy: 0, a: 1.5, e: .3, fb: 1, by: 0 },
+      { near: [8, 19, 'point'], far: [6, 18, 'point'], cy: 0, a: 1.5, e: .3, fb: 1, by: 1 }], 4),
+    hang: HANG,
+    crouch: rig({ near: [10, 19, 'flat'], far: [6, 19, 'flat'], cy: 5, hy: 0, a: .6, e: .8, lift: 2, low: true }),
+    slide: rig({ face: 'happy', near: [12, 17, 'heel'], far: [11, 18, 'heel'], cy: 3, hy: 0, a: -1.1, e: .3, lift: 2, low: true, bx: -1, by: -1 }),
+    aim: st({ face: 'up', fa: [11, 11], a: .2 }),
+    // Fidgets when she is left alone: a look around, a tug at the hood, a pat for Bigotes.
+    look: [st({ face: 'look' }), st({ face: 'up', hy: 0 })],
+    hood: [st({ face: 'shut', a: 2.8, e: .5 }), st({ face: 'calm', hy: 1, a: 2.7, e: .6 })],
+    pet: [st({ face: 'happy', a: .9, e: .6 }), st({ face: 'happy', a: 1.0, e: .9, hy: 1 })] };
+  nila.sneak = gait(SNEAK.map(k => Object.assign({ lift: 2, low: true }, k)), 4);
   // ---------------------------------------------------------------- Bigotes, el pez gato
   // Un bagre joven: lomo oliva moteado, panza crema, cabeza ancha y chata con bocaza, ojos
   // pequeños y separados en lo alto, aleta dorsal corta y cola redonda. Mira a la derecha: la
