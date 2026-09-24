@@ -1245,7 +1245,7 @@ const Item = {
     draw(e, g) { const lit = L.lit.has(e.id); if (lit) { g.globalAlpha = .18 + Math.sin(e.t / 9) * .04; g.fillStyle = '#ffcf5a'; const r = 18; g.beginPath(); g.arc(Math.round(e.x - Cam.x) + 5, Math.round(e.y - Cam.y) + 5, r, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; } g.drawImage(lit ? ART.lantern.on : ART.lantern.off, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y)); } }; },
   // Ruca, the old turtle: she talks when Nila asks (↑), in a real conversation that holds the world still.
   // The first time Nila meets her at the start of a level, she speaks up by herself (once).
-  ruca(x, y, idx) { return { kind: 'ruca', x, y, w: 20, h: 11, idx, t: Math.random() * 100, near: false, update(e) {
+  ruca(x, y, idx) { return { kind: 'ruca', x, y, w: 20, h: 11, fy: -7, idx, t: Math.random() * 100 | 0, near: false, update(e) {
       e.t++; e.dir = Player.x + 5 < e.x + 10 ? -1 : 1;
       const p = Player; e.near = !p.dead && !p.win && Math.abs(e.x + 10 - (p.x + 5)) < 30 && Math.abs(e.y - p.y) < 30;
       if (!e.near || Charla.active() || Game.learning || Maestros.busy() || Game.arrival) return;
@@ -1258,8 +1258,7 @@ const Item = {
       }
     }, draw(e, g) { Item.rucaDraw(e, g); } }; },
   rucaDraw(e, g) {
-    const s = e.talking && (e.t >> 2) % 2 ? ART.ruca.talk : (e.t % 200) < 8 ? ART.ruca.blink : ART.ruca.idle;
-    const img = e.dir > 0 ? s : ART.flip(s); g.drawImage(img, Math.round(e.x - Cam.x + (e.w - s.width) / 2), Math.round(e.y - Cam.y + e.h - s.height));
+    Maestros.drawGuide(g, e, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y));
     const heard = (Save.data.seen || {})['ruca:' + L.def.id + ':' + e.idx];
     if (e.near && !Charla.active() && !Game.learning) {
       // "↑ hablar" over her head, like the teachers.
@@ -1268,7 +1267,7 @@ const Item = {
       g.fillStyle = '#120c18'; g.fillRect(x - 1, y - 1, w + 2, 13); g.fillStyle = 'rgba(27,36,48,.95)'; g.fillRect(x, y, w, 11); g.fillStyle = '#8aa84a'; g.fillRect(x, y, w, 1);
       g.fillStyle = '#e8e0cc'; g.fillRect(x + 2, y + 2, cw, 8); g.fillStyle = '#a89a80'; g.fillRect(x + 2, y + 9, cw, 1);
       ART.text(g, cap, x + 2 + cw / 2, y + 2, '#1b2430', 'center'); Letra.text(g, label, x + cw + 5, y + 1, { color: '#fff6d6', shadow: '#120c18' });
-    } else if (!heard && (e.t >> 5) % 2) g.drawImage(ART.bubble, Math.round(e.x - Cam.x) + 14, Math.round(e.y - Cam.y) - 14 + Math.round(Math.sin(e.t / 8)));
+    } else if (!heard && (e.t >> 5) % 2) g.drawImage(ART.bubble, Math.round(e.x - Cam.x) + 14, Math.round(e.y - Cam.y) - 20 + Math.round(Math.sin(e.t / 8)));
   },
   sign(x, y, idx) { return { kind: 'sign', x, y, w: 14, h: 12, idx, update() { }, draw(e, g) { g.drawImage(ART.sign, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y)); } }; },
   // Where a cría was already rescued on an earlier visit: the ghost of its bubble, so the spot is remembered.

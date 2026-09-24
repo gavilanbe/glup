@@ -423,24 +423,8 @@ const ART = (() => {
     ['..ccccc..', '.c.....c.', 'c.W.BBB.c', 'cW.BBBEBc', 'c.bBCCCFd', 'c..bCC.Fd', 'c.......d', '.c.....d.', '..cccdd..']];
   const cria = criaRows.map((r, i) => sprite(r, CRIA, 'cria' + i));
   const criaFree = [sprite(['...BB...', 'bBBBBBE.', '.bCCCCCF', '......F.'], CRIA, 'cria-free'), sprite(['...BB...', '.bBBBBE.', 'b.CCCCCF', '.....F..'], CRIA, 'cria-free2')];
-  // Ruca, la tortuga vieja del pantano: concha con musgo y escudos marcados, cejas blancas,
-  // párpados caídos y mucha paciencia. Mira a la derecha.
-  const RUCA = { o: '#24301f', S: '#7a8a44', s: '#56663a', d: '#3c4a34', L: '#a8b85e', M: '#9ac25a', H: '#d8c47a', h: '#a8904e', K: '#a8b47a', k: '#7a8458', E: '#1d1a26', W: '#fffbe8', q: '#5a2a2a', r: '#c9463a' };
-  const rucaRows = [
-    '.......oooooo...........',
-    '.....ooMMMMMMoo.........',
-    '....oMMLSdSSSMMo...oooo.',
-    '...oLLSSSdSSSSdSo.oWWWKo',
-    '..oLSSSSddddSSdSSooKkkKo',
-    '..oSSddSdSSSdddSSooKEEKo',
-    '.oSSSSSdSSSSSdSSSooKKqqo',
-    '.oHHHhHHHhHHHHhHHHoKKoo.',
-    'oKKohhhhhhhhhhhhhooKo...',
-    'oKKKo.oKKo...oKKo.oo....',
-    '.ooo..oooo...oooo.......'];
-  const ruca = { idle: sprite(rucaRows, RUCA, 'ruca'),
-    blink: sprite(rucaRows.map((r, i) => i === 5 ? r.replace('oKEEKo', 'oKkkKo') : r), RUCA, 'ruca-blink'),
-    talk: sprite(rucaRows.map((r, i) => i === 6 ? r.replace('KKqqo', 'Kqrqo') : i === 7 ? r.replace('oKKoo.', 'oKqro.') : r), RUCA, 'ruca-talk') };
+  // Ruca, la tortuga vieja del pantano, es una marioneta por piezas como los demás maestros: vive en
+  // maestros.js. ART.ruca da sus poses de siempre (quieta, parpadeo, hablando) ya montadas.
   const bubble = sprite(['.ooooooo.', 'oWWWWWWWo', 'oWkWkWkWo', 'oWWWWWWWo', '.oooWWoo.', '....oWo..', '.....o...'], { o: '#1b2430', W: '#fff6d6', k: '#1b2430' }, 'bubble');
   const heart = sprite(['.oo...oo.', 'oRRo.oRRo', 'oRHRoRRRo', 'oRRRRRRRo', '.oRRRRRo.', '..oRRRo..', '...oRo...', '....o....'], { o: '#4a1a2a', R: '#e2445a', H: '#ffb0bd' }, 'heart');
   const heartEmpty = sprite(['.oo...oo.', 'oddo.oddo', 'oddodrddo', 'odddddddo', '.oddddDo.', '..odddo..', '...odo...', '....o....'], { o: '#2a1a24', d: '#3f2f3a', r: '#4a3644', D: '#4a3644' }, 'heart-empty');
@@ -923,6 +907,6 @@ const ART = (() => {
 
   return { sprite, flip, tint, canvas, rng, text, textWidth, wrap, glyph, logo, background, THEMES, GROUND, WATER,
     nila, fish, hand, snail, frogSit, frogJump, mosquito, crab, heronBody, heronFly, wingUp, wingDown, wingMid, egg,
-    crate, rock, pearl: cria, cria, criaFree, ruca, bubble, heart, drop, fire, ash, ring, plate, pinwheel, hard, raft, mossWall, morsels, heartEmpty, lantern, sign, boat, mushroom, mushroomSquash, thorns, gate, target, lily, plank, puff, star, cracked,
+    crate, rock, pearl: cria, cria, criaFree, get ruca() { return Maestros.rucaFrames(); }, bubble, heart, drop, fire, ash, ring, plate, pinwheel, hard, raft, mossWall, morsels, heartEmpty, lantern, sign, boat, mushroom, mushroomSquash, thorns, gate, target, lily, plank, puff, star, cracked,
     dirt, grassCap, roots, edgeL, edgeR, water, waterDeep, reed, tuft, shroomDeco };
 })();
