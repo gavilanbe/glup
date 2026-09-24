@@ -191,7 +191,7 @@ const Mapa = (() => {
     g.save(); g.translate(Math.round(np.x), 0); if (np.dir < 0) g.scale(-1, 1); Player.drawCarry(g, -6, Math.round(np.y) - 20, spr, ART.fish.closed, np.moving ? 0 : (t >> 5) % 2); g.restore();
     // Header.
     g.fillStyle = 'rgba(8,6,14,.75)'; g.fillRect(0, 0, W, 17); g.fillStyle = '#e79b3f'; g.fillRect(0, 17, W, 1);
-    ART.text(g, 'El pantano', 8, 5, '#f2c46a', 'left');
+    ART.title(g, 'El pantano', 8, 4, '#f2c46a', 'left');
     const known = POWER_ORDER.filter(Game.has).length, tot = Save.criasAll();
     const crT = tot.got + '/' + tot.all, trT = known + '/' + POWER_ORDER.length + ' trucos', crX = W - 6 - ART.textWidth(crT), trX = crX - 18 - ART.textWidth(trT);
     ART.text(g, crT, crX, 5, '#9ecbd8', 'left'); g.drawImage(ART.cria[(t >> 4) % 3], crX - 12, 4);

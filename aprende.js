@@ -140,7 +140,7 @@ const Aprende = (() => {
       const k = ease(Math.min(1, (t - NAME) / 14)), ry = 22, rw = W * k;
       g.fillStyle = '#120c18'; g.fillRect(W / 2 - rw / 2, ry - 2, rw, 30); g.fillStyle = '#8a3a2a'; g.fillRect(W / 2 - rw / 2, ry, rw, 26); g.fillStyle = '#c8583e'; g.fillRect(W / 2 - rw / 2, ry, rw, 3); g.fillStyle = '#5a2020'; g.fillRect(W / 2 - rw / 2, ry + 23, rw, 3);
       if (k >= 1) { for (const s of [-1, 1]) { const ex = W / 2 + s * (W / 2); g.fillStyle = '#6a2a20'; g.beginPath(); g.moveTo(ex, ry - 2); g.lineTo(ex - s * 10, ry + 12); g.lineTo(ex, ry + 28); g.fill(); } }
-      ART.text(g, '¡Bigotes ha aprendido!', W / 2, ry - 12, '#f2c46a', 'center', '#120c18');
+      ART.title(g, '¡Bigotes ha aprendido!', W / 2, ry - 13, '#f2c46a', 'center');
       bigName(g, pw.name, W / 2, ry + 6, t - NAME - 8);
       if (t > NAME + 26) ART.text(g, l.giver ? l.giver + ' le ha dado ' + (l.food || pw.food) : 'Se ha tragado ' + pw.food, W / 2, ry + 32, '#cfe0e8', 'center', '#120c18');
     }

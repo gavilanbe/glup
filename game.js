@@ -1354,6 +1354,8 @@ const Proj = {
   dropAsItem(p, bounceBack) {
     const e = p.kind === 'crate' ? Item.crate(p.x, p.y) : Item.rock(p.x, p.y);
     if (bounceBack) { e.vx = -Math.sign(p.vx) * 1.5; e.vy = -2.5; }
+    // Spat point-blank at a wall, the crate lands on Nila: it lets her walk out before it turns solid.
+    if (e.kind === 'crate' && overlap(e, Player.rect())) e.ghost = true;
     L.ents.push(e);
   },
   draw(p, g) {
@@ -1784,8 +1786,8 @@ const Game = {
       const t = w.t / w.life; const rise = w.big ? Math.min(6, w.t * .6) : Math.min(8, w.t * .5);
       const x = Math.round(w.x - Cam.x + (w.drift || 0) * w.t), y = Math.round(w.y - Cam.y - rise);
       g.globalAlpha = t > .7 ? (1 - t) / .3 : 1;
-      if (w.big) { const s = w.t < 4 ? 1 + (4 - w.t) * .25 : 1; g.save(); g.translate(x, y); g.scale(s, s); g.rotate(Math.sin(w.wob) * .06); ART.text(g, w.text, 0, -4, w.color, 'center', '#1b2430'); g.restore(); }
-      else ART.text(g, w.text, x, y - 4, w.color, 'center', '#1b2430');
+      // Shouts in the Letra Gorda: they land with a punch (big ones) or a small pop, and wobble a touch.
+      const s = w.t < 4 ? 1 + (4 - w.t) * (w.big ? .3 : .12) : 1; g.save(); g.translate(x, y - 4); g.scale(s, s); g.rotate(Math.sin(w.wob + w.t * .1) * (w.big ? .07 : .03)); Letra.bold(g, w.text, 0, -4, { color: w.color, align: 'center' }); g.restore();
       g.globalAlpha = 1;
     }
   },
@@ -1872,9 +1874,9 @@ const Game = {
       const t = Game.banner; const a = t > 170 ? (190 - t) / 20 : t < 30 ? t / 30 : 1;
       const lines = ART.wrap(L.def.intro || (L.def.boss ? 'Devuélvele las piedras' : 'Llega a la barca'), W - 60), bh = 20 + lines.length * 10, by = 84 - bh / 2;
       g.globalAlpha = a; g.fillStyle = '#1b2430'; g.fillRect(0, by, W, bh); g.fillStyle = '#e79b3f'; g.fillRect(0, by, W, 1); g.fillRect(0, by + bh - 1, W, 1);
-      ART.text(g, (Game.level + 1) + ' · ' + L.def.name, W / 2, by + 6, '#fff6d6', 'center'); lines.forEach((l, k) => ART.text(g, l, W / 2, by + 18 + k * 10, '#9fc0cc', 'center')); g.globalAlpha = 1;
+      ART.title(g, (Game.level + 1) + ' · ' + L.def.name, W / 2, by + 5, '#fff6d6', 'center'); lines.forEach((l, k) => ART.text(g, l, W / 2, by + 18 + k * 10, '#9fc0cc', 'center')); g.globalAlpha = 1;
     }
-    if (Game.toastT > 0) { const a = Math.min(1, Game.toastT / 20); g.globalAlpha = a; ART.text(g, Game.toastText, W / 2, 30, '#fff6d6', 'center', '#1b2430'); g.globalAlpha = 1; }
+    if (Game.toastT > 0) { const a = Math.min(1, Game.toastT / 20); g.globalAlpha = a; ART.title(g, Game.toastText, W / 2, 28, '#fff6d6', 'center'); g.globalAlpha = 1; }
     if (Player.nearSign && !Player.dead && !Maestros.busy() && !Game.learning) {
       // The sign's words on a wooden board above the sign, in the Glup letters; it pops up when you arrive.
       const e = Player.nearSign; if (Game.signFor !== e) { Game.signFor = e; Game.signT = 0; } Game.signT++;
@@ -1898,7 +1900,7 @@ const Game = {
   pauseRows() { return [70, 88, 106]; },
   drawPause(g) {
     g.fillStyle = 'rgba(8,10,16,.72)'; g.fillRect(0, 0, W, H);
-    ART.text(g, 'Pausa', W / 2, 40, '#e79b3f', 'center', '#1b2430');
+    ART.title(g, 'Pausa', W / 2, 38, '#e79b3f', 'center');
     const items = ['Seguir', 'Sonido: ' + (Sound.isMuted() ? 'no' : 'sí'), 'Salir al mapa'], rows = Game.pauseRows();
     items.forEach((it, i) => { const sel = i === Game.pauseSel; ART.text(g, (sel ? '► ' : '') + it, W / 2, rows[i], sel ? '#fff6d6' : '#9fc0cc', 'center'); });
     const known = POWER_ORDER.filter(Game.has); ART.wrap(known.length ? 'Bigotes sabe: ' + known.map(k => POWERS[k].name).join(', ') : 'Bigotes aún no sabe trucos', W - 40).slice(0, 2).forEach((ln, i) => ART.text(g, ln, W / 2, 122 + i * 9, '#9fc0cc', 'center'));

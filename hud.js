@@ -149,7 +149,7 @@ const Hud = (() => {
     for (let i = 1; i < max; i++) { const nx = x + Math.round(bw * i / max); if (bounds.includes(max - i)) { g.fillStyle = '#120c18'; g.fillRect(nx - 1, y - 2, 3, 9); g.fillStyle = '#f2c46a'; g.fillRect(nx, y - 3, 1, 11); } else { g.fillStyle = '#120c18'; g.fillRect(nx, y, 1, 5); } }
     // Her head at the left end (the eye turns red in phase III).
     const hx = x - 12, hy = y - 3; g.fillStyle = '#120c18'; g.fillRect(hx - 1, hy - 1, 10, 10); g.fillStyle = '#e9eef2'; g.fillRect(hx, hy, 8, 8); g.fillStyle = '#22262e'; g.fillRect(hx, hy, 8, 2); g.fillStyle = '#e2b63c'; g.fillRect(hx - 6, hy + 4, 6, 2); g.fillStyle = rage ? '#ff3a2a' : '#1a1a1a'; g.fillRect(hx + 2, hy + 3, 2, 2);
-    const nw = ART.text(g, 'La Garza', W / 2 - 12, y + 8, rage ? '#ff9a6a' : '#f2c46a', 'center', '#1b2430');
+    const nw = ART.title(g, 'La Garza', W / 2 - 12, y + 7, rage ? '#ff9a6a' : '#f2c46a', 'center');
     // Phase pips: spent (dim), current (bright, pulsing), still to come (hollow).
     for (let i = 0; i < 3; i++) {
       const cx = W / 2 - 12 + nw / 2 + 8 + i * 8, cy = y + 11, cur = i + 1 === phase, done = i + 1 < phase;
