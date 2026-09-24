@@ -3,23 +3,32 @@
 // piedra reforzada, el chorro, la chimenea y tres túneles resbalando.
 // `repaso`: con todos los trucos, todas las crías (el rincón del fuego y la repisa de la seta incluidos).
 'use strict';
-const { R, D, DO, HOVER, WATER, SLIDE_AT, near, TALK } = require('./comun');
+const { hookFrames, hangingAt, R, D, DO, HOVER, WATER, SLIDE_AT, near, TALK } = require('./comun');
 const TS = 16;
 // Keep sucking (with `inp` held too) until Nila hangs from the hook at column `col`.
 const HANG = (col, inp = {}) => DO('colgada del anzuelo ' + col, g => {
-  for (let n = 0; n < 240; n++) {
-    const a = g.P.grapple; if (g.P.hanging && a && Math.floor((a.x + 5) / TS) === col) return true;
-    g.frame(Object.assign({ fish: 1 }, inp));
-  }
-  return 'no llegó al anzuelo ' + col;
+  const r = hookFrames(g, hangingAt(col), { keys: inp, n: 400, dir: inp.left ? -1 : 1, stop: a => Math.floor((a.x + 5) / TS) === col });
+  return r === true || r.replace('anzuelo', 'anzuelo ' + col);
 });
 // Keep sucking until Bigotes has bitten the hook at column `col` (still reeling in).
-const BITE = col => DO('pica el anzuelo ' + col, g => {
-  for (let n = 0; n < 240; n++) { const a = g.P.grapple; if (a && Math.floor((a.x + 5) / TS) === col) return true; g.frame({ fish: 1 }); }
-  return 'no picó el anzuelo ' + col;
+const BITE = (col, dir = 1) => DO('pica el anzuelo ' + col, g => {
+  const r = hookFrames(g, g => { const a = g.P.grapple; return !!(a && Math.floor((a.x + 5) / TS) === col); }, { n: 300, dir, stop: a => Math.floor((a.x + 5) / TS) === col });
+  return r === true || 'no picó el anzuelo ' + col;
 });
 const HOP = (dir, n = 30) => [{ hold: {}, n: 1 }, { hold: Object.assign({ jump: 1 }, dir < 0 ? { left: 1 } : { right: 1 }), n }];
+// Before the timed gate of the last tunnel: turn until really facing it (a hit-stop can swallow the turning frames), wait until
+// the puff is ready, and puff again if the wheel did not catch the gust.
 const PUFF = dir => [D('puff', dir), { check: g => g.L.ents.some(e => e.kind === 'pinwheel' && e.spin > 0) || 'el molinillo no gira' }];
+const PUFF_GO = dir => [DO('sopla al molinillo', g => {
+  // The wheel in front of her (another one down the river may still be spinning from before).
+  const d = dir < 0 ? { left: 1 } : { right: 1 }, spins = () => g.L.ents.some(e => e.kind === 'pinwheel' && e.spin > 0 && Math.abs(e.x - g.P.x) < 96);
+  for (let t = 0; t < 3 && !spins(); t++) {
+    for (let n = 0; n < 20 && g.P.dir !== dir; n++) g.frame(d);
+    for (let n = 0; n < 30 && g.P.puffCd > 0; n++) g.frame({});
+    g.run({ puff: 1 }, 2); for (let n = 0; n < 24 && !spins(); n++) g.frame({});   // go the moment it catches: the gate is on a timer
+  }
+  return spins() || 'el molinillo no gira';
+})];
 const gone = (x, y) => ({ check: g => g.tileAt(x, y) === '.' || 'sigue ahí ' + x + ',' + y + ': ' + g.tileAt(x, y) });
 const CRIA = (x, y) => ({ check: g => g.L.taken.has(x + ',' + y) || 'falta la cría ' + x + ',' + y });
 // Jump straight up and flap at the top (for a cría overhead), then wait to land.
@@ -88,7 +97,8 @@ const S = {
   nenufares: [R(56, 11), R(64, 11), R(68, 11), R(72, 11)],
   anzuelos: [D('face', 1), HANG(74, { up: 1 }), HANG(84), ...HOP(1), R(88, 6)],
   // The crabs on the shelf and the reinforced stone: one charged stone.
-  repisa: [near('rock', -2), D('face', 1), D('suck', 40), R(90, 6), D('charge', 1), { wait: 40 }, gone(102, 3)],
+  // Plant her on column 87: solid ground (82–86 is a gap) with the stone a tile and a half ahead.
+  repisa: [R(88, 6), DO('ante la piedra', g => { for (let n = 0; n < 60 && !(g.P.onGround && g.P.x >= 1390 && g.P.x <= 1396); n++) g.frame(g.P.x > 1396 ? { left: 1 } : g.P.x < 1390 ? { right: 1 } : {}); g.run({}, 6); return (g.P.onGround && g.P.x >= 1388 && g.P.x <= 1398) || 'no se plantó ante la piedra (x=' + Math.round(g.P.x) + ')'; }), D('face', 1), D('suck', 40), R(90, 6), D('charge', 1), { wait: 40 }, gone(102, 3)],
   // Down to the bank, water, and the jet over the river to the chimney; up the chimney.
   rio: [R(105, 6), R(108, 11), WATER(1), ...HOVER(1, 120), R(123, 11)],
   chimenea: [R(126, 11), R(130, 3)],
@@ -101,7 +111,7 @@ const S = {
   // The second raft: the pinwheel opens the river gate.
   compuerta: [...PUFF(-1), R(221, 10), RIDE(252), R(257, 11)],
   // The last tunnel.
-  ultimo: [R(260, 11), ...PUFF(1), SLIDE_AT(262 * TS, 1, 200), R(291, 11)],
+  ultimo: [R(260, 11), ...PUFF_GO(1), SLIDE_AT(262 * TS, 1, 200), R(291, 11)],
   // The last water: jet to the lily, jet to the bank, the boat.
   final: [R(292, 11), WATER(1), JET_TO(300), WATER(1), JET_TO(309), R(315, 10, { tol: 2 }), { hold: { right: 1 }, n: 30 }],
 };
@@ -112,7 +122,7 @@ const repaso = [
   R(12, 11), R(14, 10), RIDE(40, [39]), CRIA(39, 7), R(47, 11),
   R(56, 11), R(64, 11), ...FLAP_UP, CRIA(64, 6), R(68, 11), R(72, 11),
   // Hang from the middle hook looking up, let go onto the cría and bite it again.
-  D('face', 1), HANG(74, { up: 1 }), BITE(79), HANG(79, { up: 1 }), { wait: 8 }, HANG(79, { up: 1 }), CRIA(79, 8), HANG(84), ...HOP(1), R(88, 6),
+  D('face', 1), HANG(74, { up: 1 }), BITE(79), HANG(79, { up: 1 }), { wait: 16 }, HANG(79, { up: 1 }), CRIA(79, 8), HANG(84), ...HOP(1), R(88, 6),
   ...S.repisa, ...S.rio, CRIA(115, 6),
   // The fire at the top of the chimney: water from the river, up the roots with it, spit it at the fire.
   D('face', -1), WATER(-1), ...S.chimenea, CRIA(126, 5), R(124, 3), D('spit', -1), { wait: 20 }, gone(123, 2), R(120, 3), CRIA(120, 2), CRIA(121, 2),

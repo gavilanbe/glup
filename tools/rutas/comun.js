@@ -189,4 +189,20 @@ const near = (kind, side, fromX) => ({ reach: require('../bot').beside(kind, sid
 // Talk to the level's teacher: walk up beside them (side -2 = two tiles to their left), press {up}, read every line
 // and, unless `learns` is false (a quest still pending), check that Bigotes learned the trick.
 const TALK = (o = {}) => ({ talk: Object.assign({ side: -2, learns: true }, o) });
-module.exports = { R, D, UP, HOVER, DO, POUND_AT, JET, WATER, FLAP, BOWL, SLIDE_AT, UNTIL, HERON, RAFT, near, TALK };
+// The hooks are a liana: {fish} held keeps Bigotes on the line, and to go on to the next hook a player lets go
+// and presses again, so Bigotes lunges for the marked one (`dir` steers the mark). Runs until `done(g)`, which
+// usually wants Nila hanging from a given hook with the swing settled (see `hangingAt`).
+const settled = P => !P.rope || (Math.abs(P.rope.w * P.rope.R) < .35 && Math.abs(P.rope.th) < .1);   // still AND hanging plumb (not at the top of a swing)
+const hangingAt = (col, row) => g => { const P = g.P, a = P.grapple; return !!(P.hanging && a && Math.floor((a.x + 5) / 16) === col && (row === undefined || Math.floor(a.y / 16) === row) && settled(P)); };
+function hookFrames(g, done, o = {}) {
+  const n = o.n || 500, hp0 = g.P.hp, steer = o.dir ? (o.dir < 0 ? { left: 1 } : { right: 1 }) : {};
+  for (let k = 0; k < n; k++) {
+    if (done(g)) return true;
+    const P = g.P;
+    if (P.grapple && P.hanging && settled(P) && P.target && !P.castTo && !(o.stop && o.stop(P.grapple))) { g.frame(Object.assign({}, steer)); g.frame(Object.assign({ fish: 1 }, steer)); continue; }
+    g.frame(Object.assign({ fish: 1 }, P.grapple ? {} : (o.keys || {})));
+    if (P.dead || P.hp < hp0) return 'daño en los anzuelos';
+  }
+  return done(g) || 'no llegó al anzuelo (x ' + (g.P.x / 16).toFixed(1) + (g.P.grapple ? ', en ' + Math.floor((g.P.grapple.x + 5) / 16) : '') + ')';
+}
+module.exports = { hookFrames, hangingAt, settled, R, D, UP, HOVER, DO, POUND_AT, JET, WATER, FLAP, BOWL, SLIDE_AT, UNTIL, HERON, RAFT, near, TALK };

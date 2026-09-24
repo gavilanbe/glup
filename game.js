@@ -145,7 +145,7 @@ const Touch = {
     const jit = p.sucking ? ((t >> 1) & 1) * (p.suckLv || 1) * .5 : full ? ((t >> 1) & 1) : 0, fx = Math.round(5 + jit), fy = 5 + (held ? 0 : Math.round(Math.sin(t / 20)));
     g.drawImage(face, fx, fy); Player.fishOverlay(g, face, fx, fy, t, { noWhiskers: true, mood: p.sucking || p.charge > 8 ? 'mad' : null, lx: 1 });
     if (p.sucking) { g.fillStyle = p.suckLv === 3 ? '#fff6d6' : '#cfe8f0'; for (let i = 0; i < 2 + p.suckLv; i++) { const k = (t * (.1 + p.suckLv * .04) + i / (2 + p.suckLv)) % 1; g.fillRect(Math.round(34 - k * 7), 7 + i * 2, 2, 1); } }
-    const lab = full ? '¡zas!' : held ? (held.kind === 'agua' && !p.onGround ? 'flota' : 'escupe') : 'sorbe';
+    const lab = full ? '¡zas!' : held ? (held.kind === 'agua' && !p.onGround ? 'flota' : 'escupe') : p.grapple ? 'suelta' : p.target && ((!p.onGround && p.airT > 3) || Input.held.up) ? 'pica' : 'sorbe';
     Touch.label(g, lab, 18, 21, full ? '#f2c46a' : p.sucking ? '#fff6d6' : held ? '#bdf0d0' : '#e8fbff');
   },
   drawJump(g, t) {
@@ -187,7 +187,7 @@ const Touch = {
     const p = Player, t = Game.t, B = Touch.btn, K = Touch.keys;
     const talk = !Charla.active() && !Game.learning && !Maestros.busy() && !p.dead && !!((L.maestro && L.maestro.near) || L.ents.some(e => e.kind === 'ruca' && e.near));
     B.talk.classList.toggle('show', talk); if (talk && K.talk !== (t >> 4)) { K.talk = t >> 4; Touch.drawTalk(Touch.ctx.talk, t); }
-    const fk = [p.held ? p.held.kind : '', p.sucking ? p.suckLv : 0, p.charge >= CHARGE_FULL, p.spitT > 6, p.onGround, p.sucking || p.charge >= CHARGE_FULL ? t >> 1 : t >> 3].join();
+    const fk = [!!p.grapple, !!p.target, p.held ? p.held.kind : '', p.sucking ? p.suckLv : 0, p.charge >= CHARGE_FULL, p.spitT > 6, p.onGround, p.sucking || p.charge >= CHARGE_FULL ? t >> 1 : t >> 3].join();
     if (K.fish !== fk) { K.fish = fk; Touch.drawFish(Touch.ctx.fish, t); }
     const ring = p.sucking ? (p.suckLv || 1) / 3 : p.charge > 8 ? Math.min(1, p.charge / CHARGE_FULL) : 0;
     B.fish.style.setProperty('--charge', ring.toFixed(3)); B.fish.style.setProperty('--charge-col', p.sucking ? (p.suckLv === 3 ? '#fff6d6' : '#8fe0f0') : '#f2c46a');
@@ -427,7 +427,7 @@ const Player = {
   x: 0, y: 0, w: 10, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, coyote: 0, jumpBuf: 0, held: null, sucking: false, suckT: 0, hp: 3, inv: 0, animT: 0, sx: 1, sy: 1,
   dead: false, deadT: 0, spitT: 0, swallowT: 0, blink: 0, hurtT: 0, stepT: 0, dropping: false, win: false, nearSign: null, airT: 0, puffCd: 0, jumpCut: false,
   charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, prevVx: 0, prevVy: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0,
-  reset(x, y, full) { Object.assign(Player, { x, y, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, held: null, sucking: false, inv: 0, dead: false, deadT: 0, spitT: 0, swallowT: 0, sx: 1, sy: 1, win: false, airT: 0, charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0, lastSafe: null }); if (full) Player.hp = 3; Sound.suck(false); Sound.jet(false); },
+  reset(x, y, full) { Object.assign(Player, { x, y, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, held: null, sucking: false, inv: 0, dead: false, deadT: 0, spitT: 0, swallowT: 0, sx: 1, sy: 1, win: false, airT: 0, charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0, lastSafe: null, rope: null, castTo: null, target: null, flingT: 0 }); if (full) Player.hp = 3; Sound.suck(false); Sound.jet(false); },
   // Is there firm ground a knock-back could land on, that way? Water or a drop within reach says no.
   safeSide(dir) {
     const p = Player, fy = p.y + p.h;
@@ -466,7 +466,9 @@ const Player = {
     else if (!wantCrouch && p.crouch) p.slide = 0;
     const left = Input.held.left, right = Input.held.right, ax = p.onGround ? .22 : .14;
     const busy = p.sucking || p.charge > 8;
-    const maxV = p.crouch ? 1.1 : busy ? (p.sucking && p.suckLv === 3 ? .45 : .7) : 1.7;
+    let maxV = p.crouch ? 1.1 : busy ? (p.sucking && p.suckLv === 3 ? .45 : .7) : 1.7;
+    // Thrown off a line, the swing's speed carries: it bleeds off slowly instead of being capped.
+    if (p.flingT > 0) { p.flingT--; if (p.onGround) p.flingT = 0; else maxV = Math.max(maxV, Math.abs(p.vx) - .03); if (p.flingT % 2 === 0) L.ghosts.push({ sprite: p.dir > 0 ? ART.nila.jump : ART.flip(ART.nila.jump), x: p.x - 3, y: p.y - 4, life: 4, grow: 0 }); }
     if (p.wallJumpT > 0) p.wallJumpT--;
     if (p.grapple || p.pound) { /* Bigotes does the moving, or nothing moves */ }
     else if (p.slide > 0) { p.vx = p.dir * Math.max(2.8 * Math.sqrt(p.slide / 20), p.slide <= 2 ? 2.3 : 0); if (p.slide % 3 === 0) spawnParts(1, p.x + 5 - p.dir * 5, p.y + p.h, { color: '#c9b08a', angle: -Math.PI / 2 - p.dir * .9, spread: .4, speed: [.4, 1], life: [8, 14], g: .03 }); }
@@ -484,7 +486,7 @@ const Player = {
     if (p.jumpBuf > 0 && !p.crouch) {
       if (p.coyote > 0) {
         p.vy = -5.6; p.jumpCut = true; p.jumpBuf = 0; p.coyote = 0; p.onGround = false; p.sx = .8; p.sy = 1.25; Sound.play('jump');
-        if (p.grapple) { Player.letGo(); p.vx = Input.held.left ? -1.7 : Input.held.right ? 1.7 : 0; Game.word('¡HOP!', p.x + 5, p.y - 6, '#fff6d6', false); }
+        if (p.grapple) Player.release(true);
         else spawnParts(5, p.x + 5, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.2, speed: [.5, 1.5], life: [10, 20], g: .05 });
       } else if ((p.onWall || p.wallCoyote > 0) && Game.has('ventosa')) {
         // Wall kick off the roots. A few frames of grace after letting go of the wall, so pressing away a hair early still kicks.
@@ -591,7 +593,10 @@ const Player = {
       if (p.held) { const m = p.mouth(); p.puffCd = 18; Sound.play('blub'); Game.word('mmf', m.x, m.y - 10, '#9fc0cc', false); p.sx = 1.06; p.sy = .95; }
       else if (Game.has('soplido')) Player.inhale(); else Player.burp();
     }
-    if (Input.pressed.fish) { p.fishDown = true; p.fishT = 0; }
+    Player.findTarget();
+    if (Input.pressed.fish && !p.held && p.target && (p.grapple || (!p.onGround && p.airT > 3) || Input.held.up)) { Player.cast(p.target); p.fishDown = true; p.fishT = 0; }
+    else if (Input.pressed.fish) { p.fishDown = true; p.fishT = 0; }
+    Player.castUpdate();
     if (down && p.fishDown) p.fishT++;
     const wasHover = p.hover; p.hover = false;
     // The aim latches for a few frames: letting go of {up} a hair before {fish} still shoots up.
@@ -617,8 +622,8 @@ const Player = {
       if (!down) p.charge = 0;
     } else {
       p.charge = 0;
-      if (down && p.fishDown && !p.sucking && p.fishT > 4) { p.sucking = true; p.suckT = 0; p.waterT = 0; p.suckLv = 1; p.suckLen = 36; p.suckPulse = 0; Sound.suck(true); }
-      if (!down && p.fishDown) { p.fishDown = false; if (p.sucking) { p.sucking = false; Sound.suck(false); Player.letGo(); } }
+      if (down && p.fishDown && !p.sucking && !p.grapple && !p.castTo && p.fishT > 4) { p.sucking = true; p.suckT = 0; p.waterT = 0; p.suckLv = 1; p.suckLen = 36; p.suckPulse = 0; Sound.suck(true); }
+      if (!down && p.fishDown) { p.fishDown = false; if (p.grapple) Player.release(false); else if (p.castTo) p.castTo = null; else if (p.sucking) { p.sucking = false; Sound.suck(false); Player.letGo(); } }
       if (p.sucking) Player.suck();
     }
     if (wasHover && !p.hover) Sound.jet(false);
@@ -684,7 +689,7 @@ const Player = {
       if (e.pullT < 4 && e.enemy) e.tug = 2;
       if (d < 9) Player.capture(e);
     }
-    if (best) { if (p.grapple) Game.word('¡OTRO!', best.x + 5, best.y - 8, '#e6c46a', false); p.grapple = best; p.grappleT = 0; p.hanging = false; p.vx = 0; p.vy = 0; p.crouch = false; Sound.play('glup', .6); Game.word('¡PICA!', best.x + 5, best.y - 8, '#e6c46a', true); Cam.shake(2, 5); for (let i = 0; i < 2; i++) L.parts.push({ x: best.x + 5, y: best.y - 12, vx: 0, vy: 0, life: 14 - i * 4, color: '#e8fbff', size: 1, g: 0, kind: 'ring' }); }
+    if (best) Player.bite(best);
   },
   // One more step of the inhale: a thump of air, a shock ring racing down the cone, and at the top a ¡SÚPER!
   suckUp(lv) {
@@ -695,19 +700,102 @@ const Player = {
     if (p.onGround) spawnParts(3 + lv * 2, p.x + 5 - p.dir * 4, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2 - p.dir * .8, spread: .6, speed: [.5, 1.6], life: [10, 18], g: .04 });
     if (lv === 3) { Cam.punch(1.04); Game.stop(2); Game.word('¡SÚPER!', m.x + a.x * 16, m.y - 14 + a.y * 10, '#e8fbff', true); }
   },
-  // Bigotes has clamped onto a ring: it reels Nila in until she hangs just under it.
-  pull() {
-    const p = Player, a = p.grapple; const tx = a.x + 5 - 5, ty = a.y + 10;
-    const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy); p.grappleT++;
-    // The bite: a few frames where Bigotes clamps on and the rope goes taut, then the reel accelerates.
-    if (p.grappleT <= 4 && d >= 3) { p.vx = 0; p.vy = 0; if (p.grappleT === 1) { Cam.shake(1, 3); Input.rumble(40, .3, .1); p.sx = .9; p.sy = 1.12; } return; }
-    if (d < 3) { if (!p.hanging) { p.sx = .88; p.sy = 1.14; Sound.play('thud'); Input.rumble(40, .3, .2); spawnParts(4, a.x + 5, a.y + 6, { color: ['#e6c46a', '#fff6d6'], speed: [.4, 1.2], life: [8, 14], g: .05 }); } p.x = tx; p.y = ty; p.hanging = true; p.vx = 0; p.vy = 0; if (p.animT % 6 === 0) L.parts.push({ x: a.x + 5, y: a.y + 5, vx: 0, vy: 0, life: 10, color: '#e6c46a', size: 1, g: 0, kind: 'suck' }); return; }
-    const sp = Math.min(4.4, 1.8 + (p.grappleT - 4) * .45, d); const mx = dx / d * sp, my = dy / d * sp;
-    const bx = moveX(p, mx), by = moveY(p, my); p.vy = 0;
-    if ((bx && Math.abs(dx) > 4) || (by && Math.abs(dy) > 4)) { if (++p.stuck > 12) { Player.letGo(); p.stuck = 0; } } else p.stuck = 0;
-    if (p.grappleT % 3 === 0) Sound.play('text');   // the reel clicking as it winds in
+  // ---- The hooks: a liana made of fishing line.
+  // Bigotes bites, the line hangs from where it is tied and Nila swings under it like a pendulum: she keeps
+  // the speed she came with, ←/→ pump the swing, and the reel winds the line in (faster swing as it shortens)
+  // until she hangs where the hook was. Letting go of Bigotes flings her with the swing; jumping adds a hop.
+  // In the air or on a line, the next hook in reach is marked, and a press of Bigotes lunges for it.
+  pivot(a) { return { x: a.x + 5, y: a.top + 2 }; },
+  bite(a) {
+    const p = Player, P = Player.pivot(a), was = p.grapple;
+    const dx = p.x + 5 - P.x, dy = Math.max(4, p.y + 2 - P.y), R = Math.max(12, Math.hypot(dx, dy)), th = Math.atan2(dx, dy);
+    const vt = p.vx * Math.cos(th) - p.vy * Math.sin(th);
+    p.grapple = a; p.castTo = null; p.grappleT = 0; p.hanging = false; p.crouch = false; p.pound = false; p.sucking = false; Sound.suck(false);
+    p.rope = { R, Rt: Math.max(14, a.y + 10 - P.y), th, w: clamp(vt / R, -.12, .12), vib: 2, lastSide: Math.sign(th) };
+    Sound.play('glup', .6); Game.stop(was ? 2 : 3); Cam.shake(2, 5); Input.rumble(60, .4, .2); p.sx = .9; p.sy = 1.12;
+    Game.word(was ? '¡OTRO!' : '¡PICA!', a.x + 5, a.y - 8, '#e6c46a', !was);
+    for (let i = 0; i < 2; i++) L.parts.push({ x: a.x + 5, y: a.y - 12, vx: 0, vy: 0, life: 14 - i * 4, color: '#e8fbff', size: 1, g: 0, kind: 'ring' });
+    spawnParts(6, a.x + 5, a.y + 4, { color: ['#e6c46a', '#fff6d6', '#e8fbff'], speed: [.6, 2], life: [8, 14], g: .05 });
   },
-  letGo() { const p = Player; if (p.grapple) { p.grapple = null; p.hanging = false; } if (p.sucking) { p.sucking = false; Sound.suck(false); } },
+  pull() {
+    const p = Player, a = p.grapple, r = p.rope, P = Player.pivot(a); p.grappleT++;
+    if (r.vib > 0) r.vib *= .9;
+    // The bite: two frames where Bigotes clamps on and the line snaps taut.
+    if (p.grappleT <= 2) { p.vx = 0; p.vy = 0; return; }
+    // Reel in: the line shortens and the swing speeds up (the angular momentum is kept).
+    if (r.R > r.Rt + .01) {
+      const dR = Math.min(r.R - r.Rt, Math.min(3.6, 1 + p.grappleT * .12)), R2 = r.R - dR; r.w *= r.R / R2; r.R = R2;
+      if (p.grappleT % 3 === 0) Sound.play('text');   // the reel clicking as it winds in
+      if (r.R <= r.Rt + .01) { p.sx = .88; p.sy = 1.14; Sound.play('thud'); Input.rumble(40, .3, .2); r.vib = 1.5; spawnParts(4, a.x + 5, a.y + 6, { color: ['#e6c46a', '#fff6d6'], speed: [.4, 1.2], life: [8, 14], g: .05 }); }
+    }
+    p.hanging = r.R <= r.Rt + .5;
+    // Gravity along the arc, pumping with ←/→, and friction (more of it when nobody pumps, so she settles).
+    const d = Input.held.right && !Input.held.left ? 1 : Input.held.left && !Input.held.right ? -1 : 0;
+    r.w += -(.28 / r.R) * Math.sin(r.th);
+    if (d) { r.w += d * .05 / r.R; p.dir = d; }
+    r.w *= d ? .996 : r.R <= r.Rt + .5 ? .955 : .975;   // reeled in and left alone, the swing dies down in under a second
+    if (!d && Math.abs(r.w * r.R) < .08 && Math.abs(r.th) < .03) { r.w = 0; r.th *= .8; }
+    r.w = clamp(r.w, -5.5 / r.R, 5.5 / r.R);
+    r.th += r.w; if (Math.abs(r.th) > 1.35) { r.th = Math.sign(r.th) * 1.35; r.w *= -.2; }
+    // Move towards the point on the arc; a wall knocks the swing back.
+    const tx = P.x + r.R * Math.sin(r.th) - 5, ty = P.y + r.R * Math.cos(r.th) - 2, ox = p.x, oy = p.y;
+    const bx = moveX(p, tx - p.x), by = moveY(p, ty - p.y);
+    if (bx || by) {
+      // A wall knocks the swing back; a floor or a ceiling only lets her slide along it with the line gone slack.
+      const dx = p.x + 5 - P.x, dy = Math.max(4, p.y + 2 - P.y);
+      if (bx) { const sp = Math.abs(r.w * r.R); if (sp > 1.4) { Sound.play('thud'); Cam.shake(1, 4); spawnParts(4, p.x + 5 + Math.sign(r.w) * 6, p.y + 9, { color: ['#c9b08a', '#e8fbff'], speed: [.4, 1.4], life: [8, 14], g: .05 }); } r.w *= -.3; }
+      r.th = Math.atan2(dx, dy); r.R = Math.max(8, Math.min(r.R, Math.hypot(dx, dy)));
+      if (p.x === ox && p.y === oy) { if (++p.stuck > 16) { Player.letGo(); p.stuck = 0; return; } } else p.stuck = 0;
+    } else { p.stuck = 0; if (r.R < r.Rt) r.R = Math.min(r.Rt, r.R + 1); }   // slack line pays back out
+    p.vx = p.x - ox; p.vy = p.y - oy;
+    // Juice: a whoosh through the bottom of a fast swing, streaks behind, a creak at the top.
+    const vt = Math.abs(r.w * r.R), side = Math.sign(r.th);
+    if (side && side !== r.lastSide) { if (vt > 2.2) { Sound.play('whoosh'); Input.rumble(30, .2, .3); } r.lastSide = side; }
+    if (vt > 2.6 && p.grappleT % 2 === 0) L.parts.push({ x: p.x + 5 - Math.sign(r.w) * 6 + rnd(-2, 2), y: p.y + rnd(4, 16), vx: -r.w * r.R * .15, vy: 0, life: 10, color: '#e8f2f6', size: 1, g: 0, kind: 'dot' });
+    if (vt < .25 && Math.abs(r.th) > .35 && p.grappleT % 20 === 0) Sound.play('text');
+  },
+  // Let go of the line on purpose: the swing becomes a throw (a jump adds a hop on top).
+  release(hop) {
+    const p = Player, r = p.rope; if (!p.grapple || !r) { Player.letGo(); return; }
+    const vt = r.w * r.R, vx = vt * Math.cos(r.th), vy = -vt * Math.sin(r.th);
+    Player.letGo();
+    p.vx = clamp(vx * 1.15, -4.6, 4.6); p.vy = clamp(vy * 1.15, -6, 4);
+    if (hop) { p.vy = Math.max(-7.2, Math.min(-5.6, p.vy - 4.2)); if (Input.held.left) p.vx = Math.min(p.vx, -1.7); if (Input.held.right) p.vx = Math.max(p.vx, 1.7); }
+    p.airJumps = 1; p.coyote = hop ? 0 : 6; p.onGround = false;   // just let go: a jump still counts for a few frames
+    if (Math.abs(p.vx) > 1.8) { p.flingT = 26; p.dir = Math.sign(p.vx); Game.word(hop ? '¡HOP!' : '¡FIUU!', p.x + 5, p.y - 6, '#fff6d6', Math.abs(vt) > 3); Sound.play('whoosh'); spawnParts(6, p.x + 5, p.y + 8, { color: ['#e8f2f6', '#fff6d6'], angle: Math.atan2(-p.vy, -p.vx), spread: .6, speed: [.8, 2], life: [8, 14], g: 0 }); }
+    else if (hop) Game.word('¡HOP!', p.x + 5, p.y - 6, '#fff6d6', false);
+  },
+  // Which hook would Bigotes lunge for: in reach, ahead in the way she is going (or overhead).
+  findTarget() {
+    const p = Player; p.target = null;
+    if (!Game.has('mordisco') || p.held || p.sucking || p.dead || p.win) return;
+    // Measured from Nila herself (Bigotes' mouth sits well ahead of her, which made a hook overhead look "behind").
+    const m = { x: p.x + 5, y: p.y + 2 }, onRope = !!p.grapple, r = p.rope;
+    const steer = !!Input.held.right !== !!Input.held.left;
+    const pref = Input.held.right && !Input.held.left ? 1 : Input.held.left && !Input.held.right ? -1 : onRope && r && Math.abs(r.w * r.R) > .6 ? Math.sign(r.w) : p.dir;
+    let best = null, bestS = 1e9;
+    for (const e of L.ents) {
+      if (e.kind !== 'anchor' || e.dead || e === p.grapple || (e === p.lastHook && Game.t - p.lastHookT < 24 && !Input.held.up)) continue;
+      const dx = e.x + 5 - m.x, dy = e.y + 5 - m.y, d = Math.hypot(dx, dy);
+      if (d > 104) continue;
+      if (dx * pref < -14 && Math.abs(dx) > (Input.held.up ? 40 : 20)) continue;   // ↑ means "the one above", a little behind is fine
+      if (!onRope && p.onGround && dy > -12) continue;
+      // Holding a direction means "that way": hooks overhead only count when there is none ahead.
+      const sc = d - (dx * pref > 0 ? 24 : 0) - (dy < 0 ? 8 : 0) + (steer && dx * pref <= 4 ? 1000 : 0); if (sc < bestS) { bestS = sc; best = e; }
+    }
+    p.target = best;
+  },
+  cast(a) {
+    const p = Player; if (p.grapple) { p.rope.w *= .6; Player.letGo(); }
+    p.castTo = a; p.castT = 0; p.castN = Math.max(3, Math.round(Math.hypot(a.x + 5 - (p.x + 5), a.y + 5 - p.y) / 16));
+    Sound.play('whoosh'); p.sx = 1.12; p.sy = .9; spawnParts(4, p.x + 5, p.y + 2, { color: ['#e8fbff', '#e6c46a'], speed: [.5, 1.5], life: [6, 10], g: 0 });
+  },
+  castUpdate() {
+    const p = Player, a = p.castTo; if (!a) return;
+    if (a.dead) { p.castTo = null; return; }
+    if (++p.castT >= p.castN) Player.bite(a);
+  },
+  letGo() { const p = Player; if (p.grapple) { p.lastHook = p.grapple; p.lastHookT = Game.t; p.grapple = null; p.hanging = false; p.rope = null; } p.castTo = null; if (p.sucking) { p.sucking = false; Sound.suck(false); } },
   capture(e) {
     const p = Player; e.dead = true; e.held = true;
     p.held = { kind: e.kind, sprite: e.spriteFor ? e.spriteFor() : e.sprite, w: e.w, h: e.h, proto: e };
@@ -841,11 +929,13 @@ const Player = {
     const cx = fx + 5;
     // Shear around the boots: positive leans her back (away from where she faces).
     let lean = p.sucking && !p.aimUp && !p.grapple ? p.dir * .05 : p.charge > 8 ? p.dir * .06 : 0;
-    if (p.slide > 0) lean = p.dir * .18; else if (p.onWall) lean = p.onWall * -.12; else if (p.onGround && Math.abs(p.vx) > 1.2 && !p.sucking) lean = -p.dir * .06;
+    if (p.grapple && p.rope) lean = clamp(p.rope.th * .8 + p.rope.w * 4, -.9, .9); else if (p.slide > 0) lean = p.dir * .18; else if (p.onWall) lean = p.onWall * -.12; else if (p.onGround && Math.abs(p.vx) > 1.2 && !p.sucking) lean = -p.dir * .06;
     const recoil = p.spitT > 8 ? -p.dir * 1 : 0;
     if (p.slide > 0) { Player.drawSled(g, cx, by, spr); return; }
     const fish = Player.drawFish(g, fx, fy); fish.back();
-    g.save(); g.translate(cx, by); g.scale(p.sx, p.sy); if (lean) g.transform(1, 0, lean, 1, 0, 0); g.translate(-cx, -by);
+    // On a line the body pivots from the hands up top (where the line is), so the legs trail the swing.
+    const ly = p.grapple ? by - 20 : by;
+    g.save(); g.translate(cx, ly); g.scale(p.sx, p.sy); if (lean) g.transform(1, 0, lean, 1, 0, 0); g.translate(-cx, -ly);
     g.drawImage(spr, cx - 8 + recoil, by - spr.height);
     g.restore();
     fish.front();
@@ -936,7 +1026,7 @@ const Player = {
         slices(tuck ? PIV : 0, n);
         Player.drawBarbels(g, at, 'near');
         Player.drawFishLife(g, at, fs, t);
-        if (p.grapple) { const hd = Player.fishHead, a = p.grapple, top = Math.round(a.top - Cam.y), cx = Math.round(a.x + 5 - Cam.x), vib = p.hanging ? 0 : Math.sin(t * 2.3) * .6;
+        if (p.grapple) { const hd = Player.fishHead, a = p.grapple, top = Math.round(a.top - Cam.y), cx = Math.round(a.x + 5 - Cam.x), vib = Math.sin(t * 2.3) * ((p.rope && p.rope.vib) || 0) + (p.hanging ? 0 : Math.sin(t * 2.3) * .4);
           g.fillStyle = '#e8f0f8'; const n = Math.max(1, Math.round(Math.hypot(hd.x - cx, hd.y - top))); for (let i = 0; i <= n; i++) { const k = i / n; g.fillRect(Math.round(cx + (hd.x - cx) * k + Math.sin(k * Math.PI) * vib), Math.round(top + 2 + (hd.y - 2 - top) * k), 1, 1); }
           Item.hookShape(g, Math.round(hd.x), Math.round(hd.y) - 10, false, t, p.dir); }
         // Nila's hand comes down over his flank, just under her chin.
@@ -1869,6 +1959,30 @@ const Game = {
     while (y < 120) { const ny = y + 4 + ((r() * 8) | 0), nx = x + ((r() * 9) | 0) - 4; for (let k = 0; k <= ny - y; k++) g.fillRect(Math.round(x + (nx - x) * k / (ny - y)), y + k, 1, 1); x = nx; y = ny; if (r() < .15) { let bx = x, by = y; for (let j = 0; j < 10; j++) { bx += r() < .5 ? -1 : 1; by++; g.fillRect(bx, by, 1, 1); } } }
   },
   drawTiles(g, camX, camY, layer) { Game.terrain = MUNDO.drawTiles(g, L, camX, camY, layer, W, H, Game.t) || Game.terrain; },
+  // The hooks: a golden sight on the one Bigotes would lunge for, and the lunge itself as a streak.
+  drawHookAim(g) {
+    const p = Player, t = Game.t, a = p.target;
+    if (a && !p.castTo && (p.grapple || (!p.onGround && p.airT > 3) || Input.held.up)) {
+      const cx = Math.round(a.x + 5 - Cam.x), cy = Math.round(a.y + 6 - Cam.y), k = (t % 30) / 30, r = Math.round(12 - Math.sin(k * Math.PI) * 3);
+      if (p.aimFor !== a) { p.aimFor = a; p.aimT = 0; Sound.play('text'); } p.aimT = (p.aimT || 0) + 1;
+      const pop = p.aimT < 8 ? Math.round((8 - p.aimT) * 1.5) : 0, R = r + pop;
+      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const x = cx + sx * R, y = cy + sy * R;
+        g.fillStyle = '#1a1420'; g.fillRect(x - (sx > 0 ? 4 : 0), y - 1, 5, 3); g.fillRect(x - 1, y - (sy > 0 ? 4 : 0), 3, 5);
+        g.fillStyle = (t >> 3) % 2 ? '#fff6d6' : '#f2c46a'; g.fillRect(x - (sx > 0 ? 3 : 0), y, 4, 1); g.fillRect(x, y - (sy > 0 ? 3 : 0), 1, 4);
+      }
+      // A dotted hint of the path from the mouth.
+      const m = p.mouth(), mx = m.x - Cam.x, my = m.y - Cam.y, n = Math.max(2, Math.round(Math.hypot(cx - mx, cy - my) / 7));
+      g.fillStyle = '#fff6d6'; g.globalAlpha = .45; for (let i = 1; i < n; i++) { if ((i + (t >> 2)) % 3) continue; const q = i / n; g.fillRect(Math.round(mx + (cx - mx) * q), Math.round(my + (cy - my) * q), 1, 1); } g.globalAlpha = 1;
+    } else if (!a) p.aimFor = null;
+    if (p.castTo) {
+      // The lunge: a bright line races from Bigotes' mouth to the hook.
+      const c = p.castTo, m = p.mouth(), k = Math.min(1, (p.castT + 1) / p.castN), mx = m.x - Cam.x, my = m.y - Cam.y, cx = c.x + 5 - Cam.x, cy = c.y + 6 - Cam.y;
+      const ex = mx + (cx - mx) * k, ey = my + (cy - my) * k, n = Math.max(2, Math.round(Math.hypot(ex - mx, ey - my)));
+      for (let i = 0; i <= n; i++) { const q = i / n; g.fillStyle = q > .8 ? '#ffffff' : i % 2 ? '#e6c46a' : '#fff6d6'; g.fillRect(Math.round(mx + (ex - mx) * q), Math.round(my + (ey - my) * q), 1, 1); }
+      g.fillStyle = '#ffffff'; g.fillRect(Math.round(ex) - 1, Math.round(ey) - 1, 3, 3);
+    }
+  },
   drawPlay(g) {
     const camX = Math.round(Cam.x) + Cam.ox, camY = Math.round(Cam.y) + Cam.oy;
     const zoom = Cam.zoom > 1 ? Cam.zoom : 1;
@@ -1885,6 +1999,7 @@ const Game = {
     for (const e of ents) if (!e.dead && order(e) > 1) e.draw(e, g);
     for (const gh of L.ghosts) { const sx = 1 + (5 - gh.life) * gh.grow; g.save(); g.translate(Math.round(gh.x - Cam.x + gh.sprite.width / 2), Math.round(gh.y - Cam.y + gh.sprite.height / 2)); g.scale(sx, sx); g.globalAlpha = gh.life / 5; g.drawImage(ART.tint(gh.sprite, '#ffffff'), -gh.sprite.width / 2, -gh.sprite.height / 2); g.restore(); }
     if (Game.arrival) Barca.drawFront(g); else Player.draw(g);
+    if (!Game.arrival) Game.drawHookAim(g);
     for (const p of L.projs) if (!p.dead) Proj.draw(p, g);
     Game.drawParts(g);
     Game.drawGusts(g);

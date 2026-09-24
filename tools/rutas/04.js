@@ -1,7 +1,7 @@
 // Ruta del bot · 4 · El molino anegado (llega con soplido, aleteo y ventosa; Olga da el trago de agua
 // cuando se acierta la diana de su compuerta: encargo «dianas»).
 'use strict';
-const { R, D, DO, WATER, UNTIL, near, TALK } = require('./comun');
+const { hookFrames, settled, R, D, DO, WATER, UNTIL, near, TALK } = require('./comun');
 const TS = 16;
 // Mosquitos and frogs move at random: a tricky move is tried from a snapshot and, if Nila gets hurt or it
 // fails, the world is rewound, left to run a moment and tried again.
@@ -73,10 +73,12 @@ const VIGA = RETRY('los anzuelos de la viga', g => {
   for (let n = 0; n < 160 && !g.P.hanging; n++) g.frame({ fish: 1, up: 1 });
   if (!g.P.hanging) return 'no picó el primer anzuelo';
   const first = g.P.grapple;
-  for (let n = 0; n < 200 && !(g.P.hanging && g.P.grapple !== first); n++) g.frame({ fish: 1, right: 1 });
-  if (!(g.P.hanging && g.P.grapple !== first)) return 'no pasó al segundo anzuelo';
-  g.run({ jump: 1 }, 16); g.frame({}); g.run({ jump: 1 }, 12);
-  for (let n = 0; n < 120 && !g.P.onGround; n++) { g.frame(g.P.y + g.P.h < 32 ? { right: 1 } : {}); }
+  const r = hookFrames(g, g => !!(g.P.hanging && g.P.grapple && g.P.grapple !== first && settled(g.P)), { dir: 1, n: 300 });
+  if (r !== true) return 'no pasó al segundo anzuelo';
+  // Up off the hook and a flap; once clear above the beam, drift right onto it.
+  const up = inp => Object.assign(inp, g.P.y + g.P.h < 32 ? { right: 1 } : {});
+  for (let n = 0; n < 16; n++) g.frame(up({ jump: 1 })); g.frame(up({})); for (let n = 0; n < 12; n++) g.frame(up({ jump: 1 }));
+  for (let n = 0; n < 120 && !g.P.onGround; n++) g.frame(up({}));
   return (g.P.onGround && g.P.y < 20) || 'no llegó a la viga (y=' + Math.round(g.P.y) + ')';
 });
 const A1 = [

@@ -1,7 +1,7 @@
 // Ruta del bot · 6 · La turbera (llega con soplido, aleteo, ventosa, chorro y mordisco; Canto da el panzazo
 // cuando están encendidos los tres faroles: el tercero, en lo alto de la seta).
 'use strict';
-const { R, D, DO, FLAP, HOVER, WATER, near, TALK } = require('./comun');
+const { hookFrames, settled, R, D, DO, FLAP, HOVER, WATER, near, TALK } = require('./comun');
 const TS = 16;
 // Stand on the mushroom at column `col`, hop onto it and, once bounced, drift `off` (1 right, -1 left) until she
 // lands on firm ground away from it. Checks that she got above row `row`.
@@ -23,11 +23,7 @@ const HOOKS = (last, o = {}) => DO('anzuelos hasta ' + last, g => {
   g.run({}, 4);
   for (let n = 0; n < 120 && !g.P.grapple; n++) g.frame(o.up === false ? Object.assign({ fish: 1 }, d) : { fish: 1, up: 1 });
   if (!g.P.grapple) return 'no pica el primero';
-  for (let n = 0; n < 900; n++) {
-    g.frame(Object.assign({ fish: 1 }, d));
-    if (g.P.dead || g.P.hp < 3) return 'se cayó';
-    if (g.P.hanging && g.P.grapple && Math.floor(g.P.grapple.x / TS) === last) break;
-  }
+  hookFrames(g, g => !!(g.P.hanging && g.P.grapple && Math.floor(g.P.grapple.x / TS) === last && settled(g.P)), { dir, n: 900, stop: a => Math.floor(a.x / TS) === last });
   if (!(g.P.hanging && Math.floor(g.P.grapple.x / TS) === last)) return 'no llegó al anzuelo ' + last;
   g.run(Object.assign({ jump: 1 }, d), 14);
   if (o.pound) { for (let n = 0; n < 100 && g.P.x < o.pound * TS && !g.P.onGround; n++) g.frame(d); g.frame({}); g.run({ down: 1, jump: 1 }, 2); for (let n = 0; n < 80 && g.P.pound; n++) g.frame({ down: 1 }); g.run({}, 20); }

@@ -2,22 +2,19 @@
 // el fogón y la olla apagados (encargo «apagar»): dos viajes a la charca, uno escupiendo hacia arriba.
 // `repaso`: con todos los trucos, todas las crías (los dos secretos piden el resbalón).
 'use strict';
-const { R, D, DO, HOVER, WATER, near, TALK } = require('./comun');
+const { hookFrames, hangingAt, R, D, DO, HOVER, WATER, near, TALK } = require('./comun');
 const TS = 16;
 // Jump straight up, let go, then {down}+{jump} in the air: a belly flop onto the floor below.
 const POUND = [{ hold: { jump: 1 }, n: 8 }, { hold: {}, n: 1 }, { hold: { down: 1, jump: 1 }, n: 2 }, { hold: { down: 1 }, n: 40 }, { wait: 10 }];
 // Keep sucking (with `inp` held too) until Bigotes has bitten the hook at column `col` and Nila hangs from it.
 const HANG = (col, inp = {}) => DO('colgada del anzuelo ' + col, g => {
-  for (let n = 0; n < 240; n++) {
-    const a = g.P.grapple; if (g.P.hanging && a && Math.floor((a.x + 5) / TS) === col) return true;
-    g.frame(Object.assign({ fish: 1 }, inp));
-  }
-  return 'no llegó al anzuelo ' + col;
+  const r = hookFrames(g, hangingAt(col), { keys: inp, n: 400, dir: inp.left ? -1 : 1, stop: a => Math.floor((a.x + 5) / TS) === col });
+  return r === true || r.replace('anzuelo', 'anzuelo ' + col);
 });
 // Keep sucking until Bigotes has bitten the hook at column `col` (still reeling in).
-const BITE = col => DO('pica el anzuelo ' + col, g => {
-  for (let n = 0; n < 240; n++) { const a = g.P.grapple; if (a && Math.floor((a.x + 5) / TS) === col) return true; g.frame({ fish: 1 }); }
-  return 'no picó el anzuelo ' + col;
+const BITE = (col, dir = 1) => DO('pica el anzuelo ' + col, g => {
+  const r = hookFrames(g, g => { const a = g.P.grapple; return !!(a && Math.floor((a.x + 5) / TS) === col); }, { n: 300, dir, stop: a => Math.floor((a.x + 5) / TS) === col });
+  return r === true || 'no picó el anzuelo ' + col;
 });
 // Let go of the hook jumping toward `dir`, holding it for `n` frames.
 const HOP = (dir, n = 30) => [{ hold: {}, n: 1 }, { hold: Object.assign({ jump: 1 }, dir < 0 ? { left: 1 } : { right: 1 }), n }];
@@ -104,7 +101,8 @@ const repaso = [
   R(137, 11),
   // The X wall from behind is not in the way any more; on through the crabs.
   ...S.cangrejos, CRIA(159, 10), ...S.tapon, CRIA(167, 6),
-  ...S.pilares, CRIA(189, 2), ...S.lago, CRIA(209, 5), ...S.diana,
+  // The cría over the gap between pillars 187 and 191: a jump and a flap through it (it used to be caught by chance).
+  R(172, 5), ...PUFF(1), R(187, 5), DO('salto por la cría 189,2', g => { g.run({ right: 1, jump: 1 }, 8); for (let i = 8; i < 20; i++) g.frame({ right: 1 }); g.run({ right: 1, jump: 1 }, 12); for (let n = 0; n < 80 && !g.P.onGround; n++) g.frame({ right: 1 }); g.run({}, 4); return (g.P.onGround && Math.floor((g.P.x + 5) / TS) === 191) || 'no aterrizó en el pilar 191'; }), R(196, 5), R(199, 5), CRIA(189, 2), ...S.lago, CRIA(209, 5), ...S.diana,
   // The cría behind the crabs, then the mushroom.
   R(262, 11), R(273, 11), CRIA(273, 10), ...S.seta, ...S.bajada,
   // Secret 2: blow the pinwheel by the river, drop into the hole and slide back under the crabs.

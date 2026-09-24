@@ -24,7 +24,7 @@ body.touch #hint { display: none; }
 
 /* Left: the floating stick. Touch anywhere in the zone and the pad jumps under the thumb. */
 #stick-zone { position: absolute; left: 0; bottom: 0; width: 46%; height: 72%; z-index: 3; touch-action: none; }
-#stick { position: absolute; width: 132px; height: 132px; margin: -66px 0 0 -66px; left: calc(max(14px, env(safe-area-inset-left)) + 74px); top: calc(100% - max(14px, env(safe-area-inset-bottom)) - 74px); opacity: .5; transition: opacity .15s, transform .12s; pointer-events: none; }
+#stick { position: absolute; width: 132px; height: 132px; margin: -66px 0 0 -66px; left: calc(max(14px, env(safe-area-inset-left)) + 74px); top: calc(100% - max(14px, env(safe-area-inset-bottom)) - 74px); opacity: .78; transition: opacity .15s, transform .12s; pointer-events: none; }
 #stick.on { opacity: .95; transition: opacity .05s; }
 #stick.snap { transition: left .14s cubic-bezier(.3, 1.6, .5, 1), top .14s cubic-bezier(.3, 1.6, .5, 1), opacity .25s; }
 #stick .base { width: 132px; height: 132px; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .35)); }
@@ -33,12 +33,12 @@ body.touch #hint { display: none; }
 /* Right: jump, Bigotes and the puff in a thumb arc; "talk" pops up above them when someone is near. */
 #touch-buttons { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: 200px; height: 212px; z-index: 3; pointer-events: none; }
 #touch-buttons button { position: absolute; pointer-events: auto; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: transform .07s, opacity .2s; }
-#touch-buttons .act { --ring: rgba(242, 196, 106, .9); --fill: rgba(40, 26, 36, .5); background: radial-gradient(circle at 50% 38%, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 60%), var(--fill); box-shadow: inset 0 0 0 3px var(--ring), inset 0 -5px 0 rgba(0, 0, 0, .28), 0 3px 0 rgba(0, 0, 0, .4); }
+#touch-buttons .act { --ring: rgba(242, 196, 106, .9); --fill: rgba(40, 26, 36, .7); background: radial-gradient(circle at 50% 38%, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 60%), var(--fill); box-shadow: inset 0 0 0 3px var(--ring), inset 0 -5px 0 rgba(0, 0, 0, .28), 0 3px 0 rgba(0, 0, 0, .4); }
 #touch-buttons .jump canvas, #touch-buttons .fish canvas { width: 72px; height: 72px; }
 #touch-buttons .puff canvas { width: 48px; height: 48px; }
-#touch-buttons .jump { right: 0; bottom: 0; width: 84px; height: 84px; --ring: #f2c43d; --fill: rgba(92, 62, 20, .5); }
-#touch-buttons .fish { right: 94px; bottom: 20px; width: 84px; height: 84px; --ring: #7fd0a0; --fill: rgba(22, 60, 52, .5); }
-#touch-buttons .puff { right: 52px; bottom: 102px; width: 62px; height: 62px; --ring: #a8d8f0; --fill: rgba(28, 46, 66, .5); }
+#touch-buttons .jump { right: 0; bottom: 0; width: 84px; height: 84px; --ring: #f2c43d; --fill: rgba(92, 62, 20, .72); }
+#touch-buttons .fish { right: 94px; bottom: 20px; width: 84px; height: 84px; --ring: #7fd0a0; --fill: rgba(22, 60, 52, .72); }
+#touch-buttons .puff { right: 52px; bottom: 102px; width: 62px; height: 62px; --ring: #a8d8f0; --fill: rgba(28, 46, 66, .72); }
 #touch-buttons .fish::before { content: ""; position: absolute; inset: -5px; border-radius: 50%; background: conic-gradient(var(--charge-col, #f2c46a) calc(var(--charge, 0) * 1turn), transparent 0); -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%); mask: radial-gradient(circle, transparent 62%, #000 63%); pointer-events: none; }
 #touch-buttons .fish.full::before { animation: glow .3s steps(2) infinite; }
 #touch-buttons .act.held { transform: scale(.88); --fill: rgba(255, 246, 214, .42); }
@@ -71,7 +71,26 @@ body.portrait #touch-buttons { right: max(8px, env(safe-area-inset-right)); bott
 body.portrait.in-play #rotate-hint { display: block; position: absolute; left: 14px; top: calc(56.25vw + max(0px, env(safe-area-inset-top)) + 14px); width: 208px; height: 36px; z-index: 2; opacity: .8; }
 @media (max-height: 700px) and (orientation: portrait) { body.portrait.in-play #rotate-hint { display: none; background: none; image-rendering: pixelated; pointer-events: none; } }
 
-@media (max-height: 380px) and (orientation: landscape) {
+/* Wide phones in landscape (almost all of them): the swamp in the middle and the controls in their own
+   columns at the sides, solid, never covering Nila. Narrower screens keep them floating over the game. */
+@media (orientation: landscape) and (min-aspect-ratio: 39/20) {
+  body.touch { --gut: clamp(118px, calc((100vw - 177.78vh) / 2), 176px); }
+  body.touch #shell { background: linear-gradient(90deg, #172a26, #10141c calc(var(--gut) + env(safe-area-inset-left)), #10141c calc(100% - var(--gut) - env(safe-area-inset-right)), #1c2a36); }
+  body.touch #screen { margin: 0 calc(var(--gut) + env(safe-area-inset-right)) 0 calc(var(--gut) + env(safe-area-inset-left)); }
+  body.touch #stick-zone { width: calc(var(--gut) + env(safe-area-inset-left) + 16vw); height: 100%; }
+  body.touch #stick { left: calc(env(safe-area-inset-left) + var(--gut) / 2); top: calc(100% - max(12px, env(safe-area-inset-bottom)) - 74px); opacity: .95; transform: scale(.86); }
+  body.touch #touch-buttons { right: env(safe-area-inset-right); bottom: max(8px, env(safe-area-inset-bottom)); width: var(--gut); height: 100%; transform: none; }
+  body.touch #touch-buttons .jump { right: 8px; bottom: 6px; }
+  body.touch #touch-buttons .fish { right: calc(var(--gut) - 88px); bottom: 96px; }
+  body.touch #touch-buttons .puff { right: 8px; bottom: 186px; }
+  body.touch #touch-buttons .talk { right: calc(var(--gut) - 40px); bottom: 190px; }
+  body.touch #touch-top { right: auto; left: calc(env(safe-area-inset-left) + (var(--gut) - 114px) / 2); top: max(8px, env(safe-area-inset-top)); }
+  body.touch #touch-top button { width: 34px; height: 34px; }
+}
+@media (orientation: landscape) and (min-aspect-ratio: 39/20) and (max-height: 330px) {
+  body.touch #touch-buttons { transform: scale(.86); transform-origin: 100% 100%; }
+}
+@media (max-height: 380px) and (orientation: landscape) and (max-aspect-ratio: 39/20) {
   #stick { transform: scale(.82); }
   #touch-buttons { transform: scale(.82); transform-origin: 100% 100%; }
 }

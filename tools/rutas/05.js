@@ -2,7 +2,7 @@
 // su caja de aparejos (encargo «entregar»): se sube en la boca por la chimenea de raíces. Con el mordisco,
 // el caladero: cadenas de anzuelos, morder al vuelo, flotar y morder, y el pozo de los anzuelos.
 'use strict';
-const { R, D, DO, FLAP, WATER, UNTIL, near, TALK } = require('./comun');
+const { hookFrames, settled, R, D, DO, FLAP, WATER, UNTIL, near, TALK } = require('./comun');
 const LOG = label => DO('pos ' + label, g => { if (process.argv.includes('-v')) console.log('   ·', label, 'x', (g.P.x / 16).toFixed(1), 'y', ((g.P.y + g.P.h) / 16).toFixed(1), 'crías', g.L.pearls, 'hp', g.P.hp); });
 
 // Jump, flap and hover right holding {fish} until Nila lands (then let go at once, so she doesn't walk off).
@@ -41,14 +41,9 @@ const BALSA = DO('balsa', g => {
 });
 // Hold {fish} (plus `keys`) until Bigotes hangs from the hook at column `col` (auto-chaining from hook to hook).
 const at = (a, col, row) => Math.floor(a.x / 16) === col && (row === undefined || Math.floor(a.y / 16) === row);
-const HANG = (col, keys = {}, n = 400, row) => DO('cuelga del anzuelo ' + col, g => {
-  const hp0 = g.P.hp;
-  for (let k = 0; k < n; k++) {
-    g.frame(Object.assign({ fish: 1 }, keys));
-    if (g.P.dead || g.P.hp < hp0) return 'daño colgando hacia ' + col;
-    if (g.P.hanging && g.P.grapple && at(g.P.grapple, col, row)) return true;
-  }
-  return 'no llegó al anzuelo ' + col + ' (x ' + (g.P.x / 16).toFixed(1) + (g.P.grapple ? ', en ' + Math.floor(g.P.grapple.x / 16) : '') + ')';
+const HANG = (col, keys = {}, n = 500, row) => DO('cuelga del anzuelo ' + col, g => {
+  const r = hookFrames(g, g => !!(g.P.hanging && g.P.grapple && at(g.P.grapple, col, row) && settled(g.P)), { keys, n, dir: keys.left ? -1 : keys.right ? 1 : 0, stop: a => at(a, col, row) });
+  return r === true || r.replace('anzuelo', 'anzuelo ' + col);
 });
 // Jump (right), flap after `flap` frames if given, and bite the hook at `col` on the way.
 const BITE = (col, o = {}) => DO('salta y muerde ' + col, g => {
@@ -58,7 +53,8 @@ const BITE = (col, o = {}) => DO('salta y muerde ' + col, g => {
     const inp = Object.assign({}, d);
     if (k < (o.hold || 14)) inp.jump = 1;
     if (o.flap && k === o.flap) { inp.jump = 1; } else if (o.flap && k === o.flap - 1) delete inp.jump;
-    if (k >= (o.fishAt || 4)) inp.fish = 1;
+    // Like a player: press Bigotes once the sight is on the hook we want (and keep holding while he lunges).
+    const P = g.P; if (k >= (o.fishAt || 4) && (P.castTo || P.grapple || (P.target && at(P.target, col, o.row)))) inp.fish = 1;
     if (o.up) inp.up = 1;
     g.frame(inp);
     if (g.P.dead || g.P.hp < hp0) return 'daño saltando a ' + col;
@@ -124,14 +120,14 @@ const anselmo = [
 const cadena1 = [R(118, 3), D('face', 1), HANG(127), LOG('B'), R(131, 6), LOG('pilote')];
 const cadena2 = [
   TIMED('mosquito del caladero', [BITE(136, { fishAt: 6 }), HANG(146, { right: 1 })]), LOG('E'), R(150, 6), R(152, 6), LOG('tablones'),
-  near('rock', -1), D('face', 1), D('suck', 40),
+  R(148, 11), near('rock', -1), D('face', 1), D('suck', 40),
   TIMED('cangrejo', [DO('pedrada', g => { g.run({}, 1); g.run({ fish: 1 }, 2); g.run({}, 30); return !g.L.ents.some(e => e.kind === 'crab' && !e.flipped) || 'el cangrejo sigue'; })]),
   R(162, 11), LOG('orilla'), WATER(1), FLOAT_BITE(179), HANG(184, { right: 1 }), LOG('G'), R(188, 11), LOG('cobertizo')];
 // ---- The shed, the hook well, the last chain and the frogs.
 const pozo = [
   TIMED('caracol', [GO(197, 7)]), R(203, 11), LOG('pozo'),
-  BITE(209, { row: 8 }), HANG(209, {}, 100, 8), BITE(204, { dir: -1, row: 5 }), HANG(204, {}, 100, 5),
-  BITE(209, { row: 2 }), HANG(209, {}, 100, 2), LOG('arriba del pozo'), R(213, 2), R(219, 2), LOG('última cadena'),
+  BITE(209, { row: 8 }), HANG(209, {}, 240, 8), BITE(204, { dir: -1, row: 5 }), HANG(204, {}, 240, 5),
+  BITE(209, { row: 2 }), HANG(209, {}, 240, 2), LOG('arriba del pozo'), R(213, 2), R(219, 2), LOG('última cadena'),
   D('face', 1), HANG(228),
   TIMED('mosquitos', [BITE(236), HANG(246, { right: 1 })], 400, { fish: 1 }), LOG('H5'), R(252, 11), LOG('ranas'),
   TIMED('ranas', [GO(264, 11), GO(268, 11), DO('salto a la cría', g => { const c = g.L.pearls; g.run({ right: 1, jump: 1 }, 16); g.run({ right: 1 }, 1); g.run({ right: 1, jump: 1 }, 10); for (let n = 0; n < 80 && !g.P.onGround; n++) g.frame({}); return g.L.pearls > c || 'sin cría'; }), GO(272, 11), GO(276, 11), GO(280, 11)])];
