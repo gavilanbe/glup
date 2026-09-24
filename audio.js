@@ -96,14 +96,21 @@ const Sound = (() => {
     clang() { const t = ctx.currentTime; osc('square', 1800, t, .08, .1, sfxBus, 900, .002, .1); osc('triangle', 2400, t, .12, .06, sfxBus, 1200, .002, .1); noise(t, .06, .1, 'highpass', 4000); },
     flap() { const t = ctx.currentTime; noise(t, .12, .2, 'bandpass', 900, 300, 1.5); osc('sine', 420, t, .1, .12, sfxBus, 180, .005, .06); },
     // The level-clear jingle: a quick run up, a held chord, a turn and the final chord with a drum hit.
+    // The level-clear jingle: a snare roll that swells, a run up, a big chord with a cymbal, a quick
+    // turn and the final chord with the bass an octave down, a sparkle gliss on top.
     fanfare() { const t = ctx.currentTime;
-      ['G4', 'C5', 'E5', 'G5'].forEach((n, i) => { osc('square', freq(n), t + i * .07, .09, .08, sfxBus, null, .003, .04); osc('triangle', freq(n), t + i * .07, .1, .14, sfxBus, null, .003, .05); });
-      ['C6', 'G5', 'E5'].forEach((n, i) => osc(i ? 'triangle' : 'square', freq(n), t + .3, .5, i ? .12 : .09, sfxBus, null, .005, .2));
-      osc('triangle', freq('C3'), t + .3, .5, .2, sfxBus, null, .005, .2); noise(t + .3, .15, .22, 'bandpass', 1800, 900, 1);
-      ['A5', 'B5'].forEach((n, i) => osc('square', freq(n), t + .86 + i * .12, .1, .09, sfxBus, null, .003, .05));
-      ['C6', 'G5', 'E5', 'C5'].forEach((n, i) => osc(i ? 'triangle' : 'square', freq(n), t + 1.1, 1.1, i ? .12 : .09, sfxBus, null, .005, .6));
-      osc('triangle', freq('G2'), t + .86, .22, .2, sfxBus, null, .005, .1); osc('triangle', freq('C3'), t + 1.1, 1.1, .22, sfxBus, null, .005, .6);
-      noise(t + 1.1, .3, .28, 'bandpass', 1600, 700, 1); osc('sine', 120, t + 1.1, .14, .3, sfxBus, 40); noise(t + 1.1, 1.2, .06, 'highpass', 6000, 9000); },
+      for (let i = 0; i < 10; i++) noise(t + i * .03, .05, .05 + i * .02, 'bandpass', 1900, 1200, .9);
+      ['C4', 'E4', 'G4', 'C5', 'E5', 'G5'].forEach((n, i) => { osc('square', freq(n), t + .3 + i * .055, .08, .07, sfxBus, null, .003, .04); osc('triangle', freq(n), t + .3 + i * .055, .09, .12, sfxBus, null, .003, .05); });
+      const c1 = t + .66;
+      ['C6', 'G5', 'E5', 'C5'].forEach((n, i) => osc(i ? 'triangle' : 'square', freq(n), c1, .42, i ? .11 : .08, sfxBus, null, .005, .18));
+      osc('triangle', freq('C3'), c1, .42, .22, sfxBus, null, .005, .15); osc('sine', 110, c1, .16, .32, sfxBus, 45); noise(c1, .9, .14, 'highpass', 5000, 9000, .6); noise(c1, .14, .22, 'bandpass', 1800, 900, 1);
+      ['A5', 'B5', 'D6'].forEach((n, i) => { osc('square', freq(n), t + 1.12 + i * .1, .09, .08, sfxBus, null, .003, .05); osc('triangle', freq(n), t + 1.12 + i * .1, .09, .1, sfxBus, null, .003, .05); });
+      osc('triangle', freq('G2'), t + 1.12, .3, .2, sfxBus, null, .005, .1); noise(t + 1.12, .08, .12, 'bandpass', 1900, 1000, .9); noise(t + 1.32, .08, .14, 'bandpass', 1900, 1000, .9);
+      const c2 = t + 1.44;
+      ['C6', 'G5', 'E5', 'C5', 'G4'].forEach((n, i) => osc(i ? 'triangle' : 'square', freq(n), c2, 1.3, i ? .11 : .08, sfxBus, null, .005, .7));
+      osc('triangle', freq('C2'), c2, 1.3, .26, sfxBus, null, .005, .7); osc('triangle', freq('C3'), c2, 1.3, .16, sfxBus, null, .005, .7);
+      osc('sine', 130, c2, .18, .36, sfxBus, 40); noise(c2, .3, .3, 'bandpass', 1600, 700, 1); noise(c2, 1.6, .1, 'highpass', 6000, 9000, .5);
+      for (let i = 0; i < 8; i++) osc('sine', freq(['C6', 'E6', 'G6', 'C7', 'E7', 'G7', 'C8', 'E8'][i]), c2 + .15 + i * .04, .2, .05, sfxBus, null, .002, .15); },
     // Tally sounds: a counter tick (k raises the pitch), a letter slamming down, a rubber stamp, the bonus bell.
     tick(k = 0) { const t = ctx.currentTime, f = 1100 * Math.pow(2, (k % 12) / 24); osc('square', f, t, .025, .06, sfxBus, null, .002, .015); },
     slam(k = 0) { const t = ctx.currentTime; noise(t, .09, .22, 'lowpass', 900, 150); osc('triangle', 220 + (k % 8) * 18, t, .1, .2, sfxBus, 70, .002, .05); osc('square', 660 + (k % 8) * 40, t, .03, .05, sfxBus, null, .002, .02); },
@@ -291,18 +298,22 @@ const Sound = (() => {
       { inst: 'kick', vol: .42, steps: P(`
         x . . . x . . . x . . . x . x .   x . . . x . . . x . . . x . x x`) } ] },
     // The tally: a bright, bouncy loop in C.
-    victoria: { bpm: 132, swing: .12, tracks: [
+    victoria: { bpm: 136, swing: .1, tracks: [
       { inst: 'bass', vol: .45, steps: P(`
-        C2 . G2 . C2 . G2 . C2 . G2 . E2 . G2 .   F1 . C2 . F1 . C2 . F1 . C2 . A1 . C2 .
-        G1 . D2 . G1 . D2 . G1 . D2 . B1 . D2 .   C2 . G2 . E2 . G2 . C2 . . . G1 . . .`) },
-      { inst: 'pluck', vol: .2, steps: P(`
-        C4 . E4 . G4 . E4 . C5 . G4 . E4 . G4 .   F4 . A4 . C5 . A4 . F4 . A4 . C5 . A4 .
-        G4 . B4 . D5 . B4 . G4 . B4 . D5 . B4 .   C5 . G4 . E4 . G4 . C5 . E5 . G5 . . .`) },
-      { inst: 'lead', vol: .11, steps: P(`
-        E5 - G5 - C6 - - - B5 - A5 - G5 - - -   A5 - - - F5 - A5 - C6 - - - A5 - - -
-        B5 - - - G5 - D5 - G5 - A5 - B5 - - -   C6 - - - G5 - E5 - C5 - - - . . . .`) },
-      { inst: 'hat', vol: .1, steps: P(`x . x . x . x . x . x . x . x x`) },
-      { inst: 'kick', vol: .38, steps: P(`x . . . x . . . x . . . x . x .`) } ] },
+        C2 . C2 G1 C2 . E2 . F2 . F2 C2 F2 . A2 .   G2 . G2 D2 G2 . B1 . C2 . E2 . G2 . C2 .
+        A1 . A1 E2 A1 . C2 . F1 . F1 C2 F1 . A1 .   G1 . G1 D2 G1 . B1 . C2 . G1 . C2 . . .`) },
+      { inst: 'pluck', vol: .18, steps: P(`
+        E4 G4 C5 G4 E4 G4 C5 G4 F4 A4 C5 A4 F4 A4 C5 A4   D4 G4 B4 G4 D4 G4 B4 G4 E4 G4 C5 G4 E4 G4 C5 G4
+        C4 E4 A4 E4 C4 E4 A4 E4 C4 F4 A4 F4 C4 F4 A4 F4   B3 D4 G4 D4 B3 D4 G4 D4 C4 E4 G4 C5 E5 . . .`) },
+      { inst: 'lead', vol: .12, steps: P(`
+        G5 - E5 . G5 - C6 - A5 - - - F5 - A5 -   B5 - G5 . D5 - G5 - C6 - - - - - . .
+        E5 - C5 . E5 - A5 - F5 - A5 - C6 - A5 -   D6 - - - B5 - G5 - C6 - - - - - - -`) },
+      { inst: 'lead', vol: .06, steps: P(`
+        . . . . E5 - - - . . . . C5 - - -   . . . . D5 - - - . . . . E5 - - -
+        . . . . C5 - - - . . . . C5 - - -   . . . . G5 - - - . . . . G5 - - -`) },
+      { inst: 'snare', vol: .12, steps: P(`. . . . x . . . . . . . x . . .   . . . . x . . . . . . . x . x x`) },
+      { inst: 'hat', vol: .09, steps: P(`x . x x x . x . x . x x x . x .`) },
+      { inst: 'kick', vol: .38, steps: P(`x . . . . . x . x . . . . . . .   x . . . . . x . x . . . x . . .`) } ] },
     dock: { bpm: 72, swing: .25, tracks: [
       { inst: 'pluck', vol: .28, steps: P(`
         D3 . . . A3 . . . F3 . . . A3 . . .   Bb2 . . . F3 . . . D3 . . . F3 . . .

@@ -6,7 +6,8 @@
 //  2. El recuento: «¡NIVEL SUPERADO!» cae letra a letra, una cinta con el nombre del nivel, y las
 //     líneas cuentan con tic-tic: crías (cada una salta a su hueco), tiempo contra el par, trucos
 //     aprendidos (los bocados se estampan) y los puntos; al final cae el sello con la medalla.
-//     Nila baila a un lado con Bigotes. Una pulsación adelanta la cuenta y otra sigue.
+//     Nila baila a un lado con Bigotes. Al estilo Sonic, las bonificaciones se vacían a la vez en los
+//     puntos. Una pulsación adelanta la cuenta y otra sigue; si no, sigue solo al cabo de unos segundos.
 'use strict';
 const Victoria = (() => {
   const ease = k => k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k);
@@ -222,18 +223,16 @@ const Victoria = (() => {
     T.criasEnd = T.crias0 + Math.max(1, s.pearls) * CGAP + 8;
     T.time0 = T.criasEnd + 2; T.timeEnd = T.time0 + 30; T.bonus = T.timeEnd + 4;
     T.tricks0 = T.bonus + 12; T.tricksEnd = T.tricks0 + Math.max(1, boss ? 1 : tricks.length) * TGAP + 4;
-    T.total = T.tricksEnd + 2; T.rank = T.total + 30; T.end = T.rank + 40;
     const pts = { crias: s.pearls * 100, time: fast ? (par - s.secs) * 10 : 0, tricks: tricks.length * 500, all: s.total && s.pearls >= s.total ? 1000 : 0, boss: boss ? 5000 : 0 };
-    V.clear = { s, par, fast, rank, tricks, boss, items, T, pts, target: 0, shown: 0, shake: 0, parts: [], rings: [], jig: {}, flash: 0, record: s.prevBest !== undefined && s.prevBest !== null && s.secs < s.prevBest, skipped: false, doneT: -1 };
+    // Sonic-style: the rows give way to a page of bonuses that all drain into the score at once.
+    const bank = { crias: pts.crias + pts.all, time: pts.time, tricks: pts.tricks + pts.boss }, sum = bank.crias + bank.time + bank.tricks;
+    const rate = Math.max(10, Math.ceil(sum / 80)), D = Math.ceil(Math.max(bank.crias, bank.time, bank.tricks, 1) / rate);
+    T.total = T.tricksEnd + 20; T.page = T.total; T.drain0 = T.page + 40; T.drainEnd = T.drain0 + D; T.rank = T.drainEnd + 18; T.end = T.rank + 40; T.auto = T.end + 170;
+    V.clear = { s, par, fast, rank, tricks, boss, items, T, pts, bank, rate, target: 0, shown: 0, shake: 0, parts: [], rings: [], jig: {}, flash: 0, record: s.prevBest !== undefined && s.prevBest !== null && s.secs < s.prevBest, skipped: false, doneT: -1 };
   }
-  function scoreAt(c, t) {
-    const T = c.T, s = c.s; let v = 0;
-    v += Math.min(s.pearls, Math.max(0, Math.floor((t - T.crias0) / CGAP) + 1)) * 100 * (t >= T.crias0 ? 1 : 0);
-    if (t >= T.bonus) v += c.pts.time;
-    if (t >= T.tricks0) v += Math.min(c.tricks.length, Math.floor((t - T.tricks0) / TGAP) + 1) * 500;
-    if (t >= T.total) v += c.pts.all + c.pts.boss;
-    return v;
-  }
+  // How much of each bonus has drained into the score by frame t, and what's left in each.
+  function drained(c, t) { const k = Math.max(0, t - c.T.drain0) * c.rate, b = c.bank; return { crias: Math.min(b.crias, k), time: Math.min(b.time, k), tricks: Math.min(b.tricks, k) }; }
+  function scoreAt(c, t) { const d = drained(c, t); return d.crias + d.time + d.tricks; }
   function burst(c, x, y, n, cols, spd, up, kind) { for (let i = 0; i < n; i++) { const a = up ? -Math.PI / 2 + R(-.9, .9) : R(0, Math.PI * 2), v = spd * R(.4, 1.2); c.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: R(16, 34), max: 34, col: pick(cols), g: kind === 'spark' ? .02 : .12, kind: kind || 'dot', rot: R(0, 6) }); } }
   const medalPos = { x: 280, y: 92 };
   const ROW = { x0: 88, x1: 238, crias: 60, time: 86, tricks: 108, total: 134 };
@@ -257,12 +256,15 @@ const Victoria = (() => {
     const nt = c.boss ? 1 : c.tricks.length;
     for (let i = 0; i < nt; i++) if (t === T.tricks0 + i * TGAP + 6) { Sound.play('slam', 8 + i); c.shake = 4; const x = trickX(i) + 8; burst(c, x, ROW.tricks + 12, 10, ['#ffe36a', '#fff6d6', '#e79b3f'], 1.8, false, 'spark'); c.rings.push({ x, y: ROW.tricks + 8, t: 0 }); }
     // The score rolls up to whatever has been revealed.
-    c.target = scoreAt(c, t);
-    if (c.shown < c.target) { c.shown = Math.min(c.target, c.shown + Math.max(9, Math.ceil((c.target - c.shown) * .1))); if (t % 2 === 0) Sound.play('tick', 9); }
+    c.target = c.shown = scoreAt(c, t);
+    if (t === T.page) Sound.play('whoosh');
+    for (const [i, key] of ['crias', 'time', 'tricks'].entries()) if (t === T.page + 8 + i * 6) Sound.play('slam', 3 + i);
+    if (t > T.drain0 && t <= T.drainEnd) { Sound.play('tick', (t - T.drain0) % 12); for (const key of ['crias', 'time', 'tricks']) { const b = c.bank[key]; if (b && Math.min(b, (t - T.drain0) * c.rate) === b && Math.min(b, (t - 1 - T.drain0) * c.rate) < b) { c.zero = c.zero || {}; c.zero[key] = t; } } }
+    if (t === T.drainEnd + 1) { Sound.play('kaching'); c.flash = 4; c.totalPop = t; burst(c, ROW.x1 - 20, 124, 18, ['#ffe36a', '#fff6d6', '#ffffff'], 2.2, false, 'spark'); }
     // The medal stamp.
     if (t === T.rank) landMedal(c);
     for (let i = 0; i < MEDALS[c.rank].stars; i++) if (t === T.rank + 10 + i * 8) { Sound.play('kaching'); burst(c, medalPos.x + (i - (MEDALS[c.rank].stars - 1) / 2) * 13, medalPos.y - 32, 8, ['#ffe36a', '#ffffff'], 1.6, false, 'spark'); }
-    if (t === T.total) { if (c.pts.all) c.parts.push({ x: ROW.x1 - 12, y: ROW.total - 4, vx: 0, vy: -.5, life: 50, max: 50, col: '#ffe36a', g: 0, kind: 'txt', txt: '+' + c.pts.all }); if (c.pts.boss) c.parts.push({ x: ROW.x1 - 12, y: ROW.total - 4, vx: 0, vy: -.5, life: 50, max: 50, col: '#f07080', g: 0, kind: 'txt', txt: '+' + c.pts.boss }); }
+    // (the +1000 for all crías and the Heron's +5000 are inside the bonus page now)
     // Nila's dance: a few notes and hearts.
     if (t % 26 === 0) c.parts.push({ x: 44 + R(-8, 8), y: 80, vx: R(-.2, .2), vy: -.45, life: 60, max: 60, col: pick(['#fff6d6', '#ffe36a', '#8fd9d0']), g: 0, kind: 'note', rot: R(0, 6) });
     if (t > T.rank && t % 40 === 0) burst(c, medalPos.x + R(-16, 16), medalPos.y + R(-16, 16), 3, ['#ffffff', '#fff4a8'], .6, false, 'spark');
@@ -271,9 +273,9 @@ const Victoria = (() => {
     for (const q of c.rings) q.t++; c.rings = c.rings.filter(q => q.t < 16);
     if (c.shake > 0) c.shake--; if (c.flash > 0) c.flash--;
     // A first press fast-forwards the count; the next one moves on.
-    const press = Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Game.tapped;
+    const press = Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Game.tapped || (t >= T.auto && !c.left);
     if (press) {
-      Game.tapped = false;
+      Game.tapped = false; if (t >= T.auto) c.left = true;
       if (t < T.rank) { Game.clearT = T.rank; c.shown = c.target = scoreAt(c, T.end); landMedal(c); }
       else if (t > T.rank + 10) {
         Sound.play('confirm');
@@ -335,6 +337,30 @@ const Victoria = (() => {
     const k = ease((t - (T.crias0 - 12)) / 10);
     g.save(); g.globalAlpha = k; panelBox(g, x0 - 6, 54, x1 - x0 + 12, 98); g.restore();
     if (k < 1) return;
+    // Page two: the rows slide out to the left and the bonus page takes over.
+    if (t >= T.page) { const out = Math.min(1, (t - T.page) / 10); g.save(); g.beginPath(); g.rect(x0 - 5, 55, x1 - x0 + 10, 96); g.clip(); if (out < 1) { g.translate(-Math.round(ease(out) * 180), 0); g.globalAlpha = 1 - out; drawRowsBody(g, c, t); g.globalAlpha = 1; g.translate(Math.round(ease(out) * 180), 0); } drawBonusPage(g, c, t); g.restore(); return; }
+    drawRowsBody(g, c, t);
+  }
+  // The Sonic-style bonus page: each bonus counts down while the score counts up, all at once.
+  function drawBonusPage(g, c, t) {
+    const T = c.T, x0 = ROW.x0, x1 = ROW.x1, d = drained(c, t);
+    const rows = [['crias', 'BONUS CRÍAS', 64], ['time', 'BONUS TIEMPO', 82], ['tricks', c.boss ? 'BONUS GARZA' : 'BONUS TRUCOS', 100]];
+    rows.forEach(([key, label, y], i) => {
+      const k = ease(Math.min(1, Math.max(0, (t - T.page - 4 - i * 6) / 10))); if (k <= 0) return;
+      const ox = Math.round((1 - k) * 160), left = c.bank[key] - d[key], z = c.zero && c.zero[key], flash = z && t - z < 12 && ((t - z) >> 1) % 2;
+      ART.text(g, label, x0 + ox, y, left ? '#f2c46a' : '#8a94a8');
+      ART.text(g, String(left), x1 + ox, y + (t > T.drain0 && left && (t & 2) ? -1 : 0), flash ? '#ffffff' : left ? '#fff6d6' : '#5f7899', 'right', '#1b2430');
+    });
+    if (t >= T.page + 22) {
+      g.fillStyle = '#3a4a5e'; for (let x = x0; x <= x1; x += 3) g.fillRect(x, 114, 2, 1);
+      const pop = c.totalPop && t - c.totalPop < 14 ? Math.exp(-(t - c.totalPop) / 4) * Math.cos((t - c.totalPop) / 1.6) : 0, rolling = t > T.drain0 && t <= T.drainEnd;
+      ART.text(g, 'PUNTOS', x0, 124, '#f2c46a');
+      const str = String(Math.floor(c.shown)).padStart(5, '0');
+      g.save(); g.translate(x1, 124); g.scale(1 + pop * .5, 1 + pop * .5); ART.text(g, str, 0, rolling && (t & 2) ? -1 : 0, rolling ? '#ffffff' : '#ffe36a', 'right', '#1b2430'); g.restore();
+    }
+  }
+  function drawRowsBody(g, c, t) {
+    const T = c.T, s = c.s, x0 = ROW.x0, x1 = ROW.x1;
     // Crías.
     const got = Math.min(s.pearls, Math.max(0, Math.floor((t - T.crias0) / CGAP) + 1) * (t >= T.crias0 ? 1 : 0));
     ART.text(g, 'Crías', x0, ROW.crias, '#9fc0cc');
@@ -379,8 +405,8 @@ const Victoria = (() => {
         if (t >= T.tricksEnd - 6) ART.text(g, c.tricks.length + '/' + all.length, x1, ROW.tricks + 4, '#e8fbff', 'right');
       }
     }
-    // Points.
-    if (t >= T.total - 8) {
+    // Points (page two shows them now).
+    if (false) {
       g.fillStyle = '#3a4a5e'; for (let x = x0; x <= x1; x += 3) g.fillRect(x, ROW.total - 5, 2, 1);
       ART.text(g, 'Puntos', x0, ROW.total, '#f2c46a');
       const str = String(Math.floor(c.shown)).padStart(5, '0'), rolling = c.shown < c.target;
@@ -474,6 +500,7 @@ const Victoria = (() => {
     }
     g.restore();
     if (c.flash > 0 && !Game.still) { g.globalAlpha = c.flash / 6 * .35; g.fillStyle = '#fffbe0'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
+    if (t > T.rank + 10) { const k = Math.min(1, (t - T.end) / (T.auto - T.end)); if (k > 0) { g.fillStyle = '#1b2430'; g.fillRect(150, 175, 100, 3); g.fillStyle = '#f2c46a'; g.fillRect(151, 176, Math.round(98 * k), 1); } }
     if (t > T.rank + 10 && (t >> 5) % 2 === 0) { const msg = (Touch.enabled ? 'Toca · ' : '') + (c.s.last ? 'Continuar →' : 'Al mapa →'); ART.text(g, msg, 200, 166, '#fff6d6', 'center', '#1b2430'); }
     else if (t < T.rank && t > 30) ART.text(g, Touch.enabled ? 'Toca para adelantar' : 'Z adelanta', W - 6, 170, '#5f7899', 'right');
   }

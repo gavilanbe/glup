@@ -1,6 +1,6 @@
 // GLUP service worker: the whole game installs for offline play. Network first,
 // cached copy as fallback. Bump CACHE whenever the shipped files change.
-const CACHE = 'glup-18';
+const CACHE = 'glup-19';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './style.css', './art.js', './mundo.js', './audio.js', './levels.js',
   './niveles/01-embarcadero.js', './niveles/02-juncos.js', './niveles/03-raices.js', './niveles/04-molino.js', './niveles/05-muelle.js', './niveles/06-turbera.js', './niveles/07-cueva.js', './niveles/08-rio.js', './niveles/09-nido.js',
   './cine.js', './titulo.js', './mapa.js', './hud.js', './aprende.js', './maestros.js', './victoria.js', './garza.js', './game.js',
