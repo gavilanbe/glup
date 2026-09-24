@@ -250,7 +250,7 @@
       '###########~~~~~~~~~',
       '###########~~~~~~~~~',
       '####################'));
-  NIVEL.registrar({ id: 'turbera', name: 'La turbera', theme: 'storm', music: 'storm', par: 260, rows: turbera,
+  NIVEL.registrar({ id: 'turbera', name: 'La turbera', theme: 'storm', music: 'turbera', par: 260, rows: turbera,
     intro: 'La turbera es blanda por fuera y hueca por dentro.',
     ruca: ['Bajo la turbera hay galerías. El topo Canto las conoce todas... pero ve fatal a oscuras. Y ojo con el barro: se traga lo que cae.',
       'Ya huele a río. La Garza bajó por la cueva de barro, al otro lado: ahí la tierra suena hueca y el agua corre por debajo.'],
