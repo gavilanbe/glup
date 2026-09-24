@@ -210,6 +210,44 @@ const Title = (() => {
     const sh = (t % 200) / 40; if (sh < 1) { g.globalAlpha = .6; g.fillStyle = '#fff6d6'; g.fillRect(Math.round(x + sh * w), 1, 3, h - 2); g.globalAlpha = 1; }
     g.restore();
   }
+  // The credit: a little signpost stuck in the bank, the name carved in the plank and the year on a tin
+  // tag that swings from two strings. It springs up out of the mud once the title is in place.
+  function drawCredit(g, t) {
+    const T0 = INTRO + 24; if (t < T0) return;
+    const k = Math.min(1, (t - T0) / 26), c = 1.9, kk = k - 1, rise = k >= 1 ? 0 : (1 - (1 + (c + 1) * kk * kk * kk + c * kk * kk)) * 34;
+    if (t === T0 + 12 && !Game.still) Sound.play('land', .5);
+    const name = 'gavilanbe', tw = ART.textWidth(name), w = tw + 14, h = 13, px = W - 8 - Math.round(w / 2), top = H - 30 + Math.round(rise);
+    // The post, driven into the mud with a little mound and a tuft of grass.
+    g.fillStyle = '#1a1420'; g.fillRect(px - 2, top + 4, 5, H - top); g.fillStyle = '#6b4a30'; g.fillRect(px - 1, top + 4, 3, H - top); g.fillStyle = '#8a5a34'; g.fillRect(px - 1, top + 4, 1, H - top);
+    g.fillStyle = '#1a1420'; g.fillRect(px - 6, H - 3, 13, 3); g.fillStyle = '#3a2a22'; g.fillRect(px - 5, H - 2, 11, 2);
+    g.fillStyle = '#5e8a2e'; for (const [dx, hh] of [[-6, 4], [-4, 6], [4, 5], [6, 3]]) g.fillRect(px + dx, H - 2 - hh, 1, hh); g.fillStyle = '#8fbf4a'; g.fillRect(px - 4, H - 8, 1, 2); g.fillRect(px + 4, H - 7, 1, 2);
+    // The plank sways a hair around its nail on the post.
+    const ang = Math.sin(t / 55) * .025 + (k < 1 ? Math.sin(k * 9) * (1 - k) * .12 : 0);
+    g.save(); g.translate(px + .5, top + 6); g.rotate(ang);
+    const x = -Math.round(w / 2), y = -6;
+    g.fillStyle = '#1a1420'; g.fillRect(x - 1, y - 1, w + 2, h + 2); g.fillRect(x - 2, y + 1, w + 4, h - 2);
+    g.fillStyle = '#8a5a34'; g.fillRect(x, y, w, h); g.fillStyle = '#a56f38'; g.fillRect(x, y, w, 2); g.fillRect(x, y + 6, w, 1); g.fillStyle = '#6b4a30'; g.fillRect(x, y + h - 2, w, 2);
+    g.fillStyle = '#7a4e2c'; for (let i = 5; i < w - 3; i += 9) g.fillRect(x + i, y + 3 + (i % 2), 3, 1);
+    g.fillStyle = '#5e8a2e'; for (let i = 0; i < w; i += 4) g.fillRect(x + i + ((i * 7) % 3), y - 1, 2 + (i % 2), 1); g.fillStyle = '#8fbf4a'; g.fillRect(x + 3, y - 1, 1, 1); g.fillRect(x + w - 8, y - 1, 1, 1);
+    g.fillStyle = '#c9b08a'; g.fillRect(x + 2, y + 2, 1, 1); g.fillRect(x + w - 3, y + 2, 1, 1);
+    // Carved letters filled with cream paint: the dark groove shows above and to the left.
+    ART.text(g, name, -1, y + 2, '#2a1810', 'center'); ART.text(g, name, 0, y + 3, '#fff3b8', 'center', '#4a2e1a');
+    const sh = ((t + 90) % 260) / 50; if (sh < 1) { g.globalAlpha = .45; g.fillStyle = '#fff6d6'; g.fillRect(Math.round(x + sh * w), y + 1, 2, h - 2); g.globalAlpha = 1; }
+    // The year on a tin tag, hanging from two strings and swinging on its own.
+    const yr = '2026', yw = ART.textWidth(yr) + 6, ta = Math.sin(t / 32 + 1) * .12 + (k < 1 ? Math.sin(k * 7) * (1 - k) * .5 : 0), ty = y + h + 1;
+    g.save(); g.translate(0, ty); g.rotate(ta);
+    g.fillStyle = '#b8a888'; for (let i = 0; i < 4; i++) { g.fillRect(-yw / 2 + 2, i, 1, 1); g.fillRect(yw / 2 - 3, i, 1, 1); }
+    g.fillStyle = '#1a1420'; g.fillRect(-yw / 2 - 1, 3, yw + 2, 11); g.fillStyle = '#d8d0c0'; g.fillRect(-yw / 2, 4, yw, 9); g.fillStyle = '#f2ecdc'; g.fillRect(-yw / 2, 4, yw, 1); g.fillStyle = '#a89c88'; g.fillRect(-yw / 2, 12, yw, 1);
+    ART.text(g, yr, 0, 5, '#4a3a30', 'center');
+    g.restore();
+    g.restore();
+    // Now and then a firefly comes to rest on the plank.
+    const f = (t - T0) % 420; if (f > 120 && f < 330) {
+      const land = f > 180 && f < 280, u = land ? 0 : f <= 180 ? 1 - (f - 120) / 60 : (f - 280) / 50;
+      const fx = Math.round(px + w / 2 - 5 + Math.sin(f / 7) * 10 * u + u * 16), fy = Math.round(top - 1 - u * 22 + Math.cos(f / 9) * 4 * u), glow = land ? .6 + Math.sin(f / 6) * .4 : 1;
+      g.globalAlpha = .25 * glow; g.fillStyle = '#f2f5a0'; g.fillRect(fx - 2, fy - 2, 5, 5); g.globalAlpha = glow; g.fillStyle = '#ffffe0'; g.fillRect(fx, fy, 1, 1); g.globalAlpha = 1;
+    }
+  }
   // A press on the title: the letters hop and the sign swings before the fade.
   function press(t) { for (let i = 0; i < 4; i++) hop(i, t + i * 2); if (S.sign) S.sign.va += .05; S.flash = 4; }
   function draw(g, t) {
@@ -246,7 +284,7 @@ const Title = (() => {
       g.globalAlpha = .7 + a * .3; ART.text(g, msg, W / 2 + 4, 160, '#fff6d6', 'center', '#1b2430'); g.globalAlpha = 1;
       const bx = mx + 6 + Math.round(Math.sin(t / 8) * 1.5); g.fillStyle = '#f2c46a'; g.fillRect(bx, 160, 1, 5); g.fillRect(bx + 1, 161, 1, 3); g.fillRect(bx + 2, 162, 1, 1);
     }
-    ART.text(g, 'gavilanbe · 2026', W - 4, H - 9, '#6a5a78', 'right');
+    drawCredit(g, t);
     // Coming straight from the cinematic: the white flash fades into the vista.
     if (S.whiteIn && t < 30) { g.globalAlpha = 1 - t / 30; g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
   }
