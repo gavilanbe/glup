@@ -11,43 +11,68 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; background: #
 body.touch .touch-only { display: flex; }
 body.touch #hint { display: none; }
 
-/* Buttons share one language: dark glass with a whisker-orange edge when held. */
-.touch-only button { appearance: none; border: 2px solid rgba(207, 224, 232, .35); background: rgba(27, 36, 48, .55); color: #e8fbff; font: 700 15px/1 system-ui, sans-serif; border-radius: 50%; width: 56px; height: 56px; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; touch-action: none; -webkit-user-select: none; user-select: none; transition: transform .06s, background .06s; }
-.touch-only button:focus-visible { outline: 2px solid #e79b3f; outline-offset: 2px; }
-.touch-only button.held, .touch-only button:active { background: rgba(231, 155, 63, .75); border-color: #fff6d6; color: #1b2430; transform: scale(.94); }
-.touch-only button span { font-size: 9px; font-weight: 500; opacity: .85; }
-#touch-top { position: absolute; top: max(6px, env(safe-area-inset-top)); right: max(6px, env(safe-area-inset-right)); gap: 6px; z-index: 3; }
-#touch-top button { width: 38px; height: 38px; font-size: 14px; border-radius: 10px; }
+/* The controls are part of the swamp: a lily pad under the left thumb and three pixel-art buttons
+   under the right one, glassy so the game shows through, with a squash, a ripple and a buzz on press. */
+.touch-only button { appearance: none; border: 0; padding: 0; background: none; color: #e8fbff; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.touch-only canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; pointer-events: none; background: none; }
+.touch-only button:focus-visible { outline: 2px solid #e79b3f; outline-offset: 3px; }
+
+#touch-top { position: absolute; top: max(6px, env(safe-area-inset-top)); right: max(6px, env(safe-area-inset-right)); gap: 6px; z-index: 4; }
+#touch-top button { width: 38px; height: 38px; font: 700 14px/1 system-ui, sans-serif; border-radius: 10px; background: rgba(18, 12, 24, .55); border: 2px solid rgba(242, 196, 106, .45); box-shadow: 0 2px 0 rgba(0, 0, 0, .35); display: flex; align-items: center; justify-content: center; }
+#touch-top button:active { transform: translateY(1px) scale(.94); background: rgba(231, 155, 63, .8); color: #1b1420; }
 #touch-sound.off { opacity: .55; }
-#touch-pad { position: absolute; left: max(10px, env(safe-area-inset-left)); bottom: max(10px, env(safe-area-inset-bottom)); gap: 8px; z-index: 3; padding: 6px; border-radius: 40px; background: rgba(16, 20, 28, .35); }
-#touch-pad button { width: 64px; height: 64px; font-size: 22px; }
-#touch-buttons { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); gap: 8px; z-index: 3; align-items: flex-end; }
-#touch-buttons .big { width: 74px; height: 74px; }
-#touch-buttons .fish { border-color: rgba(231, 155, 63, .8); }
-#touch-buttons .jump { border-color: rgba(242, 197, 61, .8); }
-#touch-buttons .aim { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
-#touch-buttons .small { width: 46px; height: 46px; }
-#touch-buttons .mid { width: 56px; height: 56px; margin-bottom: 10px; border-color: rgba(191, 224, 238, .8); }
-#touch-buttons .mid.locked { opacity: .3; }
-body.in-menu #touch-pad, body.in-menu #touch-buttons { opacity: .45; }
 
-/* Portrait: the swamp on top, the controls in their own band underneath. */
-body.portrait #shell { grid-template-rows: auto minmax(0, 1fr); padding-top: max(0px, env(safe-area-inset-top)); }
-body.portrait #screen { width: 100%; aspect-ratio: 16 / 9; align-items: flex-start; }
-body.portrait #touch-top { position: absolute; top: max(6px, env(safe-area-inset-top)); right: 6px; }
-body.portrait #touch-pad, body.portrait #touch-buttons { position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); }
-body.portrait #touch-pad { left: max(14px, env(safe-area-inset-left)); background: none; }
-body.portrait #touch-pad button { width: 72px; height: 72px; }
-body.portrait #touch-buttons { right: max(14px, env(safe-area-inset-right)); }
-body.portrait #touch-buttons .big { width: 84px; height: 84px; }
-body.portrait #touch-buttons .small { width: 52px; height: 52px; }
-body.portrait #touch-buttons .mid { width: 62px; height: 62px; }
+/* Left: the floating stick. Touch anywhere in the zone and the pad jumps under the thumb. */
+#stick-zone { position: absolute; left: 0; bottom: 0; width: 46%; height: 72%; z-index: 3; touch-action: none; }
+#stick { position: absolute; width: 132px; height: 132px; margin: -66px 0 0 -66px; left: calc(max(14px, env(safe-area-inset-left)) + 74px); top: calc(100% - max(14px, env(safe-area-inset-bottom)) - 74px); opacity: .5; transition: opacity .15s, transform .12s; pointer-events: none; }
+#stick.on { opacity: .95; transition: opacity .05s; }
+#stick.snap { transition: left .14s cubic-bezier(.3, 1.6, .5, 1), top .14s cubic-bezier(.3, 1.6, .5, 1), opacity .25s; }
+#stick .base { width: 132px; height: 132px; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .35)); }
+#stick .knob { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; margin: -31px 0 0 -31px; filter: drop-shadow(0 4px 2px rgba(0, 0, 0, .4)); will-change: transform; }
 
-@media (max-height: 360px) and (orientation: landscape) {
-  #touch-pad button { width: 52px; height: 52px; }
-  #touch-buttons .big { width: 60px; height: 60px; }
-  #touch-buttons .small { width: 40px; height: 40px; }
-  #touch-buttons .mid { width: 46px; height: 46px; }
-  #touch-buttons .big span { display: none; }
+/* Right: jump, Bigotes and the puff in a thumb arc; "talk" pops up above them when someone is near. */
+#touch-buttons { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: 200px; height: 212px; z-index: 3; pointer-events: none; }
+#touch-buttons button { position: absolute; pointer-events: auto; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: transform .07s, opacity .2s; }
+#touch-buttons .act { --ring: rgba(242, 196, 106, .9); --fill: rgba(40, 26, 36, .5); background: radial-gradient(circle at 50% 38%, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 60%), var(--fill); box-shadow: inset 0 0 0 3px var(--ring), inset 0 -5px 0 rgba(0, 0, 0, .28), 0 3px 0 rgba(0, 0, 0, .4); }
+#touch-buttons .jump canvas, #touch-buttons .fish canvas { width: 72px; height: 72px; }
+#touch-buttons .puff canvas { width: 48px; height: 48px; }
+#touch-buttons .jump { right: 0; bottom: 0; width: 84px; height: 84px; --ring: #f2c43d; --fill: rgba(92, 62, 20, .5); }
+#touch-buttons .fish { right: 94px; bottom: 20px; width: 84px; height: 84px; --ring: #7fd0a0; --fill: rgba(22, 60, 52, .5); }
+#touch-buttons .puff { right: 52px; bottom: 102px; width: 62px; height: 62px; --ring: #a8d8f0; --fill: rgba(28, 46, 66, .5); }
+#touch-buttons .fish::before { content: ""; position: absolute; inset: -5px; border-radius: 50%; background: conic-gradient(var(--charge-col, #f2c46a) calc(var(--charge, 0) * 1turn), transparent 0); -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%); mask: radial-gradient(circle, transparent 62%, #000 63%); pointer-events: none; }
+#touch-buttons .fish.full::before { animation: glow .3s steps(2) infinite; }
+#touch-buttons .act.held { transform: scale(.88); --fill: rgba(255, 246, 214, .42); }
+#touch-buttons .act.locked { opacity: .28; }
+#touch-buttons .act.hot { animation: hot .7s ease-in-out infinite; }
+#touch-buttons .act::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--ring); opacity: 0; pointer-events: none; }
+#touch-buttons .act.ripple::after { animation: ripple .38s ease-out; }
+#touch-buttons .talk { right: 40px; bottom: 174px; width: 112px; height: 34px; border-radius: 15px 15px 15px 4px; background: #fff6d6; box-shadow: inset 0 0 0 2px #1b1420, inset 0 -4px 0 #e6d2a0, 0 3px 0 rgba(0, 0, 0, .4); opacity: 0; transform: scale(.4) translateY(20px); pointer-events: none; transition: transform .18s cubic-bezier(.3, 1.8, .5, 1), opacity .12s; }
+#touch-buttons .talk canvas { width: 96px; height: 28px; }
+#touch-buttons .talk.show { opacity: 1; transform: none; pointer-events: auto; animation: bob 1s ease-in-out infinite .2s; }
+#touch-buttons .talk.held { transform: scale(.9); animation: none; }
+@keyframes ripple { from { opacity: .9; transform: scale(.9); } to { opacity: 0; transform: scale(1.45); } }
+@keyframes glow { 50% { filter: brightness(1.6); } }
+@keyframes hot { 50% { box-shadow: inset 0 0 0 3px #fff6d6, inset 0 -5px 0 rgba(0, 0, 0, .28), 0 3px 0 rgba(0, 0, 0, .4), 0 0 14px rgba(255, 246, 214, .55); } }
+@keyframes bob { 50% { transform: translateY(-3px); } }
+
+/* Outside the level (title, map, tallies, cinematics) the pads step aside: the screen is tapped instead. */
+body.in-menu #stick-zone, body.in-menu #touch-buttons { opacity: 0; pointer-events: none; transition: opacity .2s; }
+body.in-menu #touch-buttons button { pointer-events: none; }
+body.in-play #stick-zone, body.in-play #touch-buttons { transition: opacity .3s; }
+
+/* Portrait: the swamp on top, the controls on a wooden jetty underneath. */
+body.portrait #shell { grid-template-rows: auto minmax(0, 1fr); padding-top: max(0px, env(safe-area-inset-top)); background: linear-gradient(#10141c 0, #10141c 56.25vw, #1a2a30 calc(56.25vw + 1px), #122026 100%); }
+body.portrait #screen { width: 100%; aspect-ratio: 16 / 9; align-items: flex-start; box-shadow: 0 4px 0 #3a2a22, 0 7px 0 #1b1420; z-index: 1; }
+body.portrait #touch-top { top: calc(56.25vw + max(0px, env(safe-area-inset-top)) + 14px); right: 12px; }
+body.portrait #stick-zone { width: 50%; height: auto; top: calc(56.25vw + max(0px, env(safe-area-inset-top)) + 60px); }
+body.portrait #stick { left: 82px; top: calc(100% - max(44px, env(safe-area-inset-bottom) + 28px) - 70px); }
+body.portrait #touch-buttons { right: max(8px, env(safe-area-inset-right)); bottom: max(44px, calc(env(safe-area-inset-bottom) + 28px)); }
+#rotate-hint { display: none; background: none; image-rendering: pixelated; pointer-events: none; }
+body.portrait.in-play #rotate-hint { display: block; position: absolute; left: 14px; top: calc(56.25vw + max(0px, env(safe-area-inset-top)) + 14px); width: 208px; height: 36px; z-index: 2; opacity: .8; }
+@media (max-height: 700px) and (orientation: portrait) { body.portrait.in-play #rotate-hint { display: none; background: none; image-rendering: pixelated; pointer-events: none; } }
+
+@media (max-height: 380px) and (orientation: landscape) {
+  #stick { transform: scale(.82); }
+  #touch-buttons { transform: scale(.82); transform-origin: 100% 100%; }
 }
-@media (prefers-reduced-motion: reduce) { .touch-only button { transition: none; } .touch-only button.held { transform: none; } }
+@media (prefers-reduced-motion: reduce) { #touch-buttons button, #stick { transition: none; animation: none !important; } }

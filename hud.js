@@ -92,9 +92,18 @@ const Hud = (() => {
     const face = p.spitT > 6 ? ART.fish.spit : full ? ART.fish.squint : held ? ART.fish.full : p.sucking ? ART.fish.open : (t % 200) < 6 || p.hurtT > 0 ? ART.fish.blink : ART.fish.closed;
     g.save(); g.beginPath(); g.arc(mx, my, MED.r - .5, 0, 7); g.clip(); const fw = face.width; g.drawImage(face, fw - 15, 0, 15, face.height, Math.round(mx - 8 + jit), Math.round(my - face.height / 2), 15, face.height);
     Player.fishOverlay(g, face, Math.round(mx - 8 + jit) - (fw - 15), Math.round(my - face.height / 2), t, { noWhiskers: true, mood: p.hurtT > 0 || p.dizzyT > 40 ? 'sad' : p.happyT > 0 ? 'happy' : p.sucking || charge > 8 ? 'mad' : p.idleT > 900 ? 'sleep' : null, lx: 1 });
-    if (p.sucking && !held) { g.fillStyle = '#cfe8f0'; for (let i = 0; i < 4; i++) { const k = ((t * .15 + i * .25) % 1); g.fillRect(Math.round(mx + 10 - k * 8), Math.round(my - 3 + i * 2), 2, 1); } }
+    if (p.sucking && !held) {
+      const lv = p.suckLv || 1, n = 2 + lv * 2; g.fillStyle = lv === 3 ? '#fff6d6' : '#cfe8f0';
+      for (let i = 0; i < n; i++) { const k = ((t * (.12 + lv * .05) + i / n) % 1); g.fillRect(Math.round(mx + 10 - k * 8), Math.round(my - 4 + (i * 9 / n)), 2 + (lv === 3 ? 1 : 0), 1); }
+    }
     g.restore();
     ring(g, mx, my, MED.r + 1, '#f2c46a', 0, 1, 1); ring(g, mx, my, MED.r, '#8a6a3a', 0, 1, 1);
+    if (p.sucking && !held) {
+      const lv = p.suckLv || 1;
+      // The steps of the inhale: three little pips that light up one by one.
+      for (let i = 0; i < 3; i++) { const on = i < lv, px = Math.round(mx - 7 + i * 6), py = Math.round(my + MED.r + 3), pop = on && i === lv - 1 && p.suckPulse > 8 ? 1 : 0;
+        g.fillStyle = '#120c18'; g.fillRect(px - 1 - pop, py - 1 - pop, 5 + pop * 2, 5 + pop * 2); g.fillStyle = on ? (lv === 3 ? '#f2c46a' : '#8fe0f0') : '#3a4658'; g.fillRect(px - pop, py - pop, 3 + pop * 2, 3 + pop * 2); if (on) { g.fillStyle = '#ffffff'; g.fillRect(px - pop, py - pop, 1, 1); } }
+    }
     // The bubble with what's inside.
     const bx = BUBBLE.x, by = BUBBLE.y, br = BUBBLE.r, deflate = out ? 1 - Math.sin(outK * Math.PI) * .25 : 1;
     g.save(); g.translate(bx, by); g.scale(gs * deflate, (2 - gs) * deflate + (deflate < 1 ? .1 : 0)); g.translate(-bx, -by);

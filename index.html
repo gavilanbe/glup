@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GLUP">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 <main id="shell" aria-label="GLUP">
@@ -23,21 +23,21 @@
     <button type="button" id="touch-sound" aria-label="Sonido" aria-pressed="false">♪</button>
     <button type="button" id="touch-fs" aria-label="Pantalla completa">⛶</button>
   </nav>
-  <div id="touch-pad" class="touch-only" aria-label="Cruceta">
-    <button type="button" data-act="left" aria-label="Izquierda">◀</button>
-    <button type="button" data-act="right" aria-label="Derecha">▶</button>
+  <canvas id="rotate-hint" class="touch-only" width="104" height="18" aria-hidden="true"></canvas>
+  <div id="stick-zone" class="touch-only" aria-label="Cruceta: arrastra el pulgar">
+    <div id="stick"><canvas class="base" width="66" height="66"></canvas><canvas class="knob" width="31" height="31"></canvas></div>
   </div>
   <div id="touch-buttons" class="touch-only" aria-label="Acciones">
-    <div class="aim"><button type="button" data-act="up" class="small" aria-label="Arriba">▲</button><button type="button" data-act="down" class="small" aria-label="Abajo">▼</button></div>
-    <button type="button" data-act="puff" class="mid puff"><b>Soplo</b></button>
-    <button type="button" data-act="fish" class="big fish"><b>Bigotes</b><span>sorber · escupir</span></button>
-    <button type="button" data-act="jump" class="big jump"><b>Salto</b></button>
+    <button type="button" data-act="up" class="talk" aria-label="Hablar"><canvas width="48" height="14"></canvas></button>
+    <button type="button" data-act="puff" class="act puff" aria-label="Soplo"><canvas width="24" height="24"></canvas></button>
+    <button type="button" data-act="fish" class="act fish" aria-label="Bigotes: mantén para sorber, suelta para escupir"><canvas width="36" height="36"></canvas></button>
+    <button type="button" data-act="jump" class="act jump" aria-label="Salto"><canvas width="36" height="36"></canvas></button>
   </div>
 </main>
 <div id="hint" hidden>Flechas o WASD · Z salta (otra vez en el aire: aleteo) · X: mantén para sorber, pulsa para escupir · C: soplar · ↑ apunta arriba · ↓ agacha, desliza, suelta; ↓ y Z: planchazo · Esc pausa · M sonido</div>
 <script>
 (function () {
-  const version = location.protocol === 'file:' ? Date.now() : '24';
+  const version = location.protocol === 'file:' ? Date.now() : '25';
   const niveles = ['01-embarcadero', '02-juncos', '03-raices', '04-molino', '05-muelle', '06-turbera', '07-cueva', '08-rio', '09-nido'].map(n => 'niveles/' + n + '.js');
   for (const src of ['art.js', 'mundo.js', 'audio.js', 'levels.js', ...niveles, 'cine.js', 'titulo.js', 'mapa.js', 'hud.js', 'aprende.js', 'letra.js', 'maestros.js', 'barca.js', 'victoria.js', 'garza.js', 'game.js']) document.write('<script src="' + src + '?v=' + version + '"><\/script>');
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !location.search.includes('escena')) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

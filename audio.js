@@ -89,6 +89,7 @@ const Sound = (() => {
     clear() { const t = ctx.currentTime; ['C5', 'E5', 'G5', 'C6', 'G5', 'C6'].forEach((n, i) => osc('triangle', freq(n), t + i * .1, .25, .16, sfxBus, null, .005, .15)); },
     text() { const t = ctx.currentTime; osc('square', 1200, t, .02, .05, sfxBus, null, .002, .02); },
     splash() { const t = ctx.currentTime; noise(t, .4, .35, 'lowpass', 2000, 300, .7); osc('sine', 400, t, .15, .12, sfxBus, 80); },
+    suckup(lv = 2) { const t = ctx.currentTime, k = [1, 1.26, 1.5][lv - 1]; noise(t, .22, .1 + lv * .04, 'bandpass', 500 * lv, 2600 * lv, 2); osc('triangle', 330 * k, t, .14, .12, sfxBus, 700 * k, .005, .08); if (lv === 3) osc('square', 990, t + .08, .12, .07, sfxBus, 1480, .003, .06); },
     charge() { const t = ctx.currentTime; osc('sawtooth', 120, t, .55, .08, sfxBus, 420, .05, .2); },
     charged() { const t = ctx.currentTime; osc('square', 660, t, .06, .12, sfxBus, null, .003, .04); osc('square', 990, t + .06, .1, .12, sfxBus, null, .003, .06); noise(t, .12, .1, 'highpass', 3000); },
     bigspit() { const t = ctx.currentTime; noise(t, .3, .45, 'bandpass', 500, 3000, 1.2); osc('square', 140, t, .12, .2, sfxBus, 1200); osc('sine', 60, t, .18, .3, sfxBus, 30); },
@@ -121,6 +122,12 @@ const Sound = (() => {
     win() { const t = ctx.currentTime; ['D4', 'F4', 'A4', 'D5', 'C5', 'D5', 'F5', 'A5'].forEach((n, i) => osc('triangle', freq(n), t + i * .12, .3, .16, sfxBus, null, .005, .2)); } };
   function play(name, arg) { if (!ctx || muted) return; try { sfx[name] && sfx[name](arg); } catch (e) { /* audio is never fatal */ } }
   // The suction is a looping wind: a noise through a bandpass that rises while the mouth is open.
+  // Each step of the inhale: the wind climbs, gets louder and wobbles faster.
+  function suckLevel(lv) {
+    if (!ctx || !suckNode) return; const n = suckNode, t = ctx.currentTime;
+    n.fl.frequency.cancelScheduledValues(t); n.fl.frequency.setTargetAtTime([1400, 1900, 2600][lv - 1], t, .08);
+    n.g.gain.setTargetAtTime([.22, .28, .34][lv - 1], t, .05); n.lfo.frequency.setTargetAtTime([9, 13, 19][lv - 1], t, .05);
+  }
   function suck(on) {
     if (!ctx) return;
     if (on && !suckNode) {
@@ -128,7 +135,7 @@ const Sound = (() => {
       const fl = ctx.createBiquadFilter(); fl.type = 'bandpass'; fl.Q.value = 3; fl.frequency.setValueAtTime(400, ctx.currentTime); fl.frequency.linearRampToValueAtTime(1400, ctx.currentTime + 1.2);
       const g = ctx.createGain(); g.gain.setValueAtTime(0, ctx.currentTime); g.gain.linearRampToValueAtTime(.22, ctx.currentTime + .15);
       const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 9; lg.gain.value = 300; lfo.connect(lg); lg.connect(fl.frequency); lfo.start();
-      src.connect(fl); fl.connect(g); g.connect(sfxBus); src.start(); suckNode = { src, g, lfo };
+      src.connect(fl); fl.connect(g); g.connect(sfxBus); src.start(); suckNode = { src, g, lfo, fl };
     } else if (!on && suckNode) {
       const n = suckNode; suckNode = null; n.g.gain.setTargetAtTime(0, ctx.currentTime, .05); n.src.stop(ctx.currentTime + .3); n.lfo.stop(ctx.currentTime + .3);
     }
@@ -360,5 +367,5 @@ const Sound = (() => {
   function stopMusic() { music.name = null; music.song = null; }
   function duck(on) { if (musicBus) musicBus.gain.setTargetAtTime(on ? .18 : .5, ctx.currentTime, .1); }
   function resume() { if (ctx && ctx.state === 'suspended') ctx.resume(); if (music.song && ctx) music.next = Math.max(music.next, ctx.currentTime + .05); }
-  return { init, play, suck, jet, rain, playMusic, stopMusic, duck, setMuted, isMuted, resume, get ready() { return !!ctx; } };
+  return { init, play, suck, suckLevel, jet, rain, playMusic, stopMusic, duck, setMuted, isMuted, resume, get ready() { return !!ctx; } };
 })();

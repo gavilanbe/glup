@@ -35,42 +35,78 @@ const Input = {
   },
   endFrame() { Input.pressed = {}; },
   rumble(ms, strong, weak) {
+    // On a phone the same moments buzz the hand: only the ones with weight, kept short.
+    if (Input.mode === 'touch' && strong >= .3) Touch.buzz(Math.round(Math.min(45, 6 + ms * .12 * strong)));
     if (Game.still || !navigator.getGamepads) return;
     for (const p of navigator.getGamepads()) { const a = p && p.vibrationActuator; if (a && a.playEffect) a.playEffect('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: weak }).catch(() => { }); }
   }
 };
 
-// Touch shell: the HTML buttons around or over the canvas feed the same actions.
+// Touch shell: a floating lily-pad stick under the left thumb and pixel-art buttons under the right one.
+// The buttons read the game every frame: Bigotes' face and what he will do ("sorbe", "escupe", "flota"),
+// the inhale steps and the charge on a ring, what the jump will be, and a "hablar" bubble when someone is near.
 const Touch = {
-  enabled: false, portrait: false, pointers: new Map(), buttons: [],
+  enabled: false, portrait: false, pointers: new Map(), buttons: [], dirs: new Set(), stick: { id: null, ox: 0, oy: 0 }, keys: {},
   forced: /(?:\?|&)touch=1(?:&|$)/.test(location.search),
   init() {
     Touch.buttons = [...document.querySelectorAll('[data-act]')];
     for (const b of Touch.buttons) {
       const act = b.dataset.act;
-      b.addEventListener('pointerdown', e => { e.preventDefault(); if (act === 'pause' || act === 'mute' || act === 'fullscreen') { Sound.init(); Input.press(act); Input.mode = 'touch'; return; } Touch.pointers.set(e.pointerId, act); b.setPointerCapture && b.setPointerCapture(e.pointerId); Touch.apply(); });
+      b.addEventListener('pointerdown', e => {
+        e.preventDefault(); e.stopPropagation();
+        if (act === 'pause' || act === 'mute' || act === 'fullscreen') { Sound.init(); Input.press(act); Input.mode = 'touch'; Touch.buzz(10); return; }
+        Touch.pointers.set(e.pointerId, act); b.setPointerCapture && b.setPointerCapture(e.pointerId); Touch.buzz(act === 'jump' ? 12 : 9); Touch.ripple(b); Touch.apply();
+      });
       const end = e => { if (Touch.pointers.has(e.pointerId)) { Touch.pointers.delete(e.pointerId); Touch.apply(); } };
       b.addEventListener('pointerup', end); b.addEventListener('pointercancel', end); b.addEventListener('lostpointercapture', end);
       b.addEventListener('contextmenu', e => e.preventDefault());
     }
-    // Sliding a thumb across the pad switches direction without lifting.
-    const pad = $('touch-pad');
-    pad.addEventListener('pointermove', e => {
-      if (!Touch.pointers.has(e.pointerId)) return; const r = pad.getBoundingClientRect();
-      const act = e.clientX < r.left + r.width / 2 ? 'left' : 'right';
-      if (Touch.pointers.get(e.pointerId) !== act) { Touch.pointers.set(e.pointerId, act); Touch.apply(); }
+    // The stick: it appears under the thumb wherever it lands on the left, and follows if the thumb runs off.
+    const zone = $('stick-zone'), st = $('stick'), S = Touch.stick;
+    zone.addEventListener('pointerdown', e => {
+      e.preventDefault(); if (S.id !== null) return; S.id = e.pointerId; zone.setPointerCapture && zone.setPointerCapture(e.pointerId);
+      const r = zone.getBoundingClientRect(); S.ox = clamp(e.clientX - r.left, 60, r.width - 30); S.oy = clamp(e.clientY - r.top, 60, r.height - 60);
+      st.classList.remove('snap'); st.classList.add('on'); st.style.left = S.ox + 'px'; st.style.top = S.oy + 'px'; Sound.init(); Input.mode = 'touch';
+      Touch.stickMove(e.clientX, e.clientY);
     });
+    zone.addEventListener('pointermove', e => { if (e.pointerId === S.id) Touch.stickMove(e.clientX, e.clientY); });
+    const up = e => {
+      if (e.pointerId !== S.id) return; S.id = null;
+      st.classList.add('snap'); st.classList.remove('on'); st.style.left = ''; st.style.top = ''; Touch.knob.style.transform = '';
+      Touch.dirs = new Set(); Touch.apply(); Touch.drawBase();
+    };
+    zone.addEventListener('pointerup', up); zone.addEventListener('pointercancel', up); zone.addEventListener('lostpointercapture', up);
+    zone.addEventListener('contextmenu', e => e.preventDefault());
+    Touch.knob = st.querySelector('.knob'); Touch.base = st.querySelector('.base').getContext('2d');
+    const btn = a => Touch.buttons.find(b => b.dataset.act === a);
+    Touch.btn = { fish: btn('fish'), jump: btn('jump'), puff: btn('puff'), talk: btn('up') };
+    Touch.ctx = {}; for (const k in Touch.btn) Touch.ctx[k] = Touch.btn[k].querySelector('canvas').getContext('2d');
+    Touch.drawBase(); Touch.drawKnob();
     Touch.layout(); addEventListener('resize', Touch.layout);
   },
+  stickMove(cx, cy) {
+    const S = Touch.stick, r = $('stick-zone').getBoundingClientRect(), sc = Touch.portrait ? 1.12 : innerHeight <= 380 ? .82 : 1, R = 38 * sc, FOLLOW = 64 * sc;
+    let dx = cx - r.left - S.ox, dy = cy - r.top - S.oy, len = Math.hypot(dx, dy);
+    if (len > FOLLOW) { const k = (len - FOLLOW) / len; S.ox += dx * k; S.oy += dy * k; dx -= dx * k; dy -= dy * k; len = FOLLOW; const st = $('stick'); st.style.left = S.ox + 'px'; st.style.top = S.oy + 'px'; }
+    const k = len > R ? R / len : 1; Touch.knob.style.transform = 'translate(' + (dx * k / sc).toFixed(1) + 'px,' + (dy * k / sc).toFixed(1) + 'px)';
+    // Eight ways, but a stricter cone for ↓ (crouching mid-run by accident is the worst) and a dead zone.
+    const d = new Set();
+    if (len > 12 * sc) { const c = dx / len, sn = dy / len; if (c > .38) d.add('right'); if (c < -.38) d.add('left'); if (sn < -.55) d.add('up'); if (sn > .62) d.add('down'); }
+    const was = [...Touch.dirs].sort().join(), now = [...d].sort().join();
+    if (was !== now) { Touch.dirs = d; if (now && (d.has('up') || d.has('down') || !was)) Touch.buzz(5); Touch.apply(); Touch.drawBase(); }
+  },
   apply() {
-    const held = new Set(Touch.pointers.values());
-    for (const a of ['left', 'right', 'up', 'down', 'jump', 'fish']) {
+    const held = new Set([...Touch.pointers.values(), ...Touch.dirs]);
+    for (const a of ['left', 'right', 'up', 'down', 'jump', 'fish', 'puff']) {
       const now = held.has(a); if (now && !Input.touchHeld[a]) { Input.press(a); Input.mode = 'touch'; } Input.touchHeld[a] = now;
     }
-    for (const b of Touch.buttons) b.classList.toggle('held', held.has(b.dataset.act));
+    const pressed = new Set(Touch.pointers.values());
+    for (const b of Touch.buttons) b.classList.toggle('held', pressed.has(b.dataset.act));
     Input.sync();
   },
-  release() { Touch.pointers.clear(); for (const b of Touch.buttons) b.classList.remove('held'); },
+  release() { Touch.pointers.clear(); Touch.dirs = new Set(); for (const b of Touch.buttons) b.classList.remove('held'); if (Touch.knob) { Touch.knob.style.transform = ''; Touch.stick.id = null; $('stick').classList.remove('on'); } },
+  buzz(ms) { if (!Touch.enabled || Game.still || Save.data.noBuzz) return; try { navigator.vibrate && navigator.vibrate(ms); } catch (e) { /* not on this phone */ } },
+  ripple(b) { b.classList.remove('ripple'); void b.offsetWidth; b.classList.add('ripple'); },
   layout() {
     const coarse = matchMedia('(any-pointer: coarse)').matches;
     Touch.enabled = Touch.forced || coarse || (innerWidth <= 900 && innerHeight <= 500);
@@ -78,6 +114,88 @@ const Touch = {
     document.body.classList.toggle('touch', Touch.enabled);
     document.body.classList.toggle('portrait', Touch.enabled && Touch.portrait);
     Screen.fit();
+  },
+  // ---- pixel art for the pads
+  disc(g, cx, cy, r, col, test) { g.fillStyle = col; for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (x * x + y * y <= r * r + r * .8 && (!test || test(x, y))) g.fillRect(cx + x, cy + y, 1, 1); },
+  drawBase() {
+    // A lily pad with its notch, veins and four arrows that light up gold with the direction held.
+    const g = Touch.base, c = 33, D = Touch.dirs; g.clearRect(0, 0, 66, 66);
+    const notch = (x, y) => !(y < 0 && Math.abs(x) < -y * .35);
+    Touch.disc(g, c, c + 1, 31, '#1b1420', notch); Touch.disc(g, c, c, 30, '#2f6a3a', notch); Touch.disc(g, c, c - 1, 28, '#3f8a44', notch); Touch.disc(g, c - 3, c - 5, 20, '#4fa24c', (x, y) => notch(x + 3, y - 5) && x * x + y * y < 380);
+    g.fillStyle = '#2f6a3a'; for (let k = 0; k < 7; k++) { const a = -Math.PI / 2 + .6 + k * .74; for (let r = 5; r < 26; r += 1) g.fillRect(Math.round(c + Math.cos(a) * r), Math.round(c + Math.sin(a) * r), 1, 1); }
+    g.fillStyle = '#8fd06a'; for (let k = 0; k < 16; k++) { const a = k / 16 * 6.28 + 2.2; g.fillRect(Math.round(c + Math.cos(a) * 29), Math.round(c - 1 + Math.sin(a) * 28), 1, 1); }
+    const arrow = (dir, x, y) => {
+      const on = D.has(dir), shape = { up: [[0, -3], [-1, -2], [0, -2], [1, -2], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1]], down: [[0, 3], [-1, 2], [0, 2], [1, 2], [-2, 1], [-1, 1], [0, 1], [1, 1], [2, 1]], left: [[-3, 0], [-2, -1], [-2, 0], [-2, 1], [-1, -2], [-1, -1], [-1, 0], [-1, 1], [-1, 2]], right: [[3, 0], [2, -1], [2, 0], [2, 1], [1, -2], [1, -1], [1, 0], [1, 1], [1, 2]] }[dir];
+      g.fillStyle = '#1b1420'; for (const [a, b] of shape) g.fillRect(x + a, y + b + 1, 1, 1);
+      g.fillStyle = on ? '#fff6d6' : '#cfe8c0'; for (const [a, b] of shape) g.fillRect(x + a, y + b, 1, 1);
+      if (on) { g.fillStyle = '#f2c43d'; for (const [a, b] of shape.slice(4)) g.fillRect(x + a, y + b, 1, 1); }
+    };
+    arrow('up', c, 9); arrow('down', c, 57); arrow('left', 9, c); arrow('right', 57, c);
+  },
+  drawKnob() {
+    // A fat water bubble with a shine, like the ones the crías sleep in.
+    const g = Touch.knob.getContext('2d'); g.clearRect(0, 0, 31, 31);
+    Touch.disc(g, 15, 16, 14, '#1b1420'); Touch.disc(g, 15, 15, 13, '#6fb8c8'); Touch.disc(g, 14, 14, 11, '#a8e0e8'); Touch.disc(g, 13, 12, 7, '#d8f6f8');
+    g.fillStyle = '#ffffff'; g.fillRect(9, 7, 4, 2); g.fillRect(8, 9, 2, 2); g.fillStyle = '#5a9ab0'; for (let k = 0; k < 9; k++) g.fillRect(Math.round(15 + Math.cos(.3 + k * .18) * 12), Math.round(15 + Math.sin(.3 + k * .18) * 12), 1, 1);
+  },
+  label(g, text, x, y, col) { ART.text(g, text, x, y, col, 'center', '#120c18'); },
+  drawFish(g, t) {
+    const p = Player, held = p.held, full = p.charge >= CHARGE_FULL; g.clearRect(0, 0, 36, 36);
+    const face = p.spitT > 6 ? ART.fish.spit : full ? ART.fish.squint : held ? ART.fish.full : p.sucking ? ART.fish.open : (t % 200) < 6 ? ART.fish.blink : ART.fish.closed;
+    const jit = p.sucking ? ((t >> 1) & 1) * (p.suckLv || 1) * .5 : full ? ((t >> 1) & 1) : 0, fx = Math.round(5 + jit), fy = 5 + (held ? 0 : Math.round(Math.sin(t / 20)));
+    g.drawImage(face, fx, fy); Player.fishOverlay(g, face, fx, fy, t, { noWhiskers: true, mood: p.sucking || p.charge > 8 ? 'mad' : null, lx: 1 });
+    if (p.sucking) { g.fillStyle = p.suckLv === 3 ? '#fff6d6' : '#cfe8f0'; for (let i = 0; i < 2 + p.suckLv; i++) { const k = (t * (.1 + p.suckLv * .04) + i / (2 + p.suckLv)) % 1; g.fillRect(Math.round(34 - k * 7), 7 + i * 2, 2, 1); } }
+    const lab = full ? '¡zas!' : held ? (held.kind === 'agua' && !p.onGround ? 'flota' : 'escupe') : 'sorbe';
+    Touch.label(g, lab, 18, 21, full ? '#f2c46a' : p.sucking ? '#fff6d6' : held ? '#bdf0d0' : '#e8fbff');
+  },
+  drawJump(g, t) {
+    const p = Player; g.clearRect(0, 0, 36, 36);
+    const air = !p.onGround && !p.grapple, lab = p.hanging || p.grapple ? 'suelta' : air && Input.held.down && Game.has('panzazo') ? 'panzazo' : air && p.airJumps > 0 && Game.has('aleteo') ? 'aletea' : 'salta';
+    const N = ART.nila, spr = lab === 'panzazo' ? N.fall : lab === 'aletea' ? N.jump : N.jump, bob = lab === 'salta' ? Math.round(Math.abs(Math.sin(t / 14)) * -2) : 0;
+    g.drawImage(spr, 10, 0 + bob);
+    if (lab === 'aletea') { g.fillStyle = '#e8fbff'; const f = (t >> 3) & 1; g.fillRect(6, 10 + f, 3, 1); g.fillRect(27, 10 + f, 3, 1); g.fillRect(5, 12 - f, 2, 1); g.fillRect(29, 12 - f, 2, 1); }
+    if (lab === 'panzazo') { g.fillStyle = '#f2c46a'; for (let i = 0; i < 3; i++) g.fillRect(12 + i * 5, 2 + ((t + i * 3) % 6), 1, 3); }
+    Touch.label(g, lab, 18, 23, lab === 'salta' ? '#fff6d6' : '#f2c46a');
+  },
+  drawPuff(g, t) {
+    // Swirling gust lines; crouched with the slide learnt, a sled arrow instead.
+    const p = Player; g.clearRect(0, 0, 24, 24);
+    if (!Game.has('soplido')) { g.fillStyle = '#1b1420'; g.fillRect(7, 11, 10, 8); g.fillStyle = '#9fa8b0'; g.fillRect(8, 12, 8, 6); g.fillRect(9, 6, 1, 6); g.fillRect(14, 6, 1, 6); g.fillRect(9, 5, 6, 1); g.fillStyle = '#1b1420'; g.fillRect(11, 14, 2, 2); return; }
+    if (p.crouch && p.onGround && Game.has('resbalon') && !p.held) {
+      const k = (t >> 2) % 4; g.fillStyle = '#1b1420'; g.fillRect(3, 15, 18, 3); g.fillStyle = '#e8b878'; g.fillRect(4, 15, 16, 2); g.fillStyle = '#fff6d6';
+      for (let i = 0; i < 3; i++) g.fillRect(2 + ((i * 6 + k * 2) % 14), 9 + i * 2, 5, 1); g.fillRect(17, 9, 1, 5); g.fillRect(18, 10, 1, 3); g.fillRect(19, 11, 1, 1); return;
+    }
+    const k = t * .12;
+    for (let i = 0; i < 3; i++) {
+      const y = 7 + i * 5, len = 14 - i * 2, off = Math.round(((k + i * .7) % 1) * 3);
+      g.fillStyle = '#1b1420'; g.fillRect(3 + off, y + 1, len, 1);
+      g.fillStyle = i === 1 ? '#ffffff' : '#bfe6f5'; g.fillRect(3 + off, y, len, 1); g.fillRect(3 + off + len, y - 1, 2, 1); g.fillRect(3 + off + len + 2, y, 1, 2);
+    }
+  },
+  drawTalk(g, t) { g.clearRect(0, 0, 48, 14); g.fillStyle = '#1b1420'; const ax = 5, ay = 3 + ((t >> 4) & 1); g.fillRect(ax, ay, 1, 1); g.fillRect(ax - 1, ay + 1, 3, 1); g.fillRect(ax - 2, ay + 2, 5, 1); ART.text(g, 'hablar', 27, 1, '#1b1420', 'center'); },
+  // Called every frame: redraw a face only when what it says changes (and animate the busy ones).
+  // Portrait: a little phone that tips over, "gira el móvil", in the game's own letters.
+  drawHint(t) {
+    const c = $('rotate-hint'), g = c.getContext('2d'), k = (t % 180) / 180, a = k < .35 ? 0 : k < .55 ? (k - .35) / .2 : k < .85 ? 1 : 1 - (k - .85) / .15; g.clearRect(0, 0, 104, 18);
+    const w = 6 + a * 4, h = 10 - a * 4, x = 8 - w / 2, y = 9 - h / 2;
+    g.fillStyle = '#1b1420'; g.fillRect(Math.round(x) - 1, Math.round(y) - 1, Math.round(w) + 2, Math.round(h) + 2); g.fillStyle = '#9fc0cc'; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); g.fillStyle = '#2f7f88'; g.fillRect(Math.round(x) + 1, Math.round(y) + 1, Math.round(w) - 2, Math.round(h) - 2);
+    ART.text(g, 'gira el móvil', 18, 3, '#9fc0cc', 'left', '#0a0610');
+  },
+  updateButtons() {
+    if (Touch.enabled && Touch.portrait && Game.t % 3 === 0 && $('rotate-hint')) Touch.drawHint(Game.t);
+    if (!Touch.enabled || !Touch.btn || Game.state !== 'play' || !L.def) return;
+    const p = Player, t = Game.t, B = Touch.btn, K = Touch.keys;
+    const talk = !Charla.active() && !Game.learning && !Maestros.busy() && !p.dead && !!((L.maestro && L.maestro.near) || L.ents.some(e => e.kind === 'ruca' && e.near));
+    B.talk.classList.toggle('show', talk); if (talk && K.talk !== (t >> 4)) { K.talk = t >> 4; Touch.drawTalk(Touch.ctx.talk, t); }
+    const fk = [p.held ? p.held.kind : '', p.sucking ? p.suckLv : 0, p.charge >= CHARGE_FULL, p.spitT > 6, p.onGround, p.sucking || p.charge >= CHARGE_FULL ? t >> 1 : t >> 3].join();
+    if (K.fish !== fk) { K.fish = fk; Touch.drawFish(Touch.ctx.fish, t); }
+    const ring = p.sucking ? (p.suckLv || 1) / 3 : p.charge > 8 ? Math.min(1, p.charge / CHARGE_FULL) : 0;
+    B.fish.style.setProperty('--charge', ring.toFixed(3)); B.fish.style.setProperty('--charge-col', p.sucking ? (p.suckLv === 3 ? '#fff6d6' : '#8fe0f0') : '#f2c46a');
+    B.fish.classList.toggle('full', p.charge >= CHARGE_FULL || (p.sucking && p.suckLv === 3));
+    const jk = [p.onGround, p.airJumps, !!Input.held.down, !!p.grapple, t >> 2].join(); if (K.jump !== jk) { K.jump = jk; Touch.drawJump(Touch.ctx.jump, t); }
+    const slide = p.crouch && p.onGround && Game.has('resbalon') && !p.held;
+    const pk = [Game.has('soplido'), slide, t >> 2].join(); if (K.puff !== pk) { K.puff = pk; Touch.drawPuff(Touch.ctx.puff, t); }
+    B.puff.classList.toggle('locked', !Game.has('soplido')); B.puff.classList.toggle('hot', slide);
   }
 };
 
@@ -302,6 +420,8 @@ const POWER_ORDER = ['soplido', 'aleteo', 'ventosa', 'chorro', 'mordisco', 'panz
 const WEIGHT = { mosquito: .35, snail: .6, frog: .7, agua: .6, rock: 1, crab: 1.1, crate: 1.5 };
 // How hard each thing resists the suction (the crate is the heaviest thing Bigotes can swallow).
 const SUCK_MASS = { mosquito: .7, snail: .9, frog: .9, rock: 1, crab: 1.1, crate: 1.35 };
+// The inhale builds up in steps, Kirby-style: held longer, it reaches further, opens wider and pulls harder.
+const SUCK_STAGES = [{ at: 0, reach: 64, cone: .45, pull: 1 }, { at: 40, reach: 82, cone: .55, pull: 1.35 }, { at: 95, reach: 104, cone: .7, pull: 1.8 }];
 const CHARGE_FULL = 40, AMMO_NAMES = { rock: 'Piedra', crate: 'Caja', snail: 'Caracol', frog: 'Rana', mosquito: 'Mosquito', crab: 'Cangrejo', agua: 'Agua' };
 const Player = {
   x: 0, y: 0, w: 10, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, coyote: 0, jumpBuf: 0, held: null, sucking: false, suckT: 0, hp: 3, inv: 0, animT: 0, sx: 1, sy: 1,
@@ -346,7 +466,7 @@ const Player = {
     else if (!wantCrouch && p.crouch) p.slide = 0;
     const left = Input.held.left, right = Input.held.right, ax = p.onGround ? .22 : .14;
     const busy = p.sucking || p.charge > 8;
-    const maxV = p.crouch ? 1.1 : busy ? .7 : 1.7;
+    const maxV = p.crouch ? 1.1 : busy ? (p.sucking && p.suckLv === 3 ? .45 : .7) : 1.7;
     if (p.wallJumpT > 0) p.wallJumpT--;
     if (p.grapple || p.pound) { /* Bigotes does the moving, or nothing moves */ }
     else if (p.slide > 0) { p.vx = p.dir * Math.max(2.8 * Math.sqrt(p.slide / 20), p.slide <= 2 ? 2.3 : 0); if (p.slide % 3 === 0) spawnParts(1, p.x + 5 - p.dir * 5, p.y + p.h, { color: '#c9b08a', angle: -Math.PI / 2 - p.dir * .9, spread: .4, speed: [.4, 1], life: [8, 14], g: .03 }); }
@@ -497,7 +617,7 @@ const Player = {
       if (!down) p.charge = 0;
     } else {
       p.charge = 0;
-      if (down && p.fishDown && !p.sucking && p.fishT > 4) { p.sucking = true; p.suckT = 0; p.waterT = 0; Sound.suck(true); }
+      if (down && p.fishDown && !p.sucking && p.fishT > 4) { p.sucking = true; p.suckT = 0; p.waterT = 0; p.suckLv = 1; p.suckLen = 36; p.suckPulse = 0; Sound.suck(true); }
       if (!down && p.fishDown) { p.fishDown = false; if (p.sucking) { p.sucking = false; Sound.suck(false); Player.letGo(); } }
       if (p.sucking) Player.suck();
     }
@@ -506,15 +626,21 @@ const Player = {
   },
   suck() {
     const p = Player, m = p.mouth(), a = p.aim(); p.suckT++;
+    const lv = p.suckT >= SUCK_STAGES[2].at ? 3 : p.suckT >= SUCK_STAGES[1].at ? 2 : 1, S = SUCK_STAGES[lv - 1];
+    if (lv !== p.suckLv) { p.suckLv = lv; Player.suckUp(lv); }
+    p.suckLen = lerp(p.suckLen || 36, S.reach, .18); if (p.suckPulse > 0) p.suckPulse--;
+    // At full blast Nila digs her heels in: dust kicks up behind her and the air hums.
+    if (lv === 3 && p.onGround && p.suckT % 5 === 0) spawnParts(1, p.x + 5 - p.dir * 5, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2 - p.dir * .9, spread: .5, speed: [.4, 1.2], life: [8, 14], g: .04 });
+    if (lv === 3 && p.suckT % 14 === 0) Cam.shake(1, 3);
     // Wind streaks converge on the mouth from along the aim.
-    if (p.suckT % 2 === 0) { const d = rnd(30, 62), ang = rnd(-.55, .55); const c = Math.cos(ang), sn = Math.sin(ang); L.parts.push({ x: m.x + (a.x * c - a.y * sn) * d, y: m.y + (a.y * c + a.x * sn) * d, vx: 0, vy: 0, life: 40, color: ['#cfe0e8', '#9fc0cc', '#e8f2f6'][(Math.random() * 3) | 0], size: 1, g: 0, kind: 'suck' }); }
+    if (p.suckT % (lv === 3 ? 1 : 2) === 0) { const d = rnd(30, p.suckLen - 2), ang = rnd(-.45 - lv * .1, .45 + lv * .1); const c = Math.cos(ang), sn = Math.sin(ang); L.parts.push({ x: m.x + (a.x * c - a.y * sn) * d, y: m.y + (a.y * c + a.x * sn) * d, vx: 0, vy: 0, life: 40, color: ['#cfe0e8', '#9fc0cc', '#e8f2f6'][(Math.random() * 3) | 0], size: 1, g: 0, kind: 'suck' }); }
     // The ground under the cone gives up grass, dust and leaves; whatever is being pulled leaves a trail.
-    if (p.suckT % 3 === 0 && !p.aimUp) { const d = rnd(14, 60), gx = m.x + a.x * d; for (let dy = -8; dy < 34; dy += 3) if (rectSolid(gx, m.y + dy, 1, 1)) { const th = L.def.theme, cols = th === 'cave' ? ['#6b4a60', '#8a6a7a'] : th === 'storm' ? ['#6a7a5a', '#8a9a6a'] : ['#7fb040', '#a3cf52', '#c9b08a']; L.parts.push({ x: gx, y: m.y + dy - 1, vx: 0, vy: 0, life: 40, color: cols[(Math.random() * cols.length) | 0], size: 1, g: 0, kind: 'suck' }); break; } }
+    if (p.suckT % (4 - lv) === 0 && !p.aimUp) { const d = rnd(14, p.suckLen - 4), gx = m.x + a.x * d; for (let dy = -8; dy < 34; dy += 3) if (rectSolid(gx, m.y + dy, 1, 1)) { const th = L.def.theme, cols = th === 'cave' ? ['#6b4a60', '#8a6a7a'] : th === 'storm' ? ['#6a7a5a', '#8a9a6a'] : ['#7fb040', '#a3cf52', '#c9b08a']; L.parts.push({ x: gx, y: m.y + dy - 1, vx: 0, vy: 0, life: 40, color: cols[(Math.random() * cols.length) | 0], size: 1, g: 0, kind: 'suck' }); break; } }
     if (p.suckT % 2 === 0) for (const e of L.ents) if (e.sucked > 0 && !e.dead) L.parts.push({ x: e.x + e.w / 2 + rnd(-2, 2), y: e.y + e.h / 2 + rnd(-2, 2), vx: -(e.vx || 0) * .2, vy: -(e.vy || 0) * .2, life: 10, max: 10, color: '#e8f6ff', size: 1, g: 0, kind: 'mist' });
     if (p.suckT % 20 === 10 && p.onGround) spawnParts(2, p.x + 5 + p.dir * 4, p.y + p.h, { color: '#c9b08a', angle: -Math.PI / 2 + p.dir * .8, spread: .4, speed: [.3, .9], life: [8, 14], g: .03 });
     if (p.grapple && !p.hanging) return;
     let water = null;
-    if (!p.aimUp && Game.has('chorro')) for (let k = 1; k <= 5 && !water; k++) for (const dy of [-6, 4, 14, 24]) { const wx = m.x + p.dir * k * 10, wy = m.y + dy; if (waterAt(wx, wy)) { water = { x: wx, y: wy }; break; } }
+    if (!p.aimUp && Game.has('chorro')) for (let k = 1; k <= 4 + lv && !water; k++) for (const dy of [-6, 4, 14, 24]) { const wx = m.x + p.dir * k * 10, wy = m.y + dy; if (waterAt(wx, wy)) { water = { x: wx, y: wy }; break; } }
     p.waterSrc = water ? { x: water.x, y: Math.floor(water.y / TS) * TS } : null;
     if (water) {
       p.waterT++;
@@ -526,13 +652,13 @@ const Player = {
       if (e.dead || e.held || e === p.grapple) continue;
       const cx = e.x + e.w / 2, cy = e.y + e.h / 2, ox = cx - m.x, oy = cy - m.y;
       const along = ox * a.x + oy * a.y, across = Math.abs(ox * a.y - oy * a.x);
-      const inCone = r => along >= -12 && along <= r && across <= 10 + along * .45;
+      const inCone = r => along >= -12 && along <= r && across <= 10 + along * S.cone;
       // Too big to swallow: say so instead of silently blowing at it.
       if ((e.boss || e.kind === 'ruca' || e.kind === 'raft') && !p.grapple && p.suckT > 10 && inCone(64)) { if (!(Game.t - (e.pesaT || -99) < 70)) { e.pesaT = Game.t; Game.word('¡PESA!', cx, e.y - 8, '#cfe0e8', false); Sound.play('thud'); } continue; }
       if (!e.suckable && e.kind !== 'anchor') continue;
       if (e.kind === 'anchor' && !Game.has('mordisco')) continue;
       if (p.grapple && e.kind !== 'anchor') continue;
-      const reach = e.kind === 'anchor' ? 96 : 64;
+      const reach = e.kind === 'anchor' ? Math.max(96, S.reach) : S.reach;
       if (!inCone(reach)) {
         e.pullT = 0;
         // Just out of reach: it feels the draught (dust streams off it toward the mouth), so the player knows to step closer.
@@ -552,13 +678,22 @@ const Player = {
       const d = Math.hypot(ox, oy) || 1, mass = SUCK_MASS[e.kind] || 1;
       if (!e.sucked) e.pullT = 0; e.pullT = (e.pullT || 0) + 1;
       if (e.pullT === 1 && e.resting !== false && !e.flying) spawnParts(3, cx, e.y + e.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.2, speed: [.3, 1], life: [8, 14], g: .04 });
-      const sp = Math.min(5, (.3 + Math.max(0, 64 - d) * .035 + e.pullT * .22) / mass);
+      const sp = Math.min(5 * (1 + (S.pull - 1) * .6), (.3 + Math.max(0, 64 - d) * .035 + e.pullT * .22) * S.pull / mass);
       const k = e.pullT < 4 ? .12 : .35;
       e.vx = lerp(e.vx || 0, -ox / d * sp, k); e.vy = lerp(e.vy || 0, -oy / d * sp, k); e.sucked = 2;
       if (e.pullT < 4 && e.enemy) e.tug = 2;
       if (d < 9) Player.capture(e);
     }
     if (best) { if (p.grapple) Game.word('¡OTRO!', best.x + 5, best.y - 8, '#e6c46a', false); p.grapple = best; p.grappleT = 0; p.hanging = false; p.vx = 0; p.vy = 0; p.crouch = false; Sound.play('glup', .6); Game.word('¡PICA!', best.x + 5, best.y - 8, '#e6c46a', true); Cam.shake(2, 5); for (let i = 0; i < 2; i++) L.parts.push({ x: best.x + 5, y: best.y - 12, vx: 0, vy: 0, life: 14 - i * 4, color: '#e8fbff', size: 1, g: 0, kind: 'ring' }); }
+  },
+  // One more step of the inhale: a thump of air, a shock ring racing down the cone, and at the top a ¡SÚPER!
+  suckUp(lv) {
+    const p = Player, m = p.mouth(), a = p.aim();
+    Sound.play('suckup', lv); Sound.suckLevel(lv); Cam.shake(lv, 4 + lv * 2); Input.rumble(50 + lv * 40, .15 + lv * .2, .5);
+    p.sx = 1.14; p.sy = .86; p.suckPulse = 16;
+    spawnParts(4 + lv * 4, m.x, m.y, { color: lv === 3 ? ['#ffffff', '#fff6d6', '#f2c46a'] : ['#e8fbff', '#cfe0e8', '#ffffff'], speed: [1, 2 + lv * .6], life: [8, 16], g: 0 });
+    if (p.onGround) spawnParts(3 + lv * 2, p.x + 5 - p.dir * 4, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2 - p.dir * .8, spread: .6, speed: [.5, 1.6], life: [10, 18], g: .04 });
+    if (lv === 3) { Cam.punch(1.04); Game.stop(2); Game.word('¡SÚPER!', m.x + a.x * 16, m.y - 14 + a.y * 10, '#e8fbff', true); }
   },
   // Bigotes has clamped onto a ring: it reels Nila in until she hangs just under it.
   pull() {
@@ -750,7 +885,7 @@ const Player = {
     else if (!p.onGround && !p.sucking) bend = p.vy < -1 ? -.2 : p.vy > 2 ? .24 : 0;
     if (p.onGround && Math.abs(p.vx) > .5 && !p.sucking) { wave = 1.5; waveSpeed = .38; }
     if (p.onGround && Math.abs(p.vx) < .5 && !p.sucking && !p.held && t % 190 < 14) { wave = 2.2; waveSpeed = .5; }
-    if (p.sucking && !p.grapple) { headStretch = 1.18; jitter = .5; wave = .3; }
+    if (p.sucking && !p.grapple) { const lv = p.suckLv || 1; headStretch = 1.1 + lv * .06; jitter = .2 + lv * .3; wave = .3; }
     if (p.charge > 8) { const c = Math.min(1, p.charge / CHARGE_FULL); bend += -.45 * c; tailBend = .6 * c; spacing = 1 - .14 * c; jitter = c >= 1 ? 1.1 : .4 * c; wave = .2; }
     if (p.spitT > 0) { const k = (12 - p.spitT) / 12; lunge = p.spitT > 8 ? (12 - p.spitT) * 2.2 : p.spitT * .9; tailBend = Math.sin(k * Math.PI * 2) * 1.1; headStretch = p.spitT > 6 ? 1.35 : 1; wave = 0; }
     if (p.puffWind > 0) { const k = (5 - p.puffWind) / 5; lunge = -k * 2; headStretch = 1 + k * .12; bend -= k * .15; wave = .2; }
@@ -943,11 +1078,26 @@ const Player = {
     const p = Player, t = Game.t; if (!Player.fishHead) return;
     const head = Player.fishHead;
     if (p.hover) {
-      const wx = head.x + Cam.x, wy = head.y + Cam.y; let len = 0;
-      while (len < 64 && !rectSolid(wx, wy + len, 1, 1) && !waterAt(wx, wy + len)) len += 2;
-      const hitGround = len < 64;
-      Game.drawStream(g, head.x, head.y, head.x, head.y + len, t, hitGround ? 1 : .6, 3.2);
-      if (hitGround) { g.fillStyle = '#e8fbff'; for (let i = 0; i < 4; i++) g.fillRect(head.x - 4 + Math.round(Math.sin(t * .9 + i * 2) * 5), head.y + len - 1 - ((t + i * 3) % 4), 1, 1); if (t % 5 === 0) L.parts.push({ x: wx, y: wy + len, vx: 0, vy: 0, life: 14, color: '#c8f2ea', size: 1, g: 0, kind: 'ripple' }); }
+      // The jet falls all the way down: a solid column near the mouth that breaks into ropes of drops as it drops.
+      const wx = head.x + Cam.x, wy = head.y + Cam.y, maxLen = Math.max(64, H - head.y + 24); let len = 0;
+      while (len < maxLen && !rectSolid(wx, wy + len, 1, 1) && !waterAt(wx, wy + len)) len += 2;
+      const hitGround = len < maxLen, body = Math.min(len, 56);
+      Game.drawStream(g, head.x, head.y, head.x, head.y + body, t, 1, 3.2);
+      if (len > body) {
+        const hx = Math.round(head.x);
+        for (let s = 0; s < 3; s++) for (let y = body - 2; y < len; y++) {
+          const f = (y - body) / Math.max(1, len - body), spread = 1 + f * 3, x = hx + Math.round((s - 1) * spread + Math.sin((y + s * 11) / 9 + t * .2) * f * 1.5);
+          const ph = (y + s * 5 - t * 6) % 14, on = ((ph + 14) % 14) < 11 - Math.round(f * 5);
+          if (!on) continue;
+          const lead = ((ph + 14) % 14) < 1.5;
+          g.fillStyle = '#1d4a55'; g.fillRect(x - 1, y, 1, 1); g.fillRect(x + 1, y, 1, 1);
+          g.fillStyle = lead ? '#f2fffb' : s === 1 ? '#c8f2ea' : '#8fd9d0'; g.fillRect(x, y, 1, 1);
+        }
+        if (t % 3 === 0) L.parts.push({ x: wx + rnd(-3, 3), y: wy + body + rnd(0, len - body), vx: rnd(-.3, .3), vy: 1.5, life: 10, color: Math.random() < .4 ? '#f2fffb' : '#8fd9d0', size: 1, g: .15, kind: 'spray' });
+      }
+      if (hitGround) {
+        if (t % 2 === 0) L.parts.push({ x: wx + rnd(-2, 2), y: wy + len - 1, vx: rnd(-1.4, 1.4), vy: rnd(-2.2, -.8), life: rnd(8, 14) | 0, color: Math.random() < .35 ? '#f2fffb' : '#8fd9d0', size: 1, g: .18, kind: 'spray' });
+        g.fillStyle = '#c8f2ea'; const cw = 3 + ((t >> 1) % 3); g.fillRect(Math.round(head.x) - cw, Math.round(head.y + len) - 2, cw * 2 + 1, 1); g.fillStyle = '#f2fffb'; g.fillRect(Math.round(head.x) - cw - 1, Math.round(head.y + len) - 3 - (t % 2), 1, 1); g.fillRect(Math.round(head.x) + cw + 1, Math.round(head.y + len) - 3 - ((t + 1) % 2), 1, 1); g.fillStyle = '#e8fbff'; for (let i = 0; i < 4; i++) g.fillRect(head.x - 4 + Math.round(Math.sin(t * .9 + i * 2) * 5), head.y + len - 1 - ((t + i * 3) % 4), 1, 1); if (t % 5 === 0) L.parts.push({ x: wx, y: wy + len, vx: 0, vy: 0, life: 14, color: '#c8f2ea', size: 1, g: 0, kind: 'ripple' }); }
     }
     if (p.sucking && p.waterSrc) {
       const m = p.mouth(); const sx = p.waterSrc.x - Cam.x, sy = p.waterSrc.y - Cam.y, mx = m.x - Cam.x, my = m.y - Cam.y;
@@ -1464,8 +1614,7 @@ const Game = {
       case 'gate': Cine.gateUpdate(); break;
       case 'cine': if (!Game.frozen) Cine.update(); break;
     }
-    Touch.updateButtons && Touch.updateButtons();
-    const pb = Touch.buttons.find(b => b.dataset.act === 'puff'); if (pb) pb.classList.toggle('locked', !Game.has('soplido'));
+    Touch.updateButtons();
     Game.updateShell();
   },
   updateShell() {
@@ -1796,20 +1945,23 @@ const Game = {
   // at Bigotes' lips. It grows in over the first frames; drinking, it turns sea-green.
   drawSuction(g) {
     const p = Player, m = p.mouth(), a = p.aim(); if (p.grapple) return;
-    const mx = m.x - Cam.x, my = m.y - Cam.y, nx = -a.y, ny = a.x, len = 64, t = Game.t, ramp = Math.min(1, (p.suckT || 0) / 10);
-    const wet = !!p.waterSrc, C1 = wet ? '#8fe0d0' : '#dff2fb', C2 = wet ? '#4ab0a8' : '#a8d0e4', C3 = wet ? '#e8fff8' : '#ffffff';
-    const half = d => 4 + d * .5;
-    // A faint body of moving air.
-    g.globalAlpha = .08 * ramp; g.fillStyle = C1; g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + a.x * len + nx * half(len), my + a.y * len + ny * half(len)); g.lineTo(mx + a.x * len - nx * half(len), my + a.y * len - ny * half(len)); g.closePath(); g.fill();
+    const lv = p.suckLv || 1, mx = m.x - Cam.x, my = m.y - Cam.y, nx = -a.y, ny = a.x, len = p.suckLen || 64, t = Game.t, ramp = Math.min(1, (p.suckT || 0) / 10);
+    const wet = !!p.waterSrc, top = lv === 3 && !wet;
+    const C1 = wet ? '#8fe0d0' : top ? '#ffffff' : lv === 2 ? '#e8f8ff' : '#dff2fb', C2 = wet ? '#4ab0a8' : top ? '#9fdcf0' : '#a8d0e4', C3 = wet ? '#e8fff8' : top ? '#fff6d6' : '#ffffff';
+    const coneK = [.5, .6, .75][lv - 1], half = d => 4 + d * coneK, speed = 1 + (lv - 1) * .45;
+    // A faint body of moving air, denser at every step.
+    g.globalAlpha = (.05 + lv * .035) * ramp; g.fillStyle = C1; g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + a.x * len + nx * half(len), my + a.y * len + ny * half(len)); g.lineTo(mx + a.x * len - nx * half(len), my + a.y * len - ny * half(len)); g.closePath(); g.fill();
     // Rings of pull.
-    for (let i = 0; i < 4; i++) {
-      const u = 1 - ((t * .045 + i / 4) % 1), d = u * len, w = half(d), cx = mx + a.x * d, cy = my + a.y * d;
+    const rings = 3 + lv;
+    for (let i = 0; i < rings; i++) {
+      const u = 1 - ((t * .045 * speed + i / rings) % 1), d = u * len, w = half(d), cx = mx + a.x * d, cy = my + a.y * d;
       g.globalAlpha = ramp * (.25 + (1 - u) * .65); g.fillStyle = C1;
       for (let k = 0; k < 28; k++) { const an = k / 28 * Math.PI * 2, lat = Math.cos(an) * w, dep = Math.sin(an) * w * .22; if (Math.sin(an) < -.2 && (k & 1)) continue; g.fillRect(Math.round(cx + nx * lat + a.x * dep), Math.round(cy + ny * lat + a.y * dep), 1, 1); }
     }
     // Spiral streaks.
-    for (let i = 0; i < 9; i++) {
-      const ph = i * 2.3, head = (t * .03 * (1 + (i % 3) * .15) + i / 9) % 1;
+    const streaks = 5 + lv * 4;
+    for (let i = 0; i < streaks; i++) {
+      const ph = i * 2.3, head = (t * .03 * speed * (1 + (i % 3) * .15) + i / streaks) % 1;
       for (let j = 0; j < 12; j++) {
         const q = head - j * .012 * (1 + head * 1.5); if (q < 0) break;
         const d = (1 - q) * len, spin = q * 10 + ph + t * .12, lat = Math.sin(spin) * half(d) * .85, front = Math.cos(spin);
@@ -1821,6 +1973,18 @@ const Game = {
     // The whirl at the lips and a pulsing core.
     for (let k = 0; k < 3; k++) for (let s2 = 1; s2 < 8; s2++) { const r = s2 * .75, an = -t * .45 + k * 2.09 + s2 * .55; g.globalAlpha = ramp * (1 - s2 / 9); g.fillStyle = s2 < 3 ? C3 : C1; g.fillRect(Math.round(mx + a.x * 3 + Math.cos(an) * r), Math.round(my + a.y * 3 + Math.sin(an) * r * .8), 1, 1); }
     g.globalAlpha = ramp * (.5 + Math.sin(t * .6) * .3); g.fillStyle = C3; g.fillRect(Math.round(mx + a.x * 2) - 1, Math.round(my + a.y * 2) - 1, 2, 2);
+    // Full blast: long wind lines rushing in along the edges of the cone, with golden flecks.
+    if (lv === 3) for (let i = 0; i < 6; i++) {
+      const u = 1 - ((t * .07 + i / 6) % 1), d = u * len, side = i & 1 ? 1 : -1, lat = side * half(d) * (.55 + (i % 3) * .15);
+      g.globalAlpha = ramp * Math.min(1, u * 3) * .8; g.fillStyle = i % 3 === 0 ? '#f2c46a' : C1;
+      for (let j = 0; j < 6; j++) { const dd = d + j * 1.5; g.fillRect(Math.round(mx + a.x * dd + nx * lat * (dd / Math.max(1, d))), Math.round(my + a.y * dd + ny * lat * (dd / Math.max(1, d))), 1, 1); }
+    }
+    // The step-up: a bright shock ring racing out to the new reach.
+    if (p.suckPulse > 0) {
+      const k = 1 - p.suckPulse / 16, d = k * len, w = half(d) + 2, cx = mx + a.x * d, cy = my + a.y * d;
+      g.globalAlpha = (1 - k) * .9; g.fillStyle = lv === 3 ? '#fff6d6' : '#ffffff';
+      for (let q = 0; q < 36; q++) { const an = q / 36 * Math.PI * 2, lat = Math.cos(an) * w, dep = Math.sin(an) * w * .25; g.fillRect(Math.round(cx + nx * lat + a.x * dep), Math.round(cy + ny * lat + a.y * dep), 2, 1); }
+    }
     g.globalAlpha = 1;
   },
   // The gust: curling streaks that fan out and a pale front, ending in little spirals.
