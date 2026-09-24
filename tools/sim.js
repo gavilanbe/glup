@@ -52,6 +52,7 @@ function load() {
   const S = { powers: [] };
   function start(level, powers) {
     Save.data = Save.fresh(); Save.data.mute = true; LEVELS.forEach(d => { Save.data.abiertos[d.id] = true; });
+    Save.data.seen = Object.assign(Save.data.seen || {}, { rucaTodas: true });   // the bot does not stop for Ruca
     for (const p of powers || []) Save.data.powers[p] = true;
     Maestros.reset(); Game.still = true; Game.capture = null; Game.frozen = false; Game.learning = null; Game.fadeTo = null; Game.fade = 0; Game.story = null;
     Game.startLevel(level); Game.banner = 0; Game.intro = null;

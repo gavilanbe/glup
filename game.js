@@ -426,7 +426,7 @@ const Player = {
     if (p.hover || p.sucking && p.waterSrc) p.wetT = 200; else if (p.wetT > 0) p.wetT--;
     if (L.pearls > (p.seenPearls || 0)) p.happyT = 70; p.seenPearls = L.pearls; if (p.happyT > 0) p.happyT--;
     if (p.dizzyT > 0) p.dizzyT--;
-    p.nearSign = null; for (const e of L.ents) if ((e.kind === 'sign' || e.kind === 'ruca') && Math.abs(e.x + 7 - (p.x + 5)) < (e.kind === 'ruca' ? 30 : 22) && Math.abs(e.y - p.y) < 30) p.nearSign = e;
+    p.nearSign = null; for (const e of L.ents) if (e.kind === 'sign' && Math.abs(e.x + 7 - (p.x + 5)) < 22 && Math.abs(e.y - p.y) < 30) p.nearSign = e;
   },
   wallAt(d) { const p = Player; const x = d > 0 ? p.x + p.w + 1 : p.x - 2; return tileAt(x >> 4, (p.y + 3) >> 4) === 'M' || tileAt(x >> 4, (p.y + p.h - 3) >> 4) === 'M'; },
   // Reaching a ledge with the hands: Nila hauls herself up.
@@ -964,11 +964,32 @@ const Item = {
   heart(x, y, id) { return { kind: 'heart', x, y, w: 9, h: 8, id, t: 0, update(e) { e.t++; if (overlap(e, Player.rect()) && !Player.dead) { e.dead = true; L.taken.add(e.id); Player.hp = Math.min(3, Player.hp + 1); Sound.play('heart'); spawnParts(12, e.x + 4, e.y + 4, { color: ['#e2445a', '#ffb0bd', '#ffffff'], speed: [.5, 2.2], life: [14, 28], g: -.02 }); } }, draw(e, g) { g.drawImage(ART.heart, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y + Math.sin(e.t / 15) * 2)); } }; },
   lantern(x, y, id) { return { kind: 'lantern', x, y, w: 10, h: 18, id, t: 0, update(e) { e.t++; if (!L.lit.has(e.id) && overlap({ x: e.x - 4, y: e.y, w: 18, h: 18 }, Player.rect()) && !Player.dead) { L.lit.add(e.id); L.checkpoint = { x: e.x - 1, y: e.y }; Sound.play('lantern'); spawnParts(16, e.x + 5, e.y + 5, { color: ['#ffcf5a', '#fff2b8', '#ffffff'], speed: [.3, 1.8], life: [20, 40], g: -.03 }); Game.toast('Farol encendido', 90); Game.word('¡FAROL!', e.x + 5, e.y - 8, '#ffcf5a', true); Cam.punch(1.03); } if (L.lit.has(e.id) && e.t % 5 === 0) spawnParts(1, e.x + 5, e.y + 5, { color: ['#ffcf5a', '#fff2b8'], speed: [.1, .5], life: [16, 30], g: -.02 }); },
     draw(e, g) { const lit = L.lit.has(e.id); if (lit) { g.globalAlpha = .18 + Math.sin(e.t / 9) * .04; g.fillStyle = '#ffcf5a'; const r = 18; g.beginPath(); g.arc(Math.round(e.x - Cam.x) + 5, Math.round(e.y - Cam.y) + 5, r, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; } g.drawImage(lit ? ART.lantern.on : ART.lantern.off, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y)); } }; },
-  ruca(x, y, idx) { return { kind: 'ruca', x, y, w: 20, h: 11, idx, t: Math.random() * 100, update(e) { e.t++; e.dir = Player.x + 5 < e.x + 10 ? -1 : 1; if (Player.nearSign === e) { const n = Game.noteRaw(e).length; if ((e.talkT || 0) * 1.5 < n + 20) { e.talkT = (e.talkT || 0) + 1; if (e.talkT % 5 === 0 && e.talkT * 1.5 < n) Sound.play('talk'); } } else if (e.talkT && Math.abs(Player.x - e.x) > 90) e.talkT = 0; }, draw(e, g) { Item.rucaDraw(e, g); } }; },
+  // Ruca, the old turtle: she talks when Nila asks (↑), in a real conversation that holds the world still.
+  // The first time Nila meets her at the start of a level, she speaks up by herself (once).
+  ruca(x, y, idx) { return { kind: 'ruca', x, y, w: 20, h: 11, idx, t: Math.random() * 100, near: false, update(e) {
+      e.t++; e.dir = Player.x + 5 < e.x + 10 ? -1 : 1;
+      const p = Player; e.near = !p.dead && !p.win && Math.abs(e.x + 10 - (p.x + 5)) < 30 && Math.abs(e.y - p.y) < 30;
+      if (!e.near || Charla.active() || Game.learning || Maestros.busy() || Game.arrival) return;
+      const seen = Save.data.seen || {}, key = 'ruca:' + L.def.id + ':' + e.idx, first = !seen[key] && !seen.rucaTodas && e.idx === 0;
+      const teacherNear = L.maestro && L.maestro.near;
+      if (first || (Input.pressed.up && p.onGround && !teacherNear && !p.sucking && !p.grapple)) {
+        Save.data.seen = Object.assign(seen, { [key]: true }); Save.write();
+        p.vx = 0; p.sucking = false; Sound.suck(false);
+        Charla.start({ quien: 'ruca', ent: e, lines: [Game.noteRaw(e)] });
+      }
+    }, draw(e, g) { Item.rucaDraw(e, g); } }; },
   rucaDraw(e, g) {
-    const near = Player.nearSign === e, talking = near && (e.talkT || 0) * 1.5 < Game.noteRaw(e).length, s = talking && (e.t >> 2) % 2 ? ART.ruca.talk : (e.t % 200) < 8 ? ART.ruca.blink : ART.ruca.idle;
+    const s = e.talking && (e.t >> 2) % 2 ? ART.ruca.talk : (e.t % 200) < 8 ? ART.ruca.blink : ART.ruca.idle;
     const img = e.dir > 0 ? s : ART.flip(s); g.drawImage(img, Math.round(e.x - Cam.x + (e.w - s.width) / 2), Math.round(e.y - Cam.y + e.h - s.height));
-    if (!e.talkT && (e.t >> 5) % 2) g.drawImage(ART.bubble, Math.round(e.x - Cam.x) + 14, Math.round(e.y - Cam.y) - 14 + Math.round(Math.sin(e.t / 8)));
+    const heard = (Save.data.seen || {})['ruca:' + L.def.id + ':' + e.idx];
+    if (e.near && !Charla.active() && !Game.learning) {
+      // "↑ hablar" over her head, like the teachers.
+      const cap = Input.mode === 'touch' ? '▲' : '↑', label = 'hablar', cw = ART.textWidth(cap) + 6, w = cw + ART.textWidth(label) + 8;
+      const cx = Math.round(e.x - Cam.x + 10), y = Math.round(e.y - Cam.y) - 26 + ((e.t >> 4) % 2), x = clamp(cx - Math.round(w / 2), 2, W - w - 2);
+      g.fillStyle = '#120c18'; g.fillRect(x - 1, y - 1, w + 2, 13); g.fillStyle = 'rgba(27,36,48,.95)'; g.fillRect(x, y, w, 11); g.fillStyle = '#8aa84a'; g.fillRect(x, y, w, 1);
+      g.fillStyle = '#e8e0cc'; g.fillRect(x + 2, y + 2, cw, 8); g.fillStyle = '#a89a80'; g.fillRect(x + 2, y + 9, cw, 1);
+      ART.text(g, cap, x + 2 + cw / 2, y + 2, '#1b2430', 'center'); ART.text(g, label, x + cw + 5, y + 2, '#fff6d6', 'left');
+    } else if (!heard && (e.t >> 5) % 2) g.drawImage(ART.bubble, Math.round(e.x - Cam.x) + 14, Math.round(e.y - Cam.y) - 14 + Math.round(Math.sin(e.t / 8)));
   },
   sign(x, y, idx) { return { kind: 'sign', x, y, w: 14, h: 12, idx, update() { }, draw(e, g) { g.drawImage(ART.sign, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y)); } }; },
   // Where a cría was already rescued on an earlier visit: the ghost of its bubble, so the spot is remembered.
