@@ -60,7 +60,7 @@ const Boss = (() => {
   function set(b, s) { b.state = s; b.st = 0; }
   function face(b, px) { b.dir = px < b.x + 15 ? -1 : 1; }
   function shriek(b, big) {
-    Sound.play('shriek', big ? 1 : .6); b.shriek = big ? 50 : 30; Input.rumble(big ? 300 : 120, big ? .8 : .3, .5);
+    Sound.play('shriek', big ? 1 : .6, { x: b.x + 15 }); b.shriek = big ? 50 : 30; Input.rumble(big ? 300 : 120, big ? .8 : .3, .5);
     Game.word(big ? '¡KRAAAAA!' : '¡KRAAA!', b.x + 15, b.y - 10 < Cam.y + 30 ? b.y + 50 : b.y - 10, big ? '#ff9a6a' : '#f2c46a', true); Cam.shake(big ? 4 : 1, big ? 30 : 8);
   }
   // The beak: where the tip is, standing (for mud and glints).
@@ -147,12 +147,12 @@ const Boss = (() => {
       const n = b.phase === 1 ? 34 : b.dive === 2 ? 26 : 28;
       if (b.st === 1) shriek(b, false);
       b.x = b.tx - 15 + Math.sin(b.st * 1.3) * 1.2;
-      if (b.st >= n) { b.vy = 1; set(b, 'plunge'); Sound.play('swoop'); }
+      if (b.st >= n) { b.vy = 1; set(b, 'plunge'); Sound.play('swoop', null, { x: b.x + 15 }); }
     },
     plunge(b, A) {
       b.vy = Math.min(b.vy + .9, 9); b.y += b.vy; b.x = lerp(b.x, b.tx - 15, .3);
       if (b.y + 30 >= A.floor) {
-        b.y = A.floor - 30; b.air = false; Cam.shake(b.phase === 3 ? 4 : 3, 10); Sound.play('stab'); Sound.play('thud'); Input.rumble(120, .5, .3);
+        b.y = A.floor - 30; b.air = false; Cam.shake(b.phase === 3 ? 4 : 3, 10); Sound.play('stab', null, { x: b.x + 15 }); Sound.play('thud', null, { x: b.x + 15 }); Input.rumble(120, .5, .3);
         dust(b.x + 15, A.floor, 14, 1.7); L.parts.push({ x: b.x + 7, y: A.floor - 2, vx: 0, vy: 0, life: 8, color: '#c9b08a', size: 1, g: 0, kind: 'ring' });
         if (b.phase === 3 && b.dive === 2) set(b, 'stuck'); else set(b, 'land');
       }
@@ -205,28 +205,28 @@ const Boss = (() => {
     // The stab: she rears back (a "!" and a glint on the beak) and strikes where Nila stands.
     windup(b) {
       if (b.st === 1) { b.sdir = b.dir; Sound.play('charge'); }
-      if (b.st >= 30) { b.hurtNila = false; set(b, 'stab'); Sound.play('stab'); }
+      if (b.st >= 30) { b.hurtNila = false; set(b, 'stab'); Sound.play('stab', null, { x: b.x + 15 }); }
     },
     stab(b, A) {
       b.dir = b.sdir;
       if (b.st <= 8) b.x = clamp(b.x + b.sdir * 2, A.x0 + 4, A.x1 - 34);
       const P = Player;
       if (b.st >= 2 && b.st <= 12 && P.inv === 0 && !P.dead && !P.win && overlap(stabZone(b, A), P.rect())) { P.hurt(-b.sdir); b.hurtNila = true; }
-      if (b.st === 9) { const k = beak(b, A); Cam.shake(2, 6); Sound.play('squelch'); spawnParts(10, k.x, k.y, { color: ['#6a5a4a', '#8a7058', '#c9b08a'], angle: -Math.PI / 2, spread: 1.2, speed: [.8, 2.4], life: [12, 22], g: .15 }); }
+      if (b.st === 9) { const k = beak(b, A); Cam.shake(2, 6); Sound.play('squelch', null, { x: b.x + 15 }); spawnParts(10, k.x, k.y, { color: ['#6a5a4a', '#8a7058', '#c9b08a'], angle: -Math.PI / 2, spread: 1.2, speed: [.8, 2.4], life: [12, 22], g: .15 }); }
       if (b.st >= 12) set(b, b.hurtNila ? 'pull' : 'stuck');
     },
     pull(b) { if (b.st >= 24) { b.pat++; set(b, 'walk'); } },
     // The beak is in the mud: the window. Longer in phase II, shorter when she is furious.
     stuck(b, A) {
       b.air = false; const n = b.phase === 2 ? 110 : 80, k = beak(b, A);
-      if (b.st === 1) { Game.word('¡ATASCADA!', b.x + 15, b.y - 10, '#fff6d6', true); Sound.play('squelch'); }
+      if (b.st === 1) { Game.word('¡ATASCADA!', b.x + 15, b.y - 10, '#fff6d6', true); Sound.play('squelch', null, { x: b.x + 15 }); }
       if (b.st % 7 === 0) spawnParts(2, k.x, k.y, { color: ['#6a5a4a', '#8a7058'], angle: -Math.PI / 2 - b.dir * .4, spread: .6, speed: [.6, 1.6], life: [10, 18], g: .15 });
       if (b.st >= n) set(b, 'yank');
     },
     // She pulls the beak free with a spray of mud; the stab loosens a stone (ammo for the next window).
     yank(b, A) {
       if (b.st === 1) {
-        const k = beak(b, A); Sound.play('squelch'); spawnParts(14, k.x, k.y, { color: ['#6a5a4a', '#8a7058', '#c9b08a'], angle: -Math.PI / 2, spread: 1.4, speed: [1, 3], life: [14, 26], g: .15 });
+        const k = beak(b, A); Sound.play('squelch', null, { x: b.x + 15 }); spawnParts(14, k.x, k.y, { color: ['#6a5a4a', '#8a7058', '#c9b08a'], angle: -Math.PI / 2, spread: 1.4, speed: [1, 3], life: [14, 26], g: .15 });
         if (rocks() < 2) { const r = Item.rock(clamp(k.x - 6, A.lo, A.hi - 12), A.floor - 14); r.vy = -3.2; r.vx = -b.dir * 1.4; L.ents.push(r); Game.word('¡CLOC!', k.x, k.y - 12, '#c9b08a', false); }
       }
       if (b.st >= 18) {
@@ -297,7 +297,7 @@ const Boss = (() => {
       if (b.st === 1) { L.bossCk = 3; b.air = true; shriek(b, true); Game.stop(14); Cam.shake(5, 40); b.card = null; Game.toast('¡Sube el agua!', 110); }
       b.air = true; b.x = lerp(b.x, A.mid - 15, .05); b.y = lerp(b.y, 70, .05); face(b, px);
       if (b.st < 70 && b.st % 3 === 0) for (const x of WET_COLS(A)) if (Math.random() < .3) spawnParts(1, x * TS + rnd(2, 14), A.floor + 2, { color: ['#8fd9d0', '#c8f2ea'], angle: -Math.PI / 2, spread: .4, speed: [.4, 1.2], life: [10, 20], g: .05 });
-      if (b.st === 40) { b.rage = 1; b.redT = 24; Game.word('¡FURIA!', b.x + 15, b.y - 12, '#ff5a3a', true); Sound.play('shriek', 1); Cam.punch(1.06); }
+      if (b.st === 40) { b.rage = 1; b.redT = 24; Game.word('¡FURIA!', b.x + 15, b.y - 12, '#ff5a3a', true); Sound.play('shriek', 1, { x: b.x + 15 }); Cam.punch(1.06); }
       if (b.st === 70) flood(A);
       if (b.st >= 120) { b.phase = 3; b.pat = 0; set(b, 'hover'); }
     },
@@ -322,7 +322,7 @@ const Boss = (() => {
       const dx = b.x + 15 - (p.x + p.w / 2), dy = b.y + 14 - (p.y + p.h / 2);
       if (Math.hypot(dx, dy) > 74 || dx * p.vx + dy * p.vy <= 0) continue;
       let d = Math.sign(dx) || 1; if ((d > 0 && b.x + 60 > A.x1) || (d < 0 && b.x - 30 < A.x0)) d = -d;
-      b.dodge = 14; b.dodgeDir = d; b.dodgeCd = 40; Sound.play('flap'); feathers(b.x + 15, b.y + 14, 4); Game.word('¡FUP!', b.x + 15, b.y - 8, '#dff2fb', false);
+      b.dodge = 14; b.dodgeDir = d; b.dodgeCd = 40; Sound.play('flap', null, { x: b.x + 15 }); feathers(b.x + 15, b.y + 14, 4); Game.word('¡FUP!', b.x + 15, b.y - 8, '#dff2fb', false);
       if (!L.bossDodgeHint) { L.bossDodgeHint = true; Game.toast('¡Lo esquiva! Dale cuando se lance', 150); }
       return;
     }
@@ -342,7 +342,7 @@ const Boss = (() => {
   }
   function clash(b) {
     const mx = (b.x + 15 + Player.x + 5) / 2, my = Player.y + 10;
-    Game.word('¡CONTRA!', b.x + 15, b.y - 12, '#dff2fb', true); Sound.play('pop'); Sound.play('heronHit'); Cam.shake(3, 12); Cam.punch(1.04); Game.stop(4);
+    Game.word('¡CONTRA!', b.x + 15, b.y - 12, '#dff2fb', true); Sound.play('pop'); Sound.play('heronHit', null, { x: b.x + 15 }); Cam.shake(3, 12); Cam.punch(1.04); Game.stop(4);
     for (let i = 0; i < 16; i++) L.parts.push({ x: mx, y: my + rnd(-8, 8), vx: rnd(-2.5, 2.5), vy: rnd(-1.5, 1), life: rnd(14, 26) | 0, max: 26, color: '#f2fbff', size: 1, g: 0, kind: 'mist' });
     feathers(b.x + 15, b.y + 10, 10); Game.word('¡LE FALLAN LAS PATAS!', b.x + 15, b.y - 22, '#f2c46a', false);
     set(b, 'stagger');
@@ -357,7 +357,7 @@ const Boss = (() => {
   }
   function fire(b) {
     for (const q of b.aims || []) L.ents.push(plume(q.x, q.y, q.vx, q.vy, q.sx));
-    b.aims = null; Sound.play('feathers'); feathers(b.x + 15, b.y + 10, 6); Cam.shake(1, 4);
+    b.aims = null; Sound.play('feathers', null, { x: b.x + 15 }); feathers(b.x + 15, b.y + 10, 6); Cam.shake(1, 4);
   }
   function flood(A) {
     for (const x of WET_COLS(A)) { setTile(x, L.h - 4, '.'); setTile(x, L.h - 3, '~'); setTile(x, L.h - 2, '~'); spawnParts(6, x * TS + 8, A.floor, { color: ['#8fd9d0', '#c8f2ea', '#2f7f88'], angle: -Math.PI / 2, spread: .8, speed: [1, 3.2], life: [14, 30] }); }
@@ -419,14 +419,14 @@ const Boss = (() => {
     if (!b.fight || b.dead) return false;
     const cx = b.x + 15;
     if (PARRY[b.state] && b.inv === 0) {
-      Sound.play('clang'); Game.word('¡TOC!', cx, b.y - 6, '#cfd6e0', false); spawnParts(5, cx - b.dir * -10, b.y + 12, { color: ['#fff6d6', '#a9b8c9'], speed: [.5, 1.8], life: [6, 12], g: .1 });
+      Sound.play('clang', null, { x: b.x + 15 }); Game.word('¡TOC!', cx, b.y - 6, '#cfd6e0', false); spawnParts(5, cx - b.dir * -10, b.y + 12, { color: ['#fff6d6', '#a9b8c9'], speed: [.5, 1.8], life: [6, 12], g: .1 });
       if (!b.parryHint) { b.parryHint = true; Game.toast('Lo para con el ala: espera a que falle', 140); }
       return true;
     }
     if (!VULN[b.state] || b.inv > 0) return false;
     b.rain = null; b.aims = null;
     const floorHp = PHASE_HP[b.phase] || 0, before = b.hp; b.hp = Math.max(floorHp, b.hp - dmg);
-    b.flash = 14; b.inv = 40; Cam.punch(dmg > 1 ? 1.08 : 1.04); Input.rumble(220, 1, .5); Sound.play('heronHit'); Cam.shake(5, 14); Game.stop(dmg > 1 ? 9 : 6);
+    b.flash = 14; b.inv = 40; Cam.punch(dmg > 1 ? 1.08 : 1.04); Input.rumble(220, 1, .5); Sound.play('heronHit', null, { x: b.x + 15 }); Cam.shake(5, 14); Game.stop(dmg > 1 ? 9 : 6);
     Game.word(dmg > 1 ? '¡ZAS!' : '¡PAF!', cx, b.y - 6, '#fff6d6', true); feathers(cx, b.y + 14, 14);
     free(b, before - b.hp); Game.word('¡PLOP!', cx, b.y + b.h + 4, '#e8fbff', false);
     if (b.hp <= 0) finale(b);

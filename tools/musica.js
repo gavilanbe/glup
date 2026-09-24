@@ -7,6 +7,9 @@
 //   node tools/musica.js inst:flautaPan          un instrumento solo (escalas, notas largas, staccato, acorde)
 //   node tools/musica.js marsh 60 --amb=atardecer   canción con su ambiente debajo
 //   node tools/musica.js --todas                 resumen de todas las canciones (sin WAV)
+//   node tools/musica.js sfx:glup:1.5            un efecto (con su argumento): WAV, PNG, pico y sonoridad
+//   node tools/musica.js --sfx [filtro]          todos los efectos (Sound.efectos()) → artifacts/musica/sfx/ y una tabla
+//   node tools/musica.js --sfxvivo               todos los efectos en el motor en vivo (errores, calentamiento) · --sfxcoste: ms por efecto
 'use strict';
 const fs = require('fs'), path = require('path'), zlib = require('zlib'), os = require('os'), { spawn } = require('child_process');
 const ROOT = path.join(__dirname, '..'), OUT = path.join(ROOT, 'artifacts', 'musica');
@@ -74,7 +77,8 @@ function rmsOf(L, R, a, b) { let s = 0; a = Math.max(0, a | 0); b = Math.min(L.l
 async function renderOne(ev, name, secs) {
   const info = name.includes(':') ? null : await ev(`Sound.info(${JSON.stringify(name)})`);
   if (!name.includes(':') && !info) throw new Error('no existe la canción ' + name + '. Hay: ' + (await ev('Sound.canciones().map(c => c.nombre).join(", ")')));
-  secs = secs || (info ? Math.min(240, Math.ceil(info.primeraVuelta + 10)) : name.startsWith('inst:') ? 16 : 30);
+  const fx = name.startsWith('sfx:');
+  secs = secs || (info ? Math.min(240, Math.ceil(info.primeraVuelta + 10)) : name.startsWith('inst:') ? 16 : fx ? await ev(`Sound.fxLen(${JSON.stringify(name.split(':')[1])})`) : 30);
   const t0 = Date.now();
   const meta = await ev(`(async () => { const r = await Sound.render(${JSON.stringify(name)}, ${secs}, ${JSON.stringify(flags.amb ? { amb: flags.amb } : {})}); const b = r.buffer, L = b.getChannelData(0), R = b.getChannelData(1);
     let clip = 0, peak = 0; for (let i = 0; i < L.length; i++) { const v = Math.max(Math.abs(L[i]), Math.abs(R[i])); if (v > peak) peak = v; if (v >= .999) clip++; }
@@ -84,11 +88,17 @@ async function renderOne(ev, name, secs) {
   const parts = []; for (let i = 0, len = await ev('window.__pcm.length'); i < len; i += 4e6) parts.push(await ev(`window.__pcm.slice(${i}, ${i + 4e6})`));
   const q = new Int16Array(new Uint8Array(Buffer.from(parts.join(''), 'base64')).buffer), n = meta.n, L = new Float32Array(n), R = new Float32Array(n);
   for (let i = 0; i < n; i++) { L[i] = q[2 * i] / 32767; R[i] = q[2 * i + 1] / 32767; }
-  const base = path.join(OUT, name.replace(/[^\w-]/g, '_')); wav(L, R, meta.sr, base + '.wav'); picture(L, R, meta.sr, meta.hist, base + '.png');
+  // Short-term loudness (the loudest 50 ms and 400 ms windows): what an effect sounds like against the music.
+  const stw = w => { const k = Math.floor(meta.sr * w); let m = 0; for (let i = 0; i + k <= n; i += k >> 2) m = Math.max(m, rmsOf(L, R, i, i + k)); return m; };
+  const st50 = stw(.05), st400 = stw(.4); let last = 0; for (let i = 0; i < n; i++) if (Math.abs(L[i]) > .001 || Math.abs(R[i]) > .001) last = i;
+  const dir = fx && flags.sfx ? path.join(OUT, 'sfx') : OUT; fs.mkdirSync(dir, { recursive: true });
+  const base = path.join(dir, name.replace(/[^\w-]/g, '_')); wav(L, R, meta.sr, base + '.wav'); picture(L, R, meta.sr, meta.hist, base + '.png');
   // ---- report
   const sr = meta.sr, lines = [];
   lines.push(`${name}${info && info.titulo ? ' — ' + info.titulo : ''}: ${secs} s renderizados en ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   lines.push(`  pico ${db(meta.peak)} dBFS · RMS ${db(rmsOf(L, R, 0, n))} dBFS · recortes ${meta.clip}`);
+  if (fx && meta.log.length) lines.push('  ERROR: ' + meta.log[0][2]);
+  if (fx) { lines.push(`  sonoridad máx. 50 ms ${db(st50)} dBFS · 400 ms ${db(st400)} dBFS · suena ${(last / meta.sr).toFixed(2)} s`); return { text: lines.join('\n') + '\n  → ' + path.relative(ROOT, base) + '.wav / .png', row: { err: meta.log.length ? meta.log[0][2] : null, peak: meta.peak, st50, st400, len: last / meta.sr, clip: meta.clip, file: path.relative(ROOT, base) + '.png' } }; }
   if (info) {
     lines.push(`  ${info.tempo} bpm ${info.compas} · primera vuelta ${info.primeraVuelta} s (${info.compases} compases, ${info.compasesDistintos} distintos, ${info.compasesVacios} vacíos) · luego vuelve a «${info.vuelveA}»`);
     lines.push('  secciones:'); for (const h of meta.hist) if (h.start < secs) lines.push(`    ${h.start.toFixed(1).padStart(6)} s  ${(h.name + (h.vez ? ' (' + (h.vez + 1) + 'ª)' : '')).padEnd(16)} RMS ${db(rmsOf(L, R, h.start * sr, Math.min(h.end, secs) * sr)).padStart(6)} dBFS`);
@@ -133,10 +143,25 @@ async function renderOne(ev, name, secs) {
       const list = (await ev('Sound.instrumentos().map(i => i.nombre).concat(Sound.percusion())'));
       for (const k of list) { const r = await ev(`(async () => { const r = await Sound.render('inst:${k}', 10); const L = r.buffer.getChannelData(0), R = r.buffer.getChannelData(1); let s = 0, p = 0, n = 0; for (let i = 0; i < L.length; i++) { const v = (L[i] * L[i] + R[i] * R[i]) / 2; s += v; if (v > 1e-7) n++; p = Math.max(p, Math.abs(L[i]), Math.abs(R[i])); } return { rms: Math.sqrt(s / Math.max(1, n)), p }; })()`, true);
         console.log(k.padEnd(14), 'RMS (sonando)', db(r.rms).padStart(6), 'dBFS · pico', db(r.p).padStart(6)); }
+    } else if (flags.sfxvivo) {   // every effect through the live engine (real AudioContext): errors and the warm-up
+      const r = await ev(`(async () => { const errs = []; addEventListener('error', e => errs.push(e.message)); const oe = console.error; console.error = (...a) => { errs.push(a.join(' ')); oe(...a); };
+        Sound.init(); Sound.playMusic('marsh'); await new Promise(r => setTimeout(r, 3000)); const w = Sound.stats();
+        for (const e of Sound.efectos()) { Sound.PERF.fxErr = null; Sound.efecto(e.nombre, e.arg ?? undefined); await new Promise(r => setTimeout(r, 120)); if (Sound.PERF.fxErr) errs.push(Sound.PERF.fxErr); }
+        await new Promise(r => setTimeout(r, 4500)); return { errs, warm: w, stats: Sound.stats() }; })()`, true);
+      console.log('tras 3 s (calentando):', JSON.stringify(r.warm)); console.log('al final:', JSON.stringify(r.stats), '→ media', (r.stats.ms / r.stats.ticks).toFixed(2), 'ms por tick');
+      console.log(r.errs.length ? 'ERRORES:\n  ' + r.errs.join('\n  ') : 'sin errores');
+    } else if (flags.sfxcoste) {   // how long each effect's buffer takes to render (the first trigger pays it, unless warmed up)
+      await ev('Sound.fxCoste()'); const r = await ev('Sound.fxCoste()'); r.sort((a, b) => b[1] - a[1]); console.log(r.map(([k, ms, kb]) => k + ' ' + ms + ' ms ' + kb + ' KB').join(' · ')); console.log('total', Math.round(r.reduce((a, x) => a + x[2], 0)), 'KB');
+    } else if (flags.sfx) {   // every effect: a table of peak and short-term loudness (targets: frequent -30..-22, big -16..-10 dBFS in 50 ms)
+      const list = await ev('Sound.efectos()'), filt = pos[0] || '';
+      console.log('efecto'.padEnd(18), 'pico', '  50ms', ' 400ms', ' dura', ' descripción');
+      for (const e of list) { if (filt && !e.nombre.includes(filt)) continue; const nm = 'sfx:' + e.nombre + (e.arg === null ? '' : ':' + e.arg), r = (await renderOne(ev, nm, null)).row;
+        console.log(nm.slice(4).padEnd(18), db(r.peak).padStart(5), db(r.st50).padStart(6), db(r.st400).padStart(6), r.len.toFixed(2).padStart(5), ' ' + e.desc + (r.clip ? ' · RECORTES ' + r.clip : '') + (r.err ? ' · ERROR ' + r.err : '')); }
+      console.log('→ artifacts/musica/sfx/*.wav / .png');
     } else if (flags.todas) {
       const list = await ev('Sound.canciones().map(c => c.nombre)');
       for (const s of list) { const i = await ev(`Sound.info(${JSON.stringify(s)})`); console.log(`${s.padEnd(10)} ${String(i.titulo || '').padEnd(28)} ${String(i.tempo).padStart(3)} bpm ${i.compas} · ${String(i.primeraVuelta).padStart(6)} s · ${i.compases} compases (${i.compasesDistintos} distintos) · ${i.secciones.length} secciones${i.avisos.length ? ' · ' + i.avisos.length + ' AVISOS: ' + i.avisos.slice(0, 3).join(' | ') : ''}`); }
-    } else console.log(await renderOne(ev, what, secsArg));
+    } else { const r = await renderOne(ev, what, secsArg); console.log(r.text || r); }
   } catch (e) { console.error('ERROR', e.message); process.exitCode = 1; }
   finally { C.close(); }
 })();

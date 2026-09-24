@@ -280,6 +280,9 @@ tools/musica.sh --todas             # resumen de todas: duración, compases dist
 tools/musica.sh marsh 12 --vivo     # el motor en vivo (AudioContext real): errores y CPU del planificador
 tools/musica.sh marsh 60 --perf     # coste de síntesis (porcentaje de tiempo real en un núcleo)
 tools/musica.sh --calibrar          # sonoridad de cada instrumento, lado a lado
+tools/musica.sh sfx:glup:1.5        # un efecto de Sound.play (con su argumento) → WAV, PNG, pico y sonoridad
+tools/musica.sh --sfx               # todos los efectos → artifacts/musica/sfx/ y una tabla de sonoridad
+tools/musica.sh --sfxcoste          # cuánto tarda en renderizarse cada efecto
 ```
 
 El informe da: pico y RMS, **RMS por sección**, recortes, huecos de silencio, notas por pista,
@@ -289,11 +292,12 @@ desconocidos). El PNG tiene la forma de onda arriba (rojo = recorte), el espectr
 de color por sección (con marca blanca si es una repetición). Míralo: una canción viva tiene
 secciones con densidades distintas.
 
-Para escuchar: `index.html?gramola=1` abre la **gramola** (canciones, ambientes e instrumentos; en el
-móvil, tocar). Enseña la sección y el compás que suenan.
+Para escuchar: `index.html?gramola=1` abre la **gramola** (canciones, ambientes, instrumentos y efectos;
+en el móvil, tocar). Enseña la sección y el compás que suenan.
 
 Desde el código del juego: `Sound.playMusic(nombre)` (fundido cruzado de ~1.3 s), `stopMusic()`,
-`ambiente(nombre)`, `duck(true)` (baja música y ambiente en pausas y diálogos), `play(efecto)`,
+`ambiente(nombre)`, `duck(true)` (baja música y ambiente en pausas y diálogos), `play(efecto, arg, { x | pan })`
+(x: posición en el mundo, se convierte en panorama),
 `tocar(inst, nota, dur, fuerza, { pan, rev, en })` (una nota suelta fuera de canción, para efectos),
 `estado()`, `info(nombre)`, `validar(nombre)`.
 

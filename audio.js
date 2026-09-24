@@ -64,20 +64,20 @@ const Sound = (() => {
   function fade(x, sr, secs = .03) { const n = Math.min(x.length, Math.floor(secs * sr)); for (let i = 0; i < n; i++) x[x.length - 1 - i] *= i / n; return x; }
   const arr = (sr, secs) => new Float32Array(Math.max(1, Math.floor(sr * secs)));
 
-  // The buffer cache: every rendered note or sound, least recently used out first past ~40 MB.
-  const BUF = new Map(); let bufBytes = 0; const BUF_MAX = 32e6;
-  function bufOf(c, key, gen) {
-    const k = c.sampleRate + '|' + key; let b = BUF.get(k);
+  // The buffer cache: every rendered note or sound (and the effects), least recently used out first past ~48 MB.
+  const BUF = new Map(); let bufBytes = 0; const BUF_MAX = 48e6;
+  function bufOf(c, key, gen, sr0) {   // sr0: render at another rate (dark sounds at half rate cost half)
+    const sr = sr0 || c.sampleRate, k = sr + '|' + key; let b = BUF.get(k);
     if (b) { BUF.delete(k); BUF.set(k, b); return b; }
-    let d = gen(c.sampleRate); d = Array.isArray(d) ? d : [d];
-    b = c.createBuffer(d.length, d[0].length, c.sampleRate); d.forEach((a, i) => b.getChannelData(i).set(a));
+    let d = gen(sr); d = Array.isArray(d) ? d : [d];
+    b = c.createBuffer(d.length, d[0].length, sr); d.forEach((a, i) => b.getChannelData(i).set(a));
     BUF.set(k, b); bufBytes += d.length * d[0].length * 4;
     while (bufBytes > BUF_MAX && BUF.size > 8) { const [fk, fb] = BUF.entries().next().value; BUF.delete(fk); bufBytes -= fb.length * fb.numberOfChannels * 4; }
     return b;
   }
   // Warm-up queue: buffers a song will need are rendered a few at a time, a few ms per tick.
   const WARM = [];
-  function warmUp(budget) { const t0 = clock(); while (WARM.length && clock() - t0 < budget) { const [c, key, gen] = WARM.shift(); if (!BUF.has(c.sampleRate + '|' + key)) bufOf(c, key, gen); } }
+  function warmUp(budget) { const t0 = clock(); while (WARM.length && clock() - t0 < budget) { const [c, key, gen, sr] = WARM.shift(); if (!BUF.has((sr || c.sampleRate) + '|' + key)) bufOf(c, key, gen, sr); } }
 
   // ================================================================ Mezclador
   // master → glue compressor → limiter → out. Buses for music, ambience and effects; a shared hall
@@ -810,144 +810,429 @@ const Sound = (() => {
   function pebbles(sr) { const o = arr(sr, 1); let t = 0; for (let k = 0; k < 5 + (Math.random() * 5 | 0); k++) { partial(o, sr, rnd(1500, 4000), rnd(.3, 1) * (1 - k / 12), .02, .0002, t); partial(o, sr, rnd(500, 900), .3, .03, .0002, t); t += rnd(.04, .15) * (1 + k * .15); } return norm(o, .6); }
 
   // ================================================================ Efectos del juego
-  // (The same effects as before, now through the mixer with a little room reverb.)
-  function env(node, t, a, d, s, r, peak = 1, sustainLevel = 0) {
-    node.gain.cancelScheduledValues(t); node.gain.setValueAtTime(0, t); node.gain.linearRampToValueAtTime(peak, t + a);
-    node.gain.linearRampToValueAtTime(peak * sustainLevel, t + a + d); node.gain.setValueAtTime(peak * sustainLevel, t + a + d + s);
-    node.gain.linearRampToValueAtTime(0, t + a + d + s + r);
+  // Foley and stingers, all synthesized, in the spirit of Rayman 1: wet, woody, breathy, cartoony but
+  // organic. Most effects are rendered once in JS (a few variants each, cached like the instrument
+  // notes) and played back with a small random nudge of pitch and level, so repeated sounds never
+  // machine-gun; they go through the effects bus (a small room, a touch of hall) with an optional pan.
+  // The musical ones (stingers, chimes, UI) play the engine's instruments in D major, the key the
+  // music leans on. Sound.play(name, arg, { pan, x }) — x: a world x, turned into a pan around the camera.
+
+  // ---- JS DSP for the effects
+  const expEnv = (atk, dec) => t => (t < atk ? t / atk : Math.exp(-(t - atk) / dec));
+  const hump = (p = 1, skew = 1) => (t, u) => Math.pow(Math.sin(Math.PI * Math.pow(u, skew)), p);
+  // A sine gliding exponentially from f0 to f1 (time constant glT), decaying exponentially (dec).
+  // (A sine table and multiplicative envelopes keep these cheap: a buffer renders in a few ms.)
+  const SINE = new Float32Array(4097); for (let i = 0; i <= 4096; i++) SINE[i] = Math.sin(TAU * i / 4096);
+  const sinT = ph => { const x = (ph - Math.floor(ph)) * 4096, i = x | 0; return SINE[i] + (SINE[i + 1] - SINE[i]) * (x - i); };   // ph in cycles
+  function tone(o, sr, at, f0, f1, glT, a, dec, atk = .0015, h2 = 0) {
+    const s = Math.floor(at * sr), n = Math.min(o.length - s, Math.ceil(dec * 7 * sr)), dg = Math.exp(-1 / (glT * sr)), dd = Math.exp(-1 / (dec * sr)), na = atk * sr;
+    let ph = 0, e = 1, g = a;
+    for (let i = 0; i < n; i++) { const f = f1 + (f0 - f1) * e; ph += f / sr; o[s + i] += (sinT(ph) + (h2 ? h2 * sinT(2 * ph) : 0)) * g * (i < na ? i / na : 1); e *= dg; g *= dd; }
   }
-  function osc(type, f, t, dur, vol, bus = sfxBus, slide = null, attack = .005, release = .05) {
-    const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.setValueAtTime(f, t);
-    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, slide), t + dur);
-    env(g, t, attack, Math.max(0, dur - attack - release) * .3, Math.max(0, dur - attack - release) * .7, release, vol, .6);
-    o.connect(g); g.connect(bus); o.start(t); o.stop(t + dur + release + .02); return o;
+  // Filtered noise: fc is Hz or fn(t, u) (u = 0..1 through the burst); en(t, u) its envelope. Band-pass is level-compensated.
+  function nb(o, sr, at, len, fc, q, mode, a, en) {
+    const n = Math.floor(len * sr), s = Math.floor(at * sr); if (n <= 0) return o;
+    const z = svf(noiseArr(n), typeof fc === 'function' ? i => fc(i / sr, i / n) : fc, q, sr, mode), k = a * (mode === 'bp' ? 1 / q : 1);
+    let e = 1; for (let i = 0; i < n && s + i < o.length; i++) { if (en && (i & 7) === 0) e = en(i / sr, i / n); o[s + i] += z[i] * k * e; }
+    return o;
   }
-  function noise(t, dur, vol, filterType = 'bandpass', f0 = 1200, f1 = null, q = 1, bus = sfxBus) {
-    const src = ctx.createBufferSource(); src.buffer = noiseBuffer; src.loop = true;
-    const fl = ctx.createBiquadFilter(); fl.type = filterType; fl.frequency.setValueAtTime(f0, t); fl.Q.value = q;
-    if (f1) fl.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
-    const g = ctx.createGain(); env(g, t, .004, dur * .3, dur * .4, dur * .3, vol, .5);
-    src.connect(fl); fl.connect(g); g.connect(bus); src.start(t); src.stop(t + dur + .05);
+  function bubble(o, sr, at, f, dec, a, rise = .6) {   // an air bubble in water (Minnaert): a sine whose pitch rises as it dies
+    const s = Math.floor(at * sr), n = Math.min(o.length - s, Math.ceil(dec * 6 * sr)), dd = Math.exp(-1 / (dec * sr)), na = .0012 * sr, df = f * rise / (dec * sr) / sr;
+    let ph = 0, g = a, fr = f / sr;
+    for (let i = 0; i < n; i++) { ph += fr; fr += df; o[s + i] += sinT(ph) * g * (i < na ? i / na : 1); g *= dd; }
   }
+  function knock(o, sr, at, f, a, dec, parts = [[1, 1], [2.32, .45], [4.1, .2]]) {   // a struck piece of wood: a few modes and a click
+    for (const [r, g] of parts) tone(o, sr, at, f * r * 1.02, f * r, .004, a * g, dec / Math.sqrt(r), .0006);
+    nb(o, sr, at, .006, Math.min(9000, f * 3), 1, 'bp', a * .9, expEnv(.0003, .0012));
+  }
+  function grains(o, sr, at, len, n, fLo, fHi, a, dec, shape = 2) {   // debris, crackle: n tiny pings over len seconds, thinning out
+    for (let k = 0; k < n; k++) { const u = Math.pow(Math.random(), shape); partial(o, sr, rnd(fLo, fHi), a * rnd(.3, 1) * (1 - u * .7), dec * rnd(.5, 1.5), .0003, at + u * len); }
+  }
+  function drops(o, sr, at, len, n, fLo, fHi, a, shape = 1.5) { for (let k = 0; k < n; k++) bubble(o, sr, at + Math.pow(Math.random(), shape) * len, rnd(fLo, fHi), rnd(.006, .018), a * rnd(.3, 1), rnd(.3, 1)); }
+  // A voice source: glottal pulses with jitter, shimmer and period doubling, a spectral tilt, breath and an envelope.
+  function glot(sr, len, f0, o = {}) {
+    const x = arr(sr, len), jit = o.jit || 0, sh = o.shim || 0; let t = 0, k = 0;
+    while (t < len) { x[Math.floor(t * sr)] += (1 + rnd(-sh, sh)) * (o.sub && k & 1 ? 1 - o.sub : 1); t += (1 + rnd(-jit, jit)) / f0(t, t / len); k++; }
+    const c = Math.exp(-TAU * (o.tilt || 800) / sr); let a = 0, b = 0;
+    for (let i = 0; i < x.length; i++) { a = x[i] * (1 - c) + a * c; b = a * (1 - c) + b * c; x[i] = b; }
+    biq(x, 'hp', o.hp || 80, .7, sr); let e = 0; for (let i = 0; i < x.length; i++) e += x[i] * x[i]; const kk = 1 / Math.sqrt(e / x.length || 1);
+    for (let i = 0; i < x.length; i++) { const t = i / sr; x[i] = (x[i] * kk + (Math.random() * 2 - 1) * (o.breath || 0)) * (o.env ? o.env(t, t / len) : 1); }
+    return x;
+  }
+  function fmt(x, sr, F) {   // formants: parallel resonances [f (Hz or fn(t, u)), q, gain]
+    const n = x.length, out = new Float32Array(n);
+    for (const [f, q, g] of F) { const y = svf(x.slice(), typeof f === 'function' ? i => f(i / sr, i / n) : f, q, sr, 'bp'); for (let i = 0; i < n; i++) out[i] += y[i] * g / q; }
+    return out;
+  }
+  const sat = (x, d) => { const k = Math.tanh(d); for (let i = 0; i < x.length; i++) x[i] = Math.tanh(x[i] * d) / k; return x; };
+  function stereo(x, sr, p0, p1, wid = 0) {   // pans a mono sound from p0 to p1 across its length; wid: a short delay on the right for width
+    const n = x.length, L = new Float32Array(n), R = new Float32Array(n), d = Math.floor(wid * sr);
+    for (let i = 0; i < n; i++) { const p = (p0 + (p1 - p0) * i / n + 1) * Math.PI / 4; L[i] = x[i] * Math.cos(p); R[i] = (i >= d ? x[i - d] : 0) * Math.sin(p); }
+    return [L, R];
+  }
+  function normS(ch, peak = .9) { let m = 0; for (const x of ch) for (let i = 0; i < x.length; i++) { const v = Math.abs(x[i]); if (v > m) m = v; } if (m) for (const x of ch) for (let i = 0; i < x.length; i++) x[i] *= peak / m; return ch; }
+  const fin = (o, sr, pk = .9, f = .02) => norm(fade(o, sr, f), pk);
+  function loopify(x, sr, xf) { const n = Math.floor(xf * sr), m = x.length - n, y = x.slice(0, m); for (let i = 0; i < n; i++) { const k = i / n; y[i] = x[i] * Math.sqrt(k) + x[m + i] * Math.sqrt(1 - k); } return y; }
+  const noteHz = n => mtof(midi(n));
+
+  // ---- Voices: a heron, a babbling teacher
+  // The grey heron's call: a harsh, croaking 'fraank' — rough glottal pulses (jitter, period doubling),
+  // a rattling 'fr' onset, an open nasal 'aa' and a closing 'nk', driven into a little saturation.
+  function heronCry(sr, o) {
+    const len = o.len, [fa, fb] = o.f0;
+    const x = glot(sr, len, (t, u) => fa * Math.pow(fb / fa, u) * (1 + .03 * Math.sin(TAU * 6 * t)), { jit: o.jit ?? .12, shim: .45, sub: o.sub ?? .5, tilt: 1600, breath: o.breath ?? .42, hp: 140,
+      env: (t, u) => Math.min(1, t / .02) * (u > .78 ? Math.pow((1 - u) / .22, 1.3) : 1) * (t < .08 ? .5 + .5 * Math.abs(Math.sin(TAU * 16 * t)) : 1) });
+    const y = fmt(x, sr, [[(t, u) => 520 + 420 * Math.min(1, t / .07) - (u > .8 ? 380 * (u - .8) / .2 : 0), 2.4, 1.1], [t => 1200 + 300 * Math.min(1, t / .09), 3.2, 1], [2450, 4, .75], [3500, 5, .4], [5200, 3, .12]]);
+    sat(norm(y, 1), o.sat ?? 2.4);
+    return fin(biq(y, 'hp', 220, .7, sr), sr, .9, .025);
+  }
+  // A syllable of 'babble' for the teachers' dialogue: a glottal voice through the formants of one of
+  // five vowels (scaled by the creature's size: a high voice has a small mouth), sometimes with a
+  // plosive or a nasal onset, and an intonation that rises or falls.
+  const VOWELS = [[800, 1250, 2600], [480, 1850, 2600], [320, 2300, 3100], [520, 880, 2450], [360, 760, 2350]];
+  function syllable(sr, k, voz) {
+    const V = VOWELS[k % 5], cons = Math.floor(k / 5) % 3, size = clamp(Math.pow(voz / 210, .42), .78, 1.6), old = voz < 140, len = old ? .1 : .085, v0 = cons === 1 ? .012 : 0;
+    const dir = rnd(-1, 1), o = arr(sr, len + .02);
+    const x = glot(sr, len - v0, (t, u) => voz * (1 + dir * .14 * u) * (1 + .1 * Math.exp(-t / .015)), { jit: old ? .05 : .012, shim: old ? .25 : .08, tilt: 700 * size, breath: old ? .35 : .15, hp: Math.min(voz * .8, 200),
+      env: (t, u) => Math.min(1, t / .008) * Math.min(1, (1 - u) / .35) });
+    const F = V.map((f, i) => [cons === 2 && i === 0 ? (t => (t < .022 ? 280 : f) * size) : f * size, [5, 8, 10][i], [1, .7, .35][i]]);
+    const y = fmt(x, sr, F), s = Math.floor(v0 * sr);
+    if (cons === 2) for (let i = 0; i < y.length && i < .022 * sr; i++) y[i] *= .45;
+    for (let i = 0; i < y.length && s + i < o.length; i++) o[s + i] += y[i];
+    if (cons === 1) nb(o, sr, 0, .014, rnd(2200, 4200) * Math.min(size, 1.3), 1.2, 'bp', .9, expEnv(.001, .004));
+    return fin(o, sr, .85, .012);
+  }
+
+  // ---- The effects, rendered: v variants each (gen(sr, k, p): k the variant, p a parameter when the key carries one)
+  const FX = {
+    // Nila
+    step: { v: 6, vol: .13, jit: .07, gen(sr) { const o = arr(sr, .16); tone(o, sr, 0, rnd(150, 200), rnd(75, 95), .012, .7, .02); nb(o, sr, .002, .07, rnd(900, 1700), .9, 'bp', 1.1, expEnv(.002, .013));
+      if (Math.random() < .6) nb(o, sr, .004, .03, 4200, .8, 'hp', .25, expEnv(.001, .006)); if (Math.random() < .45) bubble(o, sr, rnd(.01, .03), rnd(450, 800), .012, .25); return fin(biq(o, 'lp', 5500, .7, sr), sr); } },
+    jump: { v: 4, vol: .3, jit: .05, gen(sr) { const o = arr(sr, .3), f = rnd(.85, 1.15);
+      nb(o, sr, 0, .2, (t, u) => (500 + 2400 * Math.pow(u, .7)) * f, 1.3, 'bp', 1, (t, u) => Math.pow(Math.sin(Math.PI * Math.pow(u, .45)), 2));
+      tone(o, sr, 0, 140, 85, .02, .45, .03); nb(o, sr, 0, .03, 1300, 1, 'bp', .45, expEnv(.001, .008)); tone(o, sr, .01, 300 * f, 620 * f, .035, .12, .05, .01); return fin(o, sr); } },
+    land: { v: 4, vol: .5, jit: .05, gen(sr) { const o = arr(sr, .4); tone(o, sr, 0, 125, 46, .025, 1, .07); nb(o, sr, 0, .22, t => 2400 * Math.exp(-t / .045) + 280, .7, 'lp', .75, expEnv(.001, .05));
+      grains(o, sr, .01, .18, 7, 1800, 5000, .12, .02); nb(o, sr, .008, .09, 850, 1, 'bp', .35, expEnv(.004, .02)); if (Math.random() < .5) bubble(o, sr, .03, rnd(350, 600), .02, .2); return fin(o, sr); } },
+    flap: { v: 4, vol: .4, jit: .06, gen(sr) { const o = arr(sr, .32);
+      nb(o, sr, 0, .17, (t, u) => 600 + 1500 * Math.sin(Math.PI * u), 1.2, 'bp', 1, (t, u) => Math.pow(Math.sin(Math.PI * Math.pow(u, .6)), 2) * (.75 + .25 * Math.sin(TAU * 34 * t)));
+      tone(o, sr, .04, 120, 70, .03, .5, .05, .008); nb(o, sr, .05, .12, 3200, .8, 'bp', .3, (t, u) => (1 - u) * Math.abs(Math.sin(TAU * 28 * t))); return fin(o, sr); } },
+    whoosh: { v: 3, vol: .26, jit: .06, gen(sr) { const len = rnd(.32, .45), o = arr(sr, len + .05), f = rnd(.8, 1.2), p = Math.random() < .5 ? -1 : 1;
+      nb(o, sr, 0, len, (t, u) => (320 + 2000 * Math.pow(Math.sin(Math.PI * u), 1.6)) * f, 1.5, 'bp', 1, (t, u) => Math.pow(Math.sin(Math.PI * Math.pow(u, .7)), 2));
+      nb(o, sr, 0, len, 4000, .7, 'hp', .12, (t, u) => Math.pow(Math.sin(Math.PI * Math.pow(u, .75)), 3)); return normS(stereo(o, sr, -.5 * p, .5 * p)); } },
+    hurt: { v: 3, vol: .45, jit: .04, gen(sr) { const o = arr(sr, .45), f = rnd(.95, 1.08);
+      knock(o, sr, 0, 330, .6, .05, [[1, 1], [2.2, .5], [3.9, .25]]); tone(o, sr, 0, 420, 170, .05, .5, .08);
+      const v = glot(sr, .22, (t, u) => 560 * f * (1 - .32 * u), { jit: .02, shim: .1, tilt: 1200, breath: .2, hp: 200, env: (t, u) => Math.min(1, t / .01) * Math.pow(1 - u, 1.2) });
+      const y = fmt(v, sr, [[t => 1050 - 300 * Math.min(1, t / .2), 5, 1], [1650, 8, .7], [3100, 10, .35]]), s = Math.floor(.02 * sr); for (let i = 0; i < y.length; i++) o[s + i] += y[i] * .9;
+      return fin(o, sr); } },
+    death: { v: 1, vol: .3, gen(sr) { const o = arr(sr, 1.6); let ph = 0;   // a slide whistle falling, and a plop
+      for (let i = 0, n = Math.floor(1.0 * sr); i < n; i++) { const t = i / sr, u = t / 1, f = 1250 * Math.pow(.27, Math.pow(u, 1.25)) * (1 + .022 * Math.sin(TAU * 6.5 * t)); ph += TAU * f / sr; o[i] += (Math.sin(ph) + .08 * Math.sin(2 * ph)) * .5 * Math.min(1, t / .03) * (u > .85 ? (1 - u) / .15 : 1); }
+      nb(o, sr, 0, 1, (t, u) => 1250 * Math.pow(.27, Math.pow(u, 1.25)), 3, 'bp', .6, hump(1, .3));
+      tone(o, sr, 1.02, 380, 140, .04, .5, .09); bubble(o, sr, 1.05, 260, .05, .5, .8); bubble(o, sr, 1.16, 330, .04, .3, .8); drops(o, sr, 1.02, .25, 6, 900, 2400, .08); return fin(o, sr); } },
+    // Bigotes: gulps, spits, blows
+    glup: { v: 4, vol: .45, jit: .04, gen(sr) { const o = arr(sr, .4);
+      nb(o, sr, 0, .014, 1900, 1.2, 'bp', .7, expEnv(.0005, .004)); tone(o, sr, .004, rnd(480, 560), rnd(170, 200), .022, 1, .045, .002, .15);
+      bubble(o, sr, .075, rnd(210, 250), .055, .85, .65); nb(o, sr, .07, .12, 700, 1.5, 'bp', .35, expEnv(.005, .03)); bubble(o, sr, rnd(.12, .16), rnd(500, 700), .02, .2, .8); return fin(biq(o, 'lp', 3800, .7, sr), sr); } },
+    belly: { v: 2, vol: .5, gen(sr) { const o = arr(sr, .35); tone(o, sr, 0, 90, 48, .04, 1, .09, .006); nb(o, sr, 0, .2, 220, 1, 'lp', .4, expEnv(.01, .06)); bubble(o, sr, .09, rnd(110, 150), .07, .35, .5); return fin(o, sr); } },
+    spit: { v: 4, vol: 1.6, jit: .05, gen(sr) { const o = arr(sr, .32);
+      nb(o, sr, 0, .005, 3000, .8, 'hp', .9, expEnv(.0003, .0012)); tone(o, sr, 0, 160, 90, .02, .45, .025);
+      nb(o, sr, .004, .15, (t, u) => 3200 - 1800 * u, .9, 'bp', 1.1, expEnv(.003, .035)); tone(o, sr, .006, rnd(950, 1100), rnd(320, 380), .03, .28, .045, .003); drops(o, sr, .02, .14, 7, 1400, 3600, .18); return fin(o, sr); } },
+    bigspit: { v: 3, vol: .95, jit: .04, gen(sr) { const o = arr(sr, .75);
+      nb(o, sr, 0, .006, 2500, .8, 'hp', 1, expEnv(.0003, .0015)); tone(o, sr, 0, 160, 42, .06, 1, .12, .002);
+      nb(o, sr, .003, .45, t => 700 + 3200 * Math.exp(-t / .07), .8, 'bp', 1.3, expEnv(.003, .1)); nb(o, sr, .003, .15, 260, 3, 'bp', .6, expEnv(.002, .05));
+      tone(o, sr, .01, 700, 230, .05, .3, .07, .004); drops(o, sr, .05, .45, 16, 1100, 3800, .2); return fin(o, sr); } },
+    blub: { v: 4, vol: .32, jit: .05, gen(sr) { const o = arr(sr, .35); let t = 0; for (let k = 0; k < 2 + (Math.random() * 2 | 0); k++) { bubble(o, sr, t, rnd(230, 420) * (1 + k * .15), rnd(.025, .04), 1 - k * .2, .7); t += rnd(.05, .09); } return fin(o, sr); } },
+    sputter: { v: 6, vol: .26, jit: .06, gen(sr) { const o = arr(sr, .22); let t = 0; for (let k = 0; k < 3 + (Math.random() * 3 | 0); k++) { nb(o, sr, t, .018, rnd(1800, 3200), 1, 'bp', .6, expEnv(.001, .005)); bubble(o, sr, t + .003, rnd(500, 1100), .012, .5, .8); t += rnd(.02, .045); }
+      nb(o, sr, 0, .15, 500, 2, 'bp', .25, hump(1, .5)); return fin(o, sr); } },
+    puff: { v: 3, vol: .8, jit: .06, gen(sr) { const o = arr(sr, .25); nb(o, sr, 0, .004, 2400, 1, 'bp', .8, expEnv(.0003, .001)); nb(o, sr, .002, .2, t => 2200 - 900 * t / .2, .8, 'bp', 1, expEnv(.006, .045)); nb(o, sr, .002, .15, 700, 1, 'bp', .35, expEnv(.008, .03)); return fin(o, sr); } },
+    inhale: { v: 2, vol: .3, gen(sr) { const len = .32, o = arr(sr, len + .02);
+      nb(o, sr, 0, len, (t, u) => 600 + 1800 * u * u, 1.1, 'bp', 1, (t, u) => Math.pow(u, 1.6) * (u > .94 ? (1 - u) / .06 : 1)); nb(o, sr, 0, len, (t, u) => 380 + 400 * u, 3, 'bp', .45, (t, u) => Math.pow(u, 2) * (u > .94 ? (1 - u) / .06 : 1)); return fin(o, sr, .9, .005); } },
+    gust: { v: 2, vol: .55, hz: 22050, jit: .05, gen(sr) { const len = .75, n = Math.floor(len * sr), m = rnd(0, 6), turb = (t) => .7 + .18 * Math.sin(TAU * 9 * t + m) + .12 * Math.sin(TAU * 23 * t + 2 * m);
+      const mk = () => { const o = arr(sr, len); nb(o, sr, 0, len, (t, u) => 900 + 700 * Math.sin(Math.PI * Math.min(1, u * 1.6)), .9, 'bp', 1, (t, u) => expEnv(.015, .22)(t) * turb(t)); nb(o, sr, 0, len, 320, 2, 'bp', .7, (t) => expEnv(.02, .18)(t) * turb(t + .05)); nb(o, sr, 0, len, 4500, .7, 'hp', .12, expEnv(.005, .1)); return o; };
+      const L = mk(), R = mk(); tone(L, sr, 0, 110, 60, .05, .35, .12, .01); tone(R, sr, 0, 110, 60, .05, .35, .12, .01); return normS([fade(L, sr), fade(R, sr)]); } },
+    pop: { v: 6, vol: .9, jit: .08, gen(sr) { const o = arr(sr, .22), f = rnd(650, 1300);
+      nb(o, sr, 0, .003, 5000, .8, 'hp', .8, expEnv(.0002, .0008)); bubble(o, sr, .001, f, .028, 1, .9); tone(o, sr, 0, 260, 150, .02, .35, .025); drops(o, sr, .01, .08, 4, 2200, 4800, .15); return fin(o, sr); } },
+    thud: { v: 5, vol: .5, jit: .08, gen(sr) { const o = arr(sr, .3);
+      tone(o, sr, 0, rnd(100, 130), rnd(50, 60), .02, 1, .065); knock(o, sr, 0, rnd(260, 380), .35, .045, [[1, 1], [2.3, .4]]); nb(o, sr, 0, .12, t => 1300 * Math.exp(-t / .03) + 250, .7, 'lp', .6, expEnv(.001, .03));
+      if (Math.random() < .5) grains(o, sr, .01, .12, 5, 1500, 4000, .08, .015); return fin(o, sr); } },
+    hit: { v: 4, vol: 1.3, jit: .06, gen(sr) { const o = arr(sr, .3);
+      nb(o, sr, 0, .006, 4000, .8, 'hp', 1, expEnv(.0002, .0015)); for (let k = 0; k < 4; k++) partial(o, sr, rnd(1700, 4600), rnd(.15, .35), rnd(.015, .045), .0003);
+      tone(o, sr, 0, 240, 105, .015, .8, .04); grains(o, sr, .015, .2, 6, 1800, 5000, .15, .02); nb(o, sr, 0, .1, 1800, .8, 'bp', .35, expEnv(.001, .02)); return fin(o, sr); } },
+    crack: { v: 2, vol: .7, hz: 22050, jit: .05, gen(sr) { const mk = () => { const o = arr(sr, 1.2); nb(o, sr, 0, .015, 1500, .7, 'hp', 1, expEnv(.0003, .003)); nb(o, sr, .002, .12, 1100, 1.2, 'bp', .7, expEnv(.001, .03));
+        tone(o, sr, 0, 95, 38, .05, .9, .14, .002); grains(o, sr, .02, .9, 26, 1000, 5500, .22, .03, 2.2); grains(o, sr, .02, .6, 8, 350, 900, .25, .04, 2); nb(o, sr, .01, .8, 1600, .9, 'bp', .12, (t, u) => Math.pow(1 - u, 3)); return o; };
+      return normS([fade(mk(), sr, .1), fade(mk(), sr, .1)]); } },
+    clang: { v: 2, vol: .8, jit: .04, gen(sr) { const o = arr(sr, .9), f = rnd(470, 560);
+      [[1, 1, .55], [2.32, .7, .4], [4.25, .5, .28], [6.63, .3, .16], [9.38, .2, .1]].forEach(([r, a, t]) => { partial(o, sr, f * r, a, t, .0004); partial(o, sr, f * r * 1.004, a * .5, t * .8, .0004); });
+      nb(o, sr, 0, .005, 5000, .8, 'hp', .8, expEnv(.0002, .001)); tone(o, sr, 0, 220, 120, .02, .4, .03); return fin(o, sr, .9, .1); } },
+    bounce: { v: 3, vol: .45, jit: .05, gen(sr) { const o = arr(sr, .55), f = rnd(.92, 1.08); let ph = 0, ph2 = 0;   // a rubbery 'boing'
+      for (let i = 0; i < o.length; i++) { const t = i / sr, fr = (140 + 230 * (1 - Math.exp(-t / .05))) * f * (1 + .07 * Math.exp(-t / .2) * Math.sin(TAU * 15 * t)), e = Math.exp(-t / .16) * Math.min(1, t / .003); ph += TAU * fr / sr; ph2 += TAU * fr * 2.31 / sr; o[i] = (Math.sin(ph) + .2 * Math.sin(ph2) * Math.exp(-t / .05)) * e; }
+      tone(o, sr, 0, 110, 60, .02, .5, .04); return fin(o, sr); } },
+    switch: { v: 3, vol: .42, jit: .05, gen(sr) { const o = arr(sr, .28), f = rnd(.93, 1.07); knock(o, sr, 0, 1500 * f, .5, .012); knock(o, sr, .045, 700 * f, .8, .03); tone(o, sr, .045, 640 * f, 600 * f, .01, .35, .05); partial(o, sr, 2700 * f, .08, .08, .001, .05); return fin(o, sr); } },
+    gate: { v: 1, vol: .4, hz: 22050, gen(sr) { const o = arr(sr, 1.7), x = arr(sr, 1.4); let t = 0;   // a stone slab grinding up, a creak, a thunk
+      nb(o, sr, 0, 1.35, t => 300 + 140 * Math.sin(TAU * 1.3 * t), .8, 'lp', 2.4, (t, u) => Math.pow(Math.sin(Math.PI * Math.pow(u, .5)), 1.5) * (.55 + .45 * Math.abs(Math.sin(TAU * (9 + 4 * Math.sin(TAU * .7 * t)) * t))));
+      while (t < 1.2) { x[Math.floor(t * sr)] += Math.sin(Math.PI * t / 1.2); t += 1 / rnd(14, 34); }
+      const c1 = biq(x.slice(), 'bp', 240, 9, sr), c2 = biq(x.slice(), 'bp', 620, 7, sr); for (let i = 0; i < x.length; i++) o[i + Math.floor(.1 * sr)] += (c1[i] + c2[i] * .6) * 2;
+      tone(o, sr, 1.32, 110, 48, .03, 1, .1); knock(o, sr, 1.32, 260, .5, .06); grains(o, sr, 1.33, .3, 8, 1500, 4000, .15, .02); return fin(o, sr, .9, .1); } },
+    // Critters
+    frog: { v: 3, vol: .55, jit: .05, gen(sr) { const o = arr(sr, .4), r = frog(sr, 'ribbit'); o.set(r.subarray(0, Math.min(r.length, o.length))); nb(o, sr, 0, .08, 900, 1, 'bp', .3, expEnv(.005, .02)); return fin(o, sr); } },
+    croak: { v: 3, vol: .55, jit: .05, gen(sr) { return fin(frog(sr, 'croac'), sr); } },
+    buzz: { v: 2, vol: .16, jit: .05, gen(sr) { const len = .9, x = glot(sr, len, (t, u) => 560 * (1 + .05 * Math.cos(Math.PI * u)) * (1 + .03 * Math.sin(TAU * 7 * t)), { tilt: 5000, hp: 300, env: (t, u) => Math.pow(Math.sin(Math.PI * u), 1.5) });
+      return fin(fmt(x, sr, [[1100, 2, 1], [2600, 3, .8], [4400, 3, .4]]), sr); } },
+    stun: { v: 1, vol: .3, gen(sr) { const L = arr(sr, 1), R = arr(sr, 1); knock(L, sr, 0, 380, .6, .04); knock(R, sr, 0, 380, .6, .04);   // a bonk and birdies circling
+      for (let k = 0; k < 6; k++) { const at = .08 + k * .13, f = rnd(2500, 3300), s = (1 + Math.cos(k * 1.9)) / 2; const b = arr(sr, .14); sweep(b, sr, f, f * 1.35, .05, .5, .03, 0, .1); for (let i = 0; i < b.length; i++) { const j = i + Math.floor(at * sr); if (j < L.length) { L[j] += b[i] * (1 - s); R[j] += b[i] * s; } } }
+      return normS([fade(L, sr), fade(R, sr)]); } },
+    // Impacts of the world
+    splash: { v: 3, vol: 1.3, jit: .06, gen(sr) { const o = arr(sr, .9);
+      bubble(o, sr, 0, rnd(250, 380), .03, .9, 1.2); nb(o, sr, 0, .6, t => 3800 * Math.exp(-t / .1) + 450, .7, 'lp', 1, (t) => Math.min(1, t / .004) * Math.exp(-t / .12));
+      nb(o, sr, .01, .5, 3000, .8, 'bp', .35, (t) => Math.exp(-t / .1)); drops(o, sr, .05, .6, 14, 700, 2400, .25, 1.2); drops(o, sr, .15, .55, 8, 1500, 3500, .12); return fin(o, sr, .9, .1); } },
+    hiss: { v: 2, vol: .45, gen(sr) { const o = arr(sr, 1);
+      nb(o, sr, 0, .9, (t, u) => 7000 - 4200 * u, .7, 'bp', 1, (t, u) => Math.min(1, t / .02) * Math.pow(1 - u, 1.4)); grains(o, sr, .02, .75, 70, 2500, 7500, .2, .005, 1.3); bubble(o, sr, 0, 320, .03, .5); drops(o, sr, 0, .12, 5, 700, 1800, .2); return fin(o, sr, .9, .05); } },
+    thunder: { v: 1, vol: .8, hz: 22050, gen(sr) { const len = rnd(4, 5), o = arr(sr, len), bumps = [[0, .02, .5, 1]]; for (let k = 0; k < 3 + (Math.random() * 3 | 0); k++) bumps.push([rnd(.1, len * .45), rnd(.08, .4), rnd(.6, 1.8), rnd(.35, .9)]);
+      nb(o, sr, 0, len, (t, u) => 90 + 220 * Math.abs(Math.sin(TAU * .8 * t)) * (1 - u), .7, 'lp', .9, t => { let e = 0; for (const [s0, a, d, g] of bumps) if (t > s0) e += g * (t < s0 + a ? (t - s0) / a : Math.exp(-(t - s0 - a) / d)); return e; });
+      nb(o, sr, 0, .02, 1200, .7, 'hp', 1, expEnv(.0005, .005)); nb(o, sr, .002, .5, t => 2500 * Math.exp(-t / .06) + 200, .7, 'lp', 1, expEnv(.002, .12)); grains(o, sr, .005, .25, 30, 800, 4000, .2, .01, 1.5); tone(o, sr, 0, 70, 35, .1, .7, .4, .01);
+      return fin(o, sr, .9, .5); } },
+    rumble: { v: 1, vol: .45, hz: 22050, gen(sr) { const o = arr(sr, 1.6);
+      nb(o, sr, 0, 1.5, t => 90 + 110 * Math.exp(-t / .3), .8, 'lp', 1.4, (t, u) => Math.min(1, t / .01) * Math.pow(1 - u, 1.4) * (.6 + .4 * Math.sin(TAU * 11 * t))); tone(o, sr, 0, 60, 38, .1, .8, .35, .01);
+      grains(o, sr, .05, 1.1, 20, 900, 4000, .08, .02, 1.6); grains(o, sr, .05, .9, 8, 250, 600, .15, .04, 1.6); return normS(stereo(fade(o, sr, .2), sr, 0, 0, .011)); } },
+    whistle: { v: 2, vol: .17, gen(sr) { const len = .7, o = arr(sr, len + .02); let ph = 0;   // a rock whistling down
+      for (let i = 0, n = Math.floor(len * sr); i < n; i++) { const t = i / sr, u = t / len, f = 1800 - 1150 * Math.pow(u, 1.3); ph += TAU * f * (1 + .006 * Math.sin(TAU * 11 * t)) / sr; o[i] += Math.sin(ph) * (.2 + .8 * Math.pow(u, 1.5)) * (u > .96 ? (1 - u) / .04 : 1); }
+      nb(o, sr, 0, len, (t, u) => 1800 - 1150 * Math.pow(u, 1.3), 4, 'bp', 1.5, (t, u) => (.2 + .8 * Math.pow(u, 1.5)) * (u > .96 ? (1 - u) / .04 : 1)); return fin(o, sr, .9, .005); } },
+    chirp: { v: 3, vol: .13, gen(sr) { const o = arr(sr, .5), base = rnd(2600, 4200); let t = 0;
+      for (let i = 0, n = 2 + (Math.random() * 3 | 0); i < n; i++) { const f = base * rnd(.85, 1.2), k = Math.random(); if (k < .4) sweep(o, sr, f * .8, f * 1.3, .05, .7, .02, t, .15); else if (k < .7) sweep(o, sr, f * 1.3, f * .75, .06, .7, .02, t, .15); else for (let j = 0; j < 4; j++) sweep(o, sr, f * 1.1, f * .95, .016, .45, .01, t + j * .026); t += rnd(.08, .15); }
+      return fin(o, sr, .8); } },
+    // The heron
+    heron: { v: 3, vol: .55, jit: .04, gen(sr) { return heronCry(sr, { len: rnd(.42, .55), f0: [rnd(290, 320), rnd(225, 250)] }); } },
+    shriekBig: { v: 2, vol: .6, jit: .03, gen(sr) { const a = heronCry(sr, { len: .72, f0: [440, 300], sat: 3.2, breath: .7, jit: .15 }), b = heronCry(sr, { len: .26, f0: [400, 340], sat: 3, breath: .7 }), o = arr(sr, 1.2);
+      o.set(a); const s = Math.floor(.8 * sr); for (let i = 0; i < b.length && s + i < o.length; i++) o[s + i] += b[i] * .7; nb(o, sr, 0, .9, 2600, 1.5, 'bp', .15, hump(1, .4)); return fin(o, sr); } },
+    shriek: { v: 2, vol: .5, jit: .04, gen(sr) { return heronCry(sr, { len: .5, f0: [400, 310], sat: 2.8, breath: .6 }); } },
+    heronHit: { v: 3, vol: .6, jit: .04, gen(sr) { const o = arr(sr, .6), q = heronCry(sr, { len: .2, f0: [560, 430], sat: 3, jit: .08 }); for (let i = 0; i < q.length; i++) o[i + Math.floor(.015 * sr)] += q[i] * .8;
+      tone(o, sr, 0, 150, 60, .03, .9, .07); nb(o, sr, 0, .1, 1500, .8, 'lp', .5, expEnv(.001, .02)); for (let k = 0; k < 7; k++) nb(o, sr, .04 + k * rnd(.025, .04), .03, rnd(2500, 4200), .8, 'bp', .25 * (1 - k / 8), hump(1)); return fin(o, sr); } },
+    swoop: { v: 2, vol: .5, hz: 22050, gen(sr) { const len = .95, o = arr(sr, len + .05), p = Math.random() < .5 ? -1 : 1;
+      nb(o, sr, 0, len, (t, u) => 240 + 1500 * Math.pow(Math.sin(Math.PI * Math.pow(u, .8)), 2), 1.3, 'bp', 1, (t, u) => Math.pow(Math.sin(Math.PI * Math.pow(u, .8)), 2) * (.7 + .3 * Math.sin(TAU * 4.5 * t)));
+      nb(o, sr, 0, len, 180, 1, 'lp', .6, (t, u) => Math.pow(Math.sin(Math.PI * u), 2) * Math.pow(Math.abs(Math.sin(TAU * 2.2 * t)), 3)); return normS(stereo(o, sr, -.7 * p, .7 * p, .008)); } },
+    gustWind: { v: 1, vol: .55, hz: 22050, gen(sr) { const len = 2, mk = ph => { const o = arr(sr, len);
+        nb(o, sr, 0, len, (t, u) => 380 + 1100 * Math.sin(Math.PI * Math.pow(u, .6)) + 150 * Math.sin(TAU * 1.7 * t + ph), 1.1, 'bp', 1, (t, u) => Math.pow(Math.sin(Math.PI * Math.pow(u, .5)), 1.4) * (.65 + .35 * Math.sin(TAU * 2.3 * t + ph) * Math.sin(TAU * 5.1 * t)));
+        nb(o, sr, 0, len, t => 600 - 380 * t / len, .8, 'lp', .7, (t, u) => Math.pow(Math.sin(Math.PI * Math.pow(u, .5)), 2)); return fade(o, sr, .2); };
+      return normS([mk(0), mk(2)]); } },
+    ruffle: { v: 2, vol: .6, gen(sr) { const o = arr(sr, .5); let t = 0; for (let k = 0; k < 11; k++) { nb(o, sr, t, .035, rnd(2600, 4800), .9, 'bp', rnd(.5, 1) * (1 - k / 14), hump(1.5)); nb(o, sr, t, .03, 900, 1, 'bp', .25, hump(2)); t += rnd(.028, .042); } return fin(o, sr); } },
+    feathers: { v: 2, vol: .45, gen(sr) { const o = arr(sr, .7);
+      for (const at of [0, .13]) { nb(o, sr, at, .12, (t, u) => 500 + 1400 * Math.sin(Math.PI * u), 1.2, 'bp', 1, hump(2, .6)); tone(o, sr, at + .03, 110, 65, .03, .5, .05, .008); }
+      let t = .2; for (let k = 0; k < 9; k++) { nb(o, sr, t, .03, rnd(2800, 5000), .9, 'bp', rnd(.3, .6) * (1 - k / 10), hump(1.5)); t += rnd(.03, .05); } return fin(o, sr); } },
+    stab: { v: 2, vol: .5, gen(sr) { const o = arr(sr, .45);
+      nb(o, sr, 0, .07, (t, u) => 800 + 2400 * u, 1.4, 'bp', .7, (t, u) => Math.pow(u, 2)); tone(o, sr, .07, 190, 65, .02, 1, .05); nb(o, sr, .07, .15, t => 1400 * Math.exp(-t / .03) + 250, .8, 'lp', .7, expEnv(.001, .04));
+      bubble(o, sr, .09, rnd(170, 230), .04, .5, .5); nb(o, sr, .07, .005, 3000, .8, 'hp', .6, expEnv(.0002, .001)); return fin(o, sr); } },
+    squelch: { v: 3, vol: .36, jit: .05, gen(sr) { const o = arr(sr, .65), len = rnd(.35, .5);
+      nb(o, sr, 0, len, (t, u) => 280 + 700 * Math.sin(Math.PI * Math.pow(u, .7)), 3.5, 'bp', 1.2, (t, u) => Math.pow(Math.sin(Math.PI * Math.pow(u, .6)), 1.2) * (.6 + .4 * Math.sin(TAU * 13 * t)));
+      for (let k = 0; k < 4; k++) bubble(o, sr, rnd(0, len * .8), rnd(140, 340), rnd(.03, .05), rnd(.3, .6), .5); tone(o, sr, len, 520, 260, .01, .5, .02); nb(o, sr, len, .005, 3000, .8, 'hp', .5, expEnv(.0002, .0012)); return fin(o, sr, .9, .05); } },
+    bossDown: { v: 1, vol: .4, hz: 22050, gen(sr) { const o = arr(sr, 2.6), c = heronCry(sr, { len: 1.15, f0: [400, 150], sat: 2.6, sub: .6, breath: .6, jit: .16 }); for (let i = 0; i < c.length; i++) o[i] += c[i] * .75;
+      const at = 1.05; tone(o, sr, at, 120, 40, .05, 1, .18, .002); nb(o, sr, at, .6, t => 2200 * Math.exp(-t / .06) + 250, .7, 'lp', .9, expEnv(.002, .12)); grains(o, sr, at + .02, .9, 22, 900, 4500, .2, .025, 2);
+      for (let k = 0; k < 8; k++) nb(o, sr, at + .05 + k * rnd(.03, .05), .04, rnd(2500, 4500), .8, 'bp', .25 * (1 - k / 9), hump(1.5)); return normS(stereo(fade(o, sr, .3), sr, 0, 0, .012)); } },
+    // The learning cinematic
+    chomp: { v: 3, vol: 1.1, jit: .05, gen(sr) { const o = arr(sr, .3); knock(o, sr, 0, rnd(1900, 2300), .7, .01, [[1, 1], [1.7, .5]]); knock(o, sr, .028, rnd(1500, 1800), .9, .012, [[1, 1], [1.8, .4]]);
+      grains(o, sr, .03, .12, 16, 900, 3500, .3, .006, 1.3); nb(o, sr, .028, .12, 1200, .8, 'lp', .5, expEnv(.002, .03)); tone(o, sr, .028, 170, 90, .02, .6, .035); return fin(o, sr); } },
+    gulpBig: { v: 1, vol: .4, gen(sr) { const o = arr(sr, .95);
+      nb(o, sr, 0, .02, 1400, 1.2, 'bp', .6, expEnv(.001, .006)); tone(o, sr, .01, 420, 125, .07, 1, .13, .004, .2); nb(o, sr, .02, .3, t => 900 - 500 * Math.min(1, t / .3), 3, 'bp', .6, hump(1, .5));
+      tone(o, sr, .26, 85, 42, .05, .9, .14, .008); for (let k = 0; k < 5; k++) bubble(o, sr, .3 + k * rnd(.06, .1), rnd(110, 240), rnd(.04, .07), .35 * (1 - k / 6), .5); return fin(o, sr, .9, .1); } },
+    heartbeat: { v: 1, vol: .38, gen(sr) { const o = arr(sr, .55); tone(o, sr, 0, 72, 42, .03, 1, .07, .006); nb(o, sr, 0, .05, 180, 1, 'lp', .4, expEnv(.003, .015)); tone(o, sr, .19, 64, 38, .03, .75, .07, .006); nb(o, sr, .19, .05, 160, 1, 'lp', .3, expEnv(.003, .015)); return fin(biq(o, 'lp', 320, .7, sr), sr); } },
+    shing: { v: 1, vol: .5, gen(sr) { const mk = d => { const o = arr(sr, 1), f = 2350 * d; [[1, 1, .9], [1.5, .5, .6], [2.13, .45, .45], [2.76, .3, .35], [3.9, .2, .2]].forEach(([r, a, t]) => partial(o, sr, f * r, a, t, .004)); nb(o, sr, 0, .12, t => 4000 + 30000 * t, .8, 'hp', .35, (t, u) => (1 - u) * Math.min(1, t / .01)); return o; };
+      const a = mk(1), b = mk(1.004); for (let i = 0; i < a.length; i++) a[i] += b[i]; return fin(a, sr, .9, .1); } },
+    powerSwell: { v: 1, vol: .45, hz: 22050, gen(sr) { const len = 1.05, mk = det => { const o = arr(sr, len + .05); let p1 = 0, p2 = 0, p3 = 0;
+        for (let i = 0, n = Math.floor(len * sr); i < n; i++) { const t = i / sr, u = t / len, f = 110 * Math.pow(4, Math.pow(u, 1.3)) * det, e = u * u * (u > .95 ? (1 - u) / .05 : 1); p1 += f / sr; p2 += f * 1.5 / sr; p3 += f * 2.01 / sr; o[i] = (sinT(p1) + .5 * sinT(p2) + .35 * sinT(p3)) * e * .35; }
+        nb(o, sr, 0, len, (t, u) => 300 + 5000 * u * u, 1.2, 'bp', 1, (t, u) => Math.pow(u, 2) * (u > .95 ? (1 - u) / .05 : 1)); return o; };
+      return normS([mk(1), mk(1.006)]); } },
+    powerBoom: { v: 1, vol: .5, hz: 22050, gen(sr) { const mk = () => { const o = arr(sr, 1.4); tone(o, sr, 0, 90, 32, .08, 1, .3, .002); nb(o, sr, 0, .9, t => 6000 * Math.exp(-t / .12) + 250, .7, 'lp', 1, expEnv(.002, .22));
+        for (let k = 0; k < 24; k++) partial(o, sr, rnd(2500, 8000), rnd(.02, .07), rnd(.3, .9), .01, rnd(.02, .3)); return fade(o, sr, .2); }; return normS([mk(), mk()]); } },
+    // UI and tallies
+    select: { v: 2, vol: .75, jit: .01, gen(sr) { const o = arr(sr, .2); partial(o, sr, 880, 1, .09, .001); partial(o, sr, 880 * 3.93, .2, .03, .001); nb(o, sr, 0, .004, 3000, 1, 'bp', .35, expEnv(.0003, .001)); return fin(o, sr); } },
+    text: { v: 4, vol: 1.1, jit: .06, gen(sr) { const o = arr(sr, .05); knock(o, sr, 0, rnd(2200, 3200), .7, .006, [[1, 1], [1.6, .4]]); return fin(o, sr, .9, .005); } },
+    tick: { v: 2, vol: .16, jit: .004, gen(sr) { const o = arr(sr, .1); partial(o, sr, 1175, 1, .045, .0008); partial(o, sr, 1175 * 2.76, .25, .015, .0005); nb(o, sr, 0, .003, 4000, 1, 'bp', .3, expEnv(.0002, .0008)); return fin(o, sr); } },
+    slam: { v: 3, vol: .45, jit: .05, gen(sr) { const o = arr(sr, .35); tone(o, sr, 0, 150, 70, .015, 1, .05); knock(o, sr, 0, rnd(420, 520), .6, .04); nb(o, sr, 0, .08, 900, .8, 'lp', .5, expEnv(.001, .02)); return fin(o, sr); } },
+    stamp: { v: 2, vol: .7, jit: .04, gen(sr) { const o = arr(sr, .45); tone(o, sr, 0, 110, 45, .02, 1, .08); knock(o, sr, 0, 240, .6, .05, [[1, 1], [2.1, .4]]); nb(o, sr, 0, .15, t => 1200 * Math.exp(-t / .03) + 200, .7, 'lp', .7, expEnv(.001, .04)); nb(o, sr, .03, .12, 700, 2, 'bp', .2, hump(1)); return fin(o, sr); } },
+    coins: { v: 2, vol: .2, gen(sr) { const o = arr(sr, .6); for (let k = 0; k < 7; k++) { const at = k * rnd(.02, .045), f = rnd(3000, 5200); partial(o, sr, f, rnd(.4, 1), rnd(.08, .2), .0005, at); partial(o, sr, f * 1.52, .3, .06, .0005, at); } nb(o, sr, 0, .005, 3500, 1, 'bp', .5, expEnv(.0002, .001)); return fin(o, sr); } },
+    bloop: { v: 3, vol: .25, jit: .03, gen(sr) { const o = arr(sr, .4); bubble(o, sr, 0, 340, .04, 1, 1.1); nb(o, sr, 0, .2, t => 3000 * Math.exp(-t / .04) + 400, .8, 'lp', .35, expEnv(.002, .04)); drops(o, sr, .03, .2, 5, 1200, 3000, .15); return fin(o, sr); } },
+    bubbles: { v: 3, vol: .3, gen(sr) { const o = arr(sr, .4); for (let k = 0; k < 6; k++) bubble(o, sr, k * rnd(.018, .03), 600 * Math.pow(1.2, k) * rnd(.9, 1.1), .02, .6, .8); return fin(o, sr); } },
+    fire: { v: 2, vol: .45, gen(sr) { const o = arr(sr, .9);   // a wick catching: a soft 'fwomp' and crackle
+      nb(o, sr, 0, .5, (t, u) => 300 + 2200 * Math.sin(Math.PI * Math.min(1, u * 1.5)), .8, 'lp', 1, (t, u) => Math.min(1, Math.pow(t / .07, 2)) * Math.exp(-Math.max(0, t - .07) / .12)); tone(o, sr, .03, 90, 60, .05, .4, .08, .02);
+      grains(o, sr, .05, .75, 26, 1500, 6000, .25, .004, 1.4); return fin(o, sr, .9, .1); } },
+    suckStep: { v: 2, vol: .3, gen(sr) { const o = arr(sr, .3); nb(o, sr, 0, .22, (t, u) => 500 + 3000 * u * u, 2.2, 'bp', 1, (t, u) => Math.pow(u, 1.2) * (u > .9 ? (1 - u) / .1 : 1)); bubble(o, sr, .2, 700, .02, .4, 1); return fin(o, sr, .9, .01); } },
+    // The loops
+    jetLoop: { v: 1, hz: 22050, gen(sr) { const len = 2.6, mk = () => { const o = arr(sr, len), m = [rnd(0, 6), rnd(0, 6)];
+        nb(o, sr, 0, len, t => 2800 + 800 * Math.sin(TAU * 1.3 * t + m[0]), .6, 'bp', 1, t => .7 + .15 * Math.sin(TAU * 7.3 * t + m[1]) + .15 * Math.sin(TAU * 13.1 * t));
+        nb(o, sr, 0, len, 420, 2, 'bp', .9, t => .5 + .5 * Math.abs(Math.sin(TAU * 4.7 * t + m[0]))); nb(o, sr, 0, len, 7000, .7, 'hp', .15);
+        for (let k = 0; k < 260; k++) bubble(o, sr, rnd(0, len - .05), rnd(900, 4200), rnd(.004, .01), rnd(.04, .14), .6); return loopify(o, sr, .3); };
+      const L = mk(), h = L.length >> 1, R = new Float32Array(L.length); R.set(L.subarray(h)); R.set(L.subarray(0, h), L.length - h); return normS([L, R], .8); } } };
+
+  // ---- Playing them
+  let FXO = {};   // options of the effect being played ({ pan })
+  const FXLAST = {}, LIM = { step: .05, text: .03, talk: .07, tick: .033, pop: .025, thud: .03, hit: .03, splash: .05, sputter: .06, whoosh: .05, land: .06, blub: .05, clang: .05, select: .02, bloop: .03, slam: .03, flap: .04, spit: .03, glup: .04 };
+  function fxRoute(n, pan, rev) { let d = n; if (pan) { const p = panner(ctx, pan); n.connect(p); d = p; } d.connect(sfxBus); if (rev) d.connect(gainNode(ctx, rev, M.sfxWet)); }
+  function shot(name, o = {}) {
+    const D = FX[name], k = (Math.random() * (D.v || 1)) | 0, buf = bufOf(ctx, 'fx:' + name + (o.key ?? '') + ':' + k, sr => D.gen(sr, k, o.p), fxRate(D));
+    const src = ctx.createBufferSource(), j = o.jit ?? D.jit ?? .03; src.buffer = buf; src.playbackRate.value = (o.rate || 1) * (1 + rnd(-j, j));
+    const g = gainNode(ctx, (o.vol ?? D.vol ?? .5) * (o.k ?? 1) * rnd(.88, 1)); src.connect(g); fxRoute(g, o.pan ?? FXO.pan ?? 0, o.rev ?? D.rev ?? 0);
+    src.start(ctx.currentTime + (o.at || 0)); return src;
+  }
+  // A note on an engine instrument, as part of an effect (the stingers are not placed in the scene).
+  let NV = 1;   // a level for the notes of the effect being played (the big stingers turn it down a little)
+  const nota = (inst, n, at, dur, vel, rev = .3) => tocar(inst, n, dur, vel * .85 * NV, { en: at, rev });
+  const seq = (inst, notes, step, dur, vel, at = 0, rev) => notes.forEach((n, i) => n && nota(inst, n, at + i * step, dur, typeof vel === 'function' ? vel(i) : vel, rev));
+  const DPENT = ['D', 'E', 'F#', 'A', 'B'], dpent = (k, oct) => DPENT[k % 5] + (oct + Math.floor(k / 5));   // D major pentatonic, climbing
   const sfx = {
-    jump() { const t = ctx.currentTime; osc('square', 300, t, .12, .12, sfxBus, 620); osc('triangle', 150, t, .08, .1, sfxBus, 300); },
-    land(k = 1) { const t = ctx.currentTime; noise(t, .06 + k * .05, .08 + k * .16, 'lowpass', 300 + k * 200, 120); osc('sine', 110 - k * 30, t, .07, .06 + k * .14, sfxBus, 40); },
-    step() { const t = ctx.currentTime; noise(t, .04, .05, 'bandpass', 900, 500, 2); },
-    // Weighted sounds: `w` is how heavy the load is (a mosquito .35, a rock 1, a crate 1.5); heavier is lower and longer.
-    glup(w = 1) { const t = ctx.currentTime, f = 1.25 - w * .3; osc('sine', 520 * f, t, .14 + w * .03, .25, sfxBus, 150 * f, .005, .08); osc('triangle', 260 * f, t + .04, .12, .15, sfxBus, 90 * f); noise(t, .1, .1, 'lowpass', 900, 200); if (w >= 1) osc('sine', 90, t + .06, .1, .18 * w, sfxBus, 45); },
-    spit(w = 1) { const t = ctx.currentTime, f = 1.3 - w * .35; noise(t, .12 + w * .05, .22 + w * .08, 'bandpass', 700 * f, 2400 * f, 1.5); osc('square', 180 * f, t, .08, .12, sfxBus, 900 * f); if (w >= 1) osc('sine', 80, t, .1, .12 * w, sfxBus, 40); },
-    blub() { const t = ctx.currentTime; osc('sine', 300, t, .08, .12, sfxBus, 620, .005, .04); osc('sine', 420, t + .07, .06, .08, sfxBus, 800, .005, .03); },
-    sputter() { const t = ctx.currentTime; noise(t, .06, .14, 'bandpass', 1800, 700, 2); osc('sine', 240, t, .05, .06, sfxBus, 120); },
-    puff() { const t = ctx.currentTime; noise(t, .1, .15, 'highpass', 1500, 4000); },
-    hit() { const t = ctx.currentTime; noise(t, .12, .3, 'lowpass', 1500, 200); osc('square', 220, t, .1, .15, sfxBus, 60); },
-    pop() { const t = ctx.currentTime; osc('sine', 800, t, .06, .2, sfxBus, 300); noise(t, .05, .12, 'highpass', 2000); },
-    crack() { const t = ctx.currentTime; noise(t, .25, .4, 'lowpass', 2500, 300, .8); osc('triangle', 120, t, .2, .2, sfxBus, 40); },
-    thud() { const t = ctx.currentTime; noise(t, .1, .2, 'lowpass', 500, 100); osc('sine', 70, t, .1, .25, sfxBus, 35); },
-    hurt() { const t = ctx.currentTime; osc('sawtooth', 500, t, .25, .16, sfxBus, 120); osc('square', 250, t + .05, .2, .1, sfxBus, 70); },
-    death() { const t = ctx.currentTime; [0, .12, .24, .4].forEach((d, i) => osc('square', 400 - i * 80, t + d, .16, .14, sfxBus, 200 - i * 40)); },
-    pearl() { const t = ctx.currentTime; osc('sine', 900, t, .05, .16, sfxBus, 300, .002, .04); noise(t, .04, .08, 'highpass', 3000); osc('sine', 1046, t + .06, .08, .16, sfxBus, 1400, .003, .05); osc('sine', 1568, t + .13, .14, .14, sfxBus, 1900, .003, .1); },
-    thunder() { const t = ctx.currentTime; noise(t, 2.2, .5, 'lowpass', 900, 60, .7); noise(t + .05, .25, .35, 'highpass', 1500, 400); osc('sine', 48, t, 1.2, .3, sfxBus, 30, .02, .8); },
-    // The ending: a bird greeting the sun, and a soft bell for the last card.
-    chirp() { const t = ctx.currentTime; osc('sine', 2500, t, .06, .05, sfxBus, 3300, .003, .03); osc('sine', 2800, t + .09, .05, .045, sfxBus, 3700, .003, .03); osc('sine', 3100, t + .16, .08, .04, sfxBus, 2600, .003, .05); },
-    bell() { const t = ctx.currentTime; [[587, 0], [880, .005], [1175, .01]].forEach(([f, d], i) => osc('sine', f, t + d, 1.6, .12 / (i + 1), sfxBus, f * .998, .004, 1.2)); },
-    learn() { const t = ctx.currentTime; ['C5', 'E5', 'G5', 'B5', 'D6', 'G6'].forEach((n, i) => osc('sine', freq(n), t + i * .05, .5 - i * .05, .1, sfxBus, null, .005, .3)); noise(t, .6, .05, 'highpass', 5000, 9000); osc('triangle', 130, t, .5, .12, sfxBus, 260, .02, .3); },
-    gust() { const t = ctx.currentTime; noise(t, .45, .42, 'bandpass', 700, 2600, 1.4); noise(t + .05, .35, .2, 'lowpass', 500, 180); osc('sine', 140, t, .25, .12, sfxBus, 70, .01, .15); },
-    inhale() { const t = ctx.currentTime; noise(t, .12, .12, 'bandpass', 2200, 900, 2); },
-    talk(p) { const t = ctx.currentTime, f = p || 180; osc('triangle', f + Math.random() * f * .33, t, .05, .1, sfxBus, f * .78, .005, .03); },
-    heart() { const t = ctx.currentTime; [523, 659, 784, 1046].forEach((f, i) => osc('triangle', f, t + i * .06, .12, .16, sfxBus, null, .003, .08)); },
-    lantern() { const t = ctx.currentTime; [392, 523, 659, 784, 1046].forEach((f, i) => osc('triangle', f, t + i * .07, .2, .15, sfxBus, null, .003, .12)); noise(t, .4, .06, 'highpass', 4000); },
-    bounce() { const t = ctx.currentTime; osc('sine', 180, t, .22, .25, sfxBus, 720, .005, .08); osc('triangle', 90, t, .1, .1, sfxBus, 360); },
-    switch() { const t = ctx.currentTime; osc('square', 440, t, .08, .14, sfxBus, null, .003, .04); osc('square', 660, t + .09, .14, .14, sfxBus, null, .003, .08); noise(t, .1, .12, 'lowpass', 1200, 300); },
-    gate() { const t = ctx.currentTime; noise(t, .5, .2, 'lowpass', 600, 150, 1); for (let i = 0; i < 6; i++) osc('square', 80 + i * 6, t + i * .07, .06, .08, sfxBus, 70); },
-    frog() { const t = ctx.currentTime; osc('sawtooth', 160, t, .12, .1, sfxBus, 260, .01, .06); },
-    croak() { const t = ctx.currentTime; osc('sawtooth', 110, t, .18, .12, sfxBus, 90, .02, .08); },
-    buzz() { const t = ctx.currentTime; osc('sawtooth', 700, t, .12, .04, sfxBus, 760, .02, .06); },
-    heron() { const t = ctx.currentTime; osc('sawtooth', 900, t, .3, .14, sfxBus, 400, .02, .1); osc('square', 1200, t + .05, .2, .06, sfxBus, 500, .02, .1); },
-    heronHit() { const t = ctx.currentTime; noise(t, .3, .35, 'lowpass', 1800, 200); osc('sawtooth', 700, t, .35, .16, sfxBus, 150, .01, .15); },
-    swoop() { const t = ctx.currentTime; noise(t, .5, .25, 'bandpass', 300, 1800, 2); },
-    // The heron's fight: a scream in layers, the wind of her wings, feathers, the stab into the mud...
-    shriek(k = 1) { const t = ctx.currentTime; for (let i = 0; i < 3; i++) osc('sawtooth', (1250 - i * 180) * (.9 + k * .1), t + i * .04, .32 + k * .3, .1 + k * .05, sfxBus, 420 - i * 60, .01, .2); osc('square', 1600, t + .06, .18 + k * .2, .05, sfxBus, 700, .01, .12); noise(t, .3 + k * .3, .12 + k * .1, 'bandpass', 2600, 900, 2); },
-    gustWind() { const t = ctx.currentTime; noise(t, 1.9, .34, 'bandpass', 380, 1500, 1.2); noise(t + .2, 1.5, .18, 'lowpass', 600, 200); },
-    ruffle() { const t = ctx.currentTime; for (let i = 0; i < 7; i++) noise(t + i * .045, .05, .12, 'bandpass', 2400 + i * 200, 1500, 3); },
-    feathers() { const t = ctx.currentTime; for (let i = 0; i < 4; i++) noise(t + i * .03, .16, .2, 'bandpass', 900 + i * 400, 3200, 2); osc('square', 900, t, .08, .06, sfxBus, 1800); },
-    stab() { const t = ctx.currentTime; noise(t, .14, .3, 'bandpass', 1500, 400, 1.5); osc('triangle', 300, t, .1, .14, sfxBus, 90); },
-    squelch() { const t = ctx.currentTime; noise(t, .22, .3, 'lowpass', 700, 150, 2); osc('sine', 180, t, .16, .18, sfxBus, 60, .005, .08); osc('sine', 260, t + .1, .08, .1, sfxBus, 120); },
-    rumble() { const t = ctx.currentTime; noise(t, 1.3, .5, 'lowpass', 260, 60, .8); osc('sine', 46, t, 1, .32, sfxBus, 32, .02, .5); },
-    whistle() { const t = ctx.currentTime; osc('sine', 1500, t, .65, .06, sfxBus, 420, .05, .1); },
-    bossDown() { const t = ctx.currentTime; noise(t, 1.2, .55, 'lowpass', 3000, 90, .7); osc('sine', 70, t, 1, .4, sfxBus, 30, .01, .6); ['E4', 'B4', 'E5', 'G5'].forEach((n, i) => osc('triangle', freq(n), t + .25 + i * .09, .9, .09, sfxBus, null, .01, .6)); },
-    stun() { const t = ctx.currentTime; [0, .1, .2, .3, .4].forEach((d, i) => osc('sine', 900 + Math.sin(i) * 300, t + d, .08, .1, sfxBus, 700 + i * 50)); },
-    select() { const t = ctx.currentTime; osc('square', 660, t, .05, .1, sfxBus, null, .003, .03); },
-    confirm() { const t = ctx.currentTime; osc('square', 523, t, .07, .12, sfxBus, null, .003, .04); osc('square', 784, t + .07, .12, .12, sfxBus, null, .003, .08); },
-    clear() { const t = ctx.currentTime; ['C5', 'E5', 'G5', 'C6', 'G5', 'C6'].forEach((n, i) => osc('triangle', freq(n), t + i * .1, .25, .16, sfxBus, null, .005, .15)); },
-    text() { const t = ctx.currentTime; osc('square', 1200, t, .02, .05, sfxBus, null, .002, .02); },
-    splash() { const t = ctx.currentTime; noise(t, .4, .35, 'lowpass', 2000, 300, .7); osc('sine', 400, t, .15, .12, sfxBus, 80); },
-    suckup(lv = 2) { const t = ctx.currentTime, k = [1, 1.26, 1.5][lv - 1]; noise(t, .22, .1 + lv * .04, 'bandpass', 500 * lv, 2600 * lv, 2); osc('triangle', 330 * k, t, .14, .12, sfxBus, 700 * k, .005, .08); if (lv === 3) osc('square', 990, t + .08, .12, .07, sfxBus, 1480, .003, .06); },
-    // The learning cinematic: the bite, the big gulp, the power rising in him and bursting out.
-    chomp() { const t = ctx.currentTime; noise(t, .09, .22, 'lowpass', 2200, 300, 1); osc('square', 190, t, .09, .12, sfxBus, 70, .002, .05); },
-    gulpBig() { const t = ctx.currentTime; osc('sine', 320, t, .4, .2, sfxBus, 80, .01, .15); osc('triangle', 160, t + .05, .3, .08, sfxBus, 60, .01, .1); },
-    shing() { const t = ctx.currentTime; osc('sine', 1800, t, .35, .09, sfxBus, 3600, .003, .3); osc('triangle', 2700, t + .03, .3, .05, sfxBus, 5400, .003, .25); noise(t, .12, .05, 'highpass', 5000); },
-    heartbeat() { const t = ctx.currentTime; osc('sine', 70, t, .16, .32, sfxBus, 40, .004, .1); osc('sine', 62, t + .2, .14, .24, sfxBus, 36, .004, .1); },
-    powerRise() { const t = ctx.currentTime; osc('sawtooth', 70, t, 1.05, .045, sfxBus, 560, .35, .15); osc('triangle', 140, t, 1.05, .07, sfxBus, 1120, .35, .15); osc('sine', 280, t + .5, .55, .05, sfxBus, 1680, .1, .1); noise(t, 1.05, .06, 'bandpass', 250, 3200, 3); },
-    powerBurst() { const t = ctx.currentTime; noise(t, .6, .24, 'lowpass', 3500, 180, 1); osc('sine', 70, t, .6, .3, sfxBus, 28, .004, .35); ['C5', 'E5', 'G5', 'C6', 'E6'].forEach((n, i) => osc('triangle', freq(n), t + .03 * i, .9, .07, sfxBus, null, .005, .45)); },
-    charge() { const t = ctx.currentTime; osc('sawtooth', 120, t, .55, .08, sfxBus, 420, .05, .2); },
-    charged() { const t = ctx.currentTime; osc('square', 660, t, .06, .12, sfxBus, null, .003, .04); osc('square', 990, t + .06, .1, .12, sfxBus, null, .003, .06); noise(t, .12, .1, 'highpass', 3000); },
-    bigspit() { const t = ctx.currentTime; noise(t, .3, .45, 'bandpass', 500, 3000, 1.2); osc('square', 140, t, .12, .2, sfxBus, 1200); osc('sine', 60, t, .18, .3, sfxBus, 30); },
-    hiss() { const t = ctx.currentTime; noise(t, .7, .3, 'highpass', 2500, 900, .8); osc('sine', 300, t, .2, .06, sfxBus, 120); },
-    clang() { const t = ctx.currentTime; osc('square', 1800, t, .08, .1, sfxBus, 900, .002, .1); osc('triangle', 2400, t, .12, .06, sfxBus, 1200, .002, .1); noise(t, .06, .1, 'highpass', 4000); },
-    flap() { const t = ctx.currentTime; noise(t, .12, .2, 'bandpass', 900, 300, 1.5); osc('sine', 420, t, .1, .12, sfxBus, 180, .005, .06); },
-    // The level-clear jingle: a snare roll that swells, a run up, a big chord with a cymbal, a quick
-    // turn and the final chord with the bass an octave down, a sparkle gliss on top.
-    fanfare() { const t = ctx.currentTime;
-      for (let i = 0; i < 10; i++) noise(t + i * .03, .05, .05 + i * .02, 'bandpass', 1900, 1200, .9);
-      ['C4', 'E4', 'G4', 'C5', 'E5', 'G5'].forEach((n, i) => { osc('square', freq(n), t + .3 + i * .055, .08, .07, sfxBus, null, .003, .04); osc('triangle', freq(n), t + .3 + i * .055, .09, .12, sfxBus, null, .003, .05); });
-      const c1 = t + .66;
-      ['C6', 'G5', 'E5', 'C5'].forEach((n, i) => osc(i ? 'triangle' : 'square', freq(n), c1, .42, i ? .11 : .08, sfxBus, null, .005, .18));
-      osc('triangle', freq('C3'), c1, .42, .22, sfxBus, null, .005, .15); osc('sine', 110, c1, .16, .32, sfxBus, 45); noise(c1, .9, .14, 'highpass', 5000, 9000, .6); noise(c1, .14, .22, 'bandpass', 1800, 900, 1);
-      ['A5', 'B5', 'D6'].forEach((n, i) => { osc('square', freq(n), t + 1.12 + i * .1, .09, .08, sfxBus, null, .003, .05); osc('triangle', freq(n), t + 1.12 + i * .1, .09, .1, sfxBus, null, .003, .05); });
-      osc('triangle', freq('G2'), t + 1.12, .3, .2, sfxBus, null, .005, .1); noise(t + 1.12, .08, .12, 'bandpass', 1900, 1000, .9); noise(t + 1.32, .08, .14, 'bandpass', 1900, 1000, .9);
-      const c2 = t + 1.44;
-      ['C6', 'G5', 'E5', 'C5', 'G4'].forEach((n, i) => osc(i ? 'triangle' : 'square', freq(n), c2, 1.3, i ? .11 : .08, sfxBus, null, .005, .7));
-      osc('triangle', freq('C2'), c2, 1.3, .26, sfxBus, null, .005, .7); osc('triangle', freq('C3'), c2, 1.3, .16, sfxBus, null, .005, .7);
-      osc('sine', 130, c2, .18, .36, sfxBus, 40); noise(c2, .3, .3, 'bandpass', 1600, 700, 1); noise(c2, 1.6, .1, 'highpass', 6000, 9000, .5);
-      for (let i = 0; i < 8; i++) osc('sine', freq(['C6', 'E6', 'G6', 'C7', 'E7', 'G7', 'C8', 'E8'][i]), c2 + .15 + i * .04, .2, .05, sfxBus, null, .002, .15); },
-    // Tally sounds: a counter tick (k raises the pitch), a letter slamming down, a rubber stamp, the bonus bell.
-    tick(k = 0) { const t = ctx.currentTime, f = 1100 * Math.pow(2, (k % 12) / 24); osc('square', f, t, .025, .06, sfxBus, null, .002, .015); },
-    slam(k = 0) { const t = ctx.currentTime; noise(t, .09, .22, 'lowpass', 900, 150); osc('triangle', 220 + (k % 8) * 18, t, .1, .2, sfxBus, 70, .002, .05); osc('square', 660 + (k % 8) * 40, t, .03, .05, sfxBus, null, .002, .02); },
-    stamp(k = 0) { const t = ctx.currentTime; noise(t, .25, .45, 'lowpass', 1400, 120, .8); osc('sine', 90, t, .2, .4, sfxBus, 35); if (k) { ['E6', 'G6', 'C7'].forEach((n, i) => osc('sine', freq(n), t + .08 + i * .06, .25, .07, sfxBus, null, .003, .2)); noise(t + .08, .5, .05, 'highpass', 6000, 9000); } },
-    kaching() { const t = ctx.currentTime; osc('square', 1568, t, .06, .08, sfxBus, null, .002, .04); osc('square', 2093, t + .06, .25, .08, sfxBus, null, .002, .2); noise(t, .3, .08, 'highpass', 5000, 9000); },
-    bloop(k = 0) { const t = ctx.currentTime, f = 300 * Math.pow(2, (k % 8) / 12); osc('sine', f, t, .12, .16, sfxBus, f * 2.4, .004, .06); noise(t, .06, .06, 'highpass', 2500); },
-    whoosh() { const t = ctx.currentTime; noise(t, .35, .2, 'bandpass', 400, 2400, 1.6); },
-    win() { const t = ctx.currentTime; ['D4', 'F4', 'A4', 'D5', 'C5', 'D5', 'F5', 'A5'].forEach((n, i) => osc('triangle', freq(n), t + i * .12, .3, .16, sfxBus, null, .005, .2)); } };
-  function play(name, arg) { if (!ctx || muted) return; try { sfx[name] && sfx[name](arg); } catch (e) { /* audio is never fatal */ } }
-  // The suction is a looping wind: a noise through a bandpass that rises while the mouth is open.
-  // Each step of the inhale: the wind climbs, gets louder and wobbles faster.
+    // ---- Nila
+    step() { shot('step'); },
+    jump() { shot('jump'); },
+    land(k = 1) { k = clamp(k, 0, 1.5); shot('land', { k: .25 + .75 * k, rate: 1.12 - .2 * Math.min(1, k) }); },
+    flap() { shot('flap'); },
+    whoosh() { shot('whoosh'); },
+    hurt() { shot('hurt'); },
+    death() { shot('death', { rev: .15 }); nota('pizzicato', 'D3', 1.0, .3, .5); nota('pizzicato', 'A2', 1.22, .4, .58); },
+    // ---- Bigotes. `w` is how heavy the load is (a mosquito .35, a rock 1, a crate 1.5): heavier is lower, longer, with a belly thump.
+    glup(w = 1) { w = clamp(w, .2, 2.5); shot('glup', { rate: clamp(1.3 - .28 * w, .62, 1.25), k: .6 + .3 * Math.min(w, 1.5) }); if (w >= 1.1) shot('belly', { at: .06, k: .5 * Math.min(1, w - .8), rate: 1.1 - .1 * w }); },
+    swallow(w) { sfx.glup(w); },
+    spit(w = 1) { w = clamp(w, .2, 2.5); shot('spit', { rate: clamp(1.28 - .26 * w, .7, 1.25), k: .8 + .15 * Math.min(w, 1.5) }); if (w >= 1) shot('belly', { k: .3 * Math.min(1, w - .5), rate: 1.3 }); },
+    bigspit(w = 1) { w = clamp(w, .2, 2.5); shot('bigspit', { rate: clamp(1.2 - .18 * w, .75, 1.15) }); },
+    blub() { shot('blub'); },
+    sputter() { shot('sputter'); },
+    puff() { shot('puff'); },
+    inhale() { shot('inhale'); },
+    gust() { shot('gust'); },
+    charge() {   // winding up: breath drawn in against a rising, straining tone
+      shot('suckStep', { rate: .7, vol: .12 }); shot('charge', { vol: .11 });
+    },
+    charged() { shot('shing', { rate: 1.5, vol: .22 }); nota('kalimba', ['D6', 'A6'], 0, .4, .55, .35); nota('glock', 'D7', .05, .3, .3, .4); },
+    suckup(lv = 2) { lv = clamp(lv | 0, 1, 3); shot('suckStep', { rate: [.8, 1, 1.25][lv - 1], vol: .16 + lv * .03 }); nota('kalimba', ['A5', 'D6', 'F#6'][lv - 1], .15, .3, .38 + lv * .04, .3); if (lv === 3) nota('glock', 'A6', .2, .3, .25, .4); },
+    // ---- Impacts
+    thud() { shot('thud'); },
+    hit() { shot('hit'); },
+    crack() { shot('crack'); },
+    clang() { shot('clang', { rev: .08 }); },
+    splash() { shot('splash'); },
+    pop() { shot('pop'); },
+    bounce() { shot('bounce'); },
+    switch() { shot('switch'); },
+    gate() { shot('gate', { rev: .1 }); },
+    hiss() { shot('hiss'); },
+    thunder() { shot('thunder', { rev: .25 }); },
+    rumble() { shot('rumble'); },
+    whistle() { shot('whistle'); },
+    // ---- Critters
+    frog() { shot('frog'); },
+    croak() { shot('croak'); },
+    buzz() { shot('buzz'); },
+    stun() { shot('stun'); },
+    chirp() { shot('chirp', { rev: .35 }); },
+    // ---- The heron: a grey heron's harsh 'fraank', her wings, her beak in the mud
+    heron() { shot('heron', { rev: .25 }); },
+    shriek(k = 1) { if (k >= .8) shot('shriekBig', { rev: .3, k: Math.min(1.1, k) }); else shot('shriek', { rev: .25, k: .75 + .3 * k }); },
+    heronHit() { shot('heronHit', { rev: .15 }); },
+    swoop() { shot('swoop'); },
+    gustWind() { shot('gustWind'); },
+    ruffle() { shot('ruffle'); },
+    feathers() { shot('feathers'); },
+    stab() { shot('stab'); },
+    squelch() { shot('squelch'); },
+    bossDown() { shot('bossDown', { rev: .3 }); nota('timbal', 'E2', 1.05, 1.5, .7, .35); nota('cuerdas', ['E3', 'B3', 'G4'], 1.2, 1.6, .38, .45); nota('chelo', 'E3', 1.2, 1.8, .42, .4); },
+    // ---- Pickups
+    pearl() { shot('bubbles', { vol: .2 }); nota('kalimba', 'A5', .02, .3, .48, .3); nota('kalimba', 'D6', .09, .4, .52, .3); nota('glock', 'A6', .09, .3, .24, .4); },
+    heart() { shot('blub', { vol: .2 }); seq('marimba', ['D5', 'F#5', 'A5', 'D6'], .055, .3, i => .45 + i * .05, 0, .25); nota('kalimba', 'D6', .165, .4, .32, .3); },
+    lantern() { shot('fire'); seq('vibrafono', ['D5', 'A5', 'C#6', 'F#6'], .07, 1, .42, .12, .45); nota('glock', 'E7', .42, .4, .2, .5); },
+    // ---- The learning cinematic
+    chomp() { shot('chomp'); },
+    gulpBig() { shot('gulpBig'); },
+    heartbeat() { shot('heartbeat'); },
+    shing() { shot('shing', { rev: .4 }); nota('glock', 'A6', 0, .5, .35, .5); },
+    powerRise() { shot('powerSwell', { rev: .35, vol: .32 }); nota('tremolo', ['D3', 'A3', 'D4'], .25, .85, .4, .4); for (let i = 0; i < 9; i++) nota('timbal', 'D2', .2 + i * .09, .2, .2 + i * .05, .3); },
+    powerBurst() { shot('powerBoom', { rev: .3 }); tocar('plato', null, 1, .6, { rev: .3 }); },
+    learn() {   // a harp glissando up D lydian into a warm chord, flute and bells on top
+      NV = .9;
+      seq('arpa', ['D4', 'E4', 'F#4', 'G#4', 'A4', 'B4', 'C#5', 'D5', 'E5', 'F#5', 'G#5', 'A5'], .03, .6, i => .45 + i * .03, 0, .45);
+      nota('cuerdas', ['D4', 'F#4', 'A4', 'C#5', 'E5'], .3, 1.3, .55, .45); nota('fretless', 'D2', .3, 1.2, .6, .1);
+      nota('flauta', 'F#5', .32, .2, .6, .4); nota('flauta', 'A5', .56, .9, .68, .4); nota('glock', 'A6', .45, .4, .35, .5); nota('glock', 'D7', .62, .6, .35, .5); },
+    win() {   // the power is his: kalimba climbs, the flute answers
+      seq('kalimba', ['D5', 'F#5', 'A5', 'D6'], .09, .4, .6, 0, .3); seq('marimba', ['D4', 'A4'], .18, .3, .5, 0, .2);
+      nota('flauta', 'E6', .38, .14, .6, .4); nota('flauta', 'F#6', .54, .7, .7, .4); nota('arpa', ['D4', 'A4', 'F#5'], .54, 1, .55, .4); nota('glock', 'D7', .54, .5, .3, .5); },
+    // ---- Stingers
+    clear() {   // level or boss cleared: marimba and flute, pizzicato bass, a string chord and a triangle
+      NV = .9;
+      seq('marimba', ['A5', 'B5', 'D6', null, 'A5', 'D6'], .08, .25, .7, 0, .25); seq('xilofono', ['A6', 'B6', 'D7'], .08, .2, .35, 0, .25);
+      seq('pizzicato', ['D3', null, 'A3', null, null, 'D3'], .08, .3, .8, 0, .2); tocar('bongo', null, .1, .5, { en: .24 }); tocar('bongo', null, .1, .7, { en: .32 });
+      nota('flauta', 'D6', .4, .85, .72, .4); nota('cuerdas', ['F#4', 'A4', 'D5'], .4, 1.1, .5, .45); tocar('triangulo', null, 1, .6, { en: .4, rev: .4 }); },
+    fanfare() {   // the level-end fanfare: a snare roll, a marimba run, a hit, a quick turn and the big chord
+      NV = .88;
+      for (let i = 0; i < 9; i++) tocar('caja', null, .1, .2 + i * .05, { en: i * .036 }); tocar('bombo', null, .2, .65, { en: .33 });
+      seq('marimba', ['D5', 'E5', 'F#5', 'A5', 'B5'], .06, .2, i => .6 + i * .05, .33, .22); seq('xilofono', ['D6', 'E6', 'F#6', 'A6', 'B6'], .06, .15, .35, .33, .22);
+      const h = .66; nota('trompa', ['D4', 'F#4', 'A4'], h, .36, .75); nota('cuerdas', ['D4', 'A4', 'D5', 'F#5'], h, .38, .6); nota('marimba', 'D6', h, .3, .8, .25); nota('contrabajo', 'D2', h, .35, .9, .1);
+      tocar('bombo', null, .2, .65, { en: h }); tocar('plato', null, 1, .38, { en: h, rev: .3 });
+      seq('flauta', ['B5', 'A5', 'B5'], .1, .09, .7, 1.1, .35); seq('marimba', ['B5', 'A5', 'B5'], .1, .1, .55, 1.1, .22); nota('pizzicato', 'G3', 1.12, .2, .8); nota('pizzicato', 'A3', 1.32, .2, .8);
+      tocar('caja', null, .1, .42, { en: 1.12 }); tocar('caja', null, .1, .5, { en: 1.32 });
+      const c = 1.44; nota('cuerdas', ['D4', 'F#4', 'A4', 'E5'], c, 1.25, .62, .45); nota('trompa', ['D4', 'A4'], c, 1.1, .7, .4); nota('flauta', 'D6', c, 1.05, .78, .4);
+      nota('contrabajo', 'D2', c, 1.2, .85, .1); nota('timbal', 'D2', c, 1, .65, .3); tocar('bombo', null, .2, .7, { en: c }); tocar('plato', null, 1, .48, { en: c, rev: .35 });
+      seq('glock', ['D6', 'F#6', 'A6', 'D7'], .06, .5, .4, c + .15, .45); },
+    bell() { nota('campana', 'D5', 0, 3, .55, .5); nota('glock', 'D6', .01, 1, .22, .5); nota('coroU', ['D4', 'A4', 'F#5'], 0, 2.4, .35, .55); },
+    // ---- UI and the tally
+    select() { shot('select'); },
+    confirm() { nota('marimba', 'D5', 0, .2, .45, .2); nota('marimba', 'A5', .07, .3, .55, .2); nota('kalimba', 'A5', .07, .3, .28, .25); },
+    text() { shot('text'); },
+    talk(p) { const v = Math.round(clamp(p || 200, 60, 900)); shot('talk', { key: v, p: v, vol: .17, jit: .04 }); },
+    tick(k = 0) { const s = [0, 2, 4, 7, 9][k % 5] + 12 * Math.floor((k % 15) / 5); shot('tick', { rate: Math.pow(2, (s - 12) / 12) }); },
+    slam(k = 0) { shot('slam'); nota('marimba', dpent(k, 4), 0, .2, .45, .2); },
+    stamp(k = 0) { shot('stamp'); if (k) { seq('glock', ['D6', 'F#6', 'A6'], .06, .4, .4, .08, .45); tocar('triangulo', null, 1, .5, { en: .08, rev: .4 }); } },
+    kaching() { shot('coins'); nota('glock', 'A6', 0, .2, .42, .4); nota('glock', 'D7', .07, .5, .5, .45); },
+    bloop(k = 0) { shot('bloop', { rate: Math.pow(2, ([0, 2, 4, 7, 9][k % 5] + 12 * Math.floor((k % 10) / 5)) / 12) }); nota('kalimba', dpent(k % 10, 5), .02, .3, .45, .3); } };
+  FX.talk = { v: 15, gen: (sr, k, voz) => syllable(sr, k, voz || 200) };
+  FX.charge = { v: 2, vol: .3, gen(sr) { const len = .55, o = arr(sr, len + .03); let ph = 0, t = 0;   // a rubbery tension: a rising tone with a growing wobble, and a creak
+    for (let i = 0, n = Math.floor(len * sr); i < n; i++) { const tt = i / sr, u = tt / len, f = 150 * Math.pow(3, u) * (1 + .04 * u * Math.sin(TAU * 9 * tt)); ph += TAU * f / sr; o[i] += (Math.sin(ph) + .3 * Math.sin(2 * ph)) * Math.pow(u, 1.2) * .5 * (u > .95 ? (1 - u) / .05 : 1); }
+    const x = arr(sr, len); while (t < len) { x[Math.floor(t * sr)] += Math.pow(t / len, .5); t += 1 / (20 + 50 * t / len) * rnd(.9, 1.1); } const c = biq(x, 'bp', 900, 8, sr); for (let i = 0; i < c.length; i++) o[i] += c[i] * .5;
+    return fin(o, sr, .9, .01); } };
+  const SFX_ALIAS = {};
+  function play(name, arg, o) {
+    if (!ctx || muted) return; name = SFX_ALIAS[name] || name; const f = sfx[name]; if (!f) return;
+    const t = ctx.currentTime, lim = LIM[name]; if (lim && t - (FXLAST[name] ?? -9) < lim) return; FXLAST[name] = t;
+    FXO = {}; if (o) { if (typeof o.pan === 'number') FXO.pan = clamp(o.pan, -1, 1); else if (typeof o.x === 'number' && typeof Cam !== 'undefined' && typeof W !== 'undefined') FXO.pan = clamp((o.x - Cam.x - W / 2) / (W / 2), -1, 1) * .7; }
+    try { f(arg ?? undefined); } catch (e) { PERF.fxErr = name + ': ' + (e && e.message || e); /* audio is never fatal */ } FXO = {}; NV = 1;
+  }
+  // The frequent effects are rendered in the idle time after init, so the first jump doesn't hitch.
+  // The effects of play are rendered in the idle time after init, so no jump or gulp hitches; the rare ones
+  // (the heron, the cinematics, the stingers) render when first played, in a few ms.
+  const fxRate = D => D.hz && ctx.sampleRate > D.hz ? D.hz : 0;
+  function warmFx() {
+    const list = ['step', 'jump', 'land', 'thud', 'splash', 'pop', 'glup', 'spit', 'text', 'select', 'flap', 'whoosh', 'hit', 'blub', 'puff', 'sputter', 'belly', 'bigspit', 'charge', 'suckStep', 'inhale', 'gust', 'jetLoop', 'clang', 'crack', 'switch', 'bounce', 'hurt', 'bubbles', 'frog', 'croak', 'buzz'];
+    for (const k of list) for (let v = 0; v < (FX[k].v || 1); v++) WARM.push([ctx, 'fx:' + k + ':' + v, sr => FX[k].gen(sr, v), fxRate(FX[k])]);
+  }
+
+  // The inhale (Bigotes sucking things in) is a looping breath of air: a wide band of noise, a
+  // whistling resonance that flutters and a low roar. Each stage (suckLevel 1..3) pulls harder:
+  // the air climbs, whistles louder, wobbles faster and, at the top, pulses like a vacuum.
   let suckNode = null, jetNode = null;
+  const SUCK = [{ br: 1000, wh: 1050, whg: .6, ro: .1, lfo: 5.5, dep: 80, am: 0, g: .2 }, { br: 1500, wh: 1550, whg: 1, ro: .3, lfo: 8, dep: 160, am: .15, g: .25 }, { br: 2200, wh: 2250, whg: 1.5, ro: .6, lfo: 12, dep: 300, am: .35, g: .3 }];
   function suckLevel(lv) {
-    if (!ctx || !suckNode) return; const n = suckNode, t = ctx.currentTime;
-    n.fl.frequency.cancelScheduledValues(t); n.fl.frequency.setTargetAtTime([1400, 1900, 2600][lv - 1], t, .08);
-    n.g.gain.setTargetAtTime([.22, .28, .34][lv - 1], t, .05); n.lfo.frequency.setTargetAtTime([9, 13, 19][lv - 1], t, .05);
+    if (!ctx || !suckNode) return; const n = suckNode, t = ctx.currentTime, S = SUCK[clamp(lv | 0, 1, 3) - 1];
+    for (const [p, v] of [[n.br.frequency, S.br], [n.wh.frequency, S.wh], [n.whg.gain, S.whg], [n.rog.gain, S.ro], [n.lfo.frequency, S.lfo], [n.lg.gain, S.dep], [n.amg.gain, S.am], [n.g.gain, S.g]]) { p.cancelScheduledValues(t); p.setTargetAtTime(v, t, .07); }
   }
   function suck(on) {
-    if (!ctx) return;
+    if (!ctx) return; const t = ctx.currentTime;
     if (on && !suckNode) {
-      const src = ctx.createBufferSource(); src.buffer = noiseBuffer; src.loop = true;
-      const fl = ctx.createBiquadFilter(); fl.type = 'bandpass'; fl.Q.value = 3; fl.frequency.setValueAtTime(400, ctx.currentTime); fl.frequency.linearRampToValueAtTime(1400, ctx.currentTime + 1.2);
-      const g = ctx.createGain(); g.gain.setValueAtTime(0, ctx.currentTime); g.gain.linearRampToValueAtTime(.22, ctx.currentTime + .15);
-      const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 9; lg.gain.value = 300; lfo.connect(lg); lg.connect(fl.frequency); lfo.start();
-      src.connect(fl); fl.connect(g); g.connect(sfxBus); src.start(); suckNode = { src, g, lfo, fl };
+      const src = ctx.createBufferSource(); src.buffer = noiseBuffer; src.loop = true; src.playbackRate.value = rnd(.92, 1.08);
+      const br = filt(ctx, 'bandpass', 500, 1.5), wh = filt(ctx, 'bandpass', 600, 11), ro = filt(ctx, 'lowpass', 280, .9), mix = gainNode(ctx, 1), am = gainNode(ctx, 1), g = gainNode(ctx, 0);
+      krate(br.frequency); krate(wh.frequency);
+      const brg = gainNode(ctx, 1), whg = gainNode(ctx, .6), rog = gainNode(ctx, .1);
+      src.connect(br); br.connect(brg); brg.connect(mix); src.connect(wh); wh.connect(whg); whg.connect(mix); src.connect(ro); ro.connect(rog); rog.connect(mix); mix.connect(am); am.connect(g); fxRoute(g, 0, .08);
+      const lfo = ctx.createOscillator(), lg = gainNode(ctx, 80), amg = gainNode(ctx, 0); lfo.frequency.value = 5.5; lfo.connect(lg); lg.connect(wh.frequency); lfo.connect(amg); amg.connect(am.gain);
+      br.frequency.setValueAtTime(450, t); br.frequency.setTargetAtTime(SUCK[0].br, t, .35); wh.frequency.setValueAtTime(500, t); wh.frequency.setTargetAtTime(SUCK[0].wh, t, .35);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(SUCK[0].g, t + .14);
+      src.start(t, rnd(0, 1.5)); lfo.start(t); suckNode = { src, g, lfo, lg, br, wh, whg, rog, amg };
     } else if (!on && suckNode) {
-      const n = suckNode; suckNode = null; n.g.gain.setTargetAtTime(0, ctx.currentTime, .05); n.src.stop(ctx.currentTime + .3); n.lfo.stop(ctx.currentTime + .3);
+      const n = suckNode; suckNode = null; n.g.gain.cancelScheduledValues(t); n.g.gain.setTargetAtTime(0, t, .04); n.br.frequency.setTargetAtTime(700, t, .05); n.src.stop(t + .3); n.lfo.stop(t + .3);
     }
   }
-  // The water jet is a soft hiss that follows the hover.
+  // The water jet (the hover): a looping spray — hiss, droplets, a churning gurgle — that spurts in.
   function jet(on) {
-    if (!ctx) return;
+    if (!ctx) return; const t = ctx.currentTime;
     if (on && !jetNode) {
-      const src = ctx.createBufferSource(); src.buffer = noiseBuffer; src.loop = true;
-      const fl = ctx.createBiquadFilter(); fl.type = 'bandpass'; fl.Q.value = 1.2; fl.frequency.value = 2600;
-      const g = ctx.createGain(); g.gain.setValueAtTime(0, ctx.currentTime); g.gain.linearRampToValueAtTime(.16, ctx.currentTime + .08);
-      src.connect(fl); fl.connect(g); g.connect(sfxBus); src.start(); jetNode = { src, g };
-    } else if (!on && jetNode) { const n = jetNode; jetNode = null; n.g.gain.setTargetAtTime(0, ctx.currentTime, .05); n.src.stop(ctx.currentTime + .3); }
+      const src = ctx.createBufferSource(); src.buffer = bufOf(ctx, 'fx:jetLoop:0', sr => FX.jetLoop.gen(sr), fxRate(FX.jetLoop)); src.loop = true; src.playbackRate.value = rnd(.95, 1.05);
+      const g = gainNode(ctx, 0); src.connect(g); fxRoute(g, 0, .05);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.34, t + .03); g.gain.setTargetAtTime(.2, t + .05, .12);
+      src.start(t, rnd(0, 2)); jetNode = { src, g };
+    } else if (!on && jetNode) { const n = jetNode; jetNode = null; n.g.gain.cancelScheduledValues(t); n.g.gain.setTargetAtTime(0, t, .05); n.src.stop(t + .4); }
   }
 
   // ================================================================ Motor en vivo
@@ -957,7 +1242,7 @@ const Sound = (() => {
     if (ctx) { if (ctx.state !== 'running') ctx.resume(); return; }
     if (!AC) return;
     try { ctx = new AC(); } catch (e) { return; }
-    M = buildMixer(ctx); sfxBus = M.sfx; noiseBuffer = M.noise;
+    M = buildMixer(ctx); sfxBus = M.sfx; noiseBuffer = M.noise; warmFx();
     if (music.name) startSong(.05); if (ambS.name) startAmb(.5); if (rainS.on) rain(true);
     timer = setInterval(tick, 40);
   }
@@ -1005,9 +1290,8 @@ const Sound = (() => {
     return Object.assign(o, { titulo: P.song.titulo || music.name, seccion: h.name, idx: h.k, vez: h.vez, compas: Math.floor((t - h.start) / (h.spb * h.bpb)) + 1, compases: h.bars, t: Math.max(0, t - P.t0), forma: P.S.forma, vueltas: P.loops || 0 });
   }
   // Plays one note (or a drum) outside any song, for effects and auditions: Sound.tocar('marimba', 'E5', .5, .8, { pan, rev }).
-  const solo = {};
   function tocar(inst, nota, dur = .5, vel = .8, o = {}) {
-    if (!ctx || muted) return; inst = ALIAS[inst] || DR_ALIAS[inst] || inst; const drum = !!DR[inst], k = inst + '|' + (o.pan || 0) + '|' + (o.rev ?? '');
+    if (!ctx || muted) return; inst = ALIAS[inst] || DR_ALIAS[inst] || inst; const drum = !!DR[inst], k = inst + '|' + (o.pan || 0) + '|' + (o.rev ?? ''), solo = M.solo || (M.solo = {});   // the tracks belong to the mixer (the live one, or an offline render's)
     let tr = solo[k]; if (!tr) tr = solo[k] = mkTrack({ c: ctx, M, out: M.sfx, wet: M.sfxWet }, k, { inst: drum ? 'bateria' : inst, vol: 1, pan: o.pan || 0, rev: o.rev ?? (drum ? .1 : .25) });
     const t = ctx.currentTime + (o.en || 0) + .01;
     try { if (drum) playDrum(tr, inst, t, vel, {}); else for (const n of [].concat(nota)) { const m = typeof n === 'number' ? n : midi(n); if (m !== null && tr.I) tr.I.play(tr, t, m, dur, vel, { i: 0 }); } } catch (e) { }
@@ -1045,8 +1329,46 @@ const Sound = (() => {
     return { titulo: name, tempo: 96, pistas: { a: { inst: name, vol: .9 } }, secciones: { A: { compases: 5, a: `mf ${run} | ${[12, 11, 9, 7, 5, 4, 2, 0].map(k => n(k) + 'e').join(' ')} | p < ${n(0)}h ${n(7)}h ff | mp ${n(4)}q' ${n(5)}q' ${n(7)}q'! ${n(9)}e_ ${n(11)}e_ | [${n(0)} ${n(4)} ${n(7)} ${n(11)}]w` } }, forma: ['A'], bucle: false };
   }
   // render(what, secs): renders a song ('marsh') and/or an ambience ('amb:noche') offline → { buffer, log, hist }.
+  // The effects, to audition them: every name with the arguments worth hearing, and a description.
+  const EFECTOS = [
+    ['step', null, 'paso de Nila (frecuente: 6 variantes)'], ['jump', null, 'salto: tela y empuje'], ['land', .3, 'aterrizaje suave'], ['land', 1, 'aterrizaje fuerte'], ['flap', null, 'doble salto: aleteo'],
+    ['whoosh', null, 'soplo de aire que cruza'], ['hurt', null, 'Nila se hace daño: golpe y "¡ay!"'], ['death', null, 'Nila cae: silbato que baja y plof'],
+    ['glup', .35, 'Bigotes traga un mosquito'], ['glup', 1, 'traga una piedra'], ['glup', 1.5, 'traga una caja (con tripa)'], ['spit', .35, 'escupe algo ligero'], ['spit', 1, 'escupe una piedra'], ['spit', 1.5, 'escupe una caja'],
+    ['bigspit', 1, 'escupitajo cargado'], ['charge', null, 'cargando (tensión que sube)'], ['charged', null, 'carga lista: ¡ting!'], ['blub', null, 'burbujas de eructo'], ['sputter', null, 'el chorro se agota'],
+    ['puff', null, 'pff: se acaba el agua'], ['inhale', null, 'toma aire antes de soplar'], ['gust', null, 'el soplido'], ['suck', null, 'bucle: aspirar, 3 etapas'], ['suckup', 2, 'sube a la etapa 2'], ['suckup', 3, 'sube a la etapa 3'], ['jet', null, 'bucle: chorro de agua (flotar)'],
+    ['thud', null, 'golpe sordo de madera/tierra (frecuente)'], ['hit', null, 'piedra que golpea'], ['crack', null, 'algo se rompe: grieta y cascotes'], ['clang', null, '¡CLONC! metal'], ['splash', null, 'chapuzón'], ['pop', null, 'burbuja que revienta'],
+    ['bounce', null, 'seta: ¡boing!'], ['switch', null, 'palanca / interruptor de madera'], ['gate', null, 'la compuerta de piedra se abre'], ['hiss', null, 'agua sobre fuego: SSSH'], ['thunder', null, 'trueno'], ['rumble', null, 'temblor de tierra'], ['whistle', null, 'piedra que cae silbando'],
+    ['frog', null, 'rana que salta'], ['croak', null, 'rana que avisa'], ['buzz', null, 'mosquito'], ['stun', null, 'aturdido: pajaritos'], ['chirp', null, 'pájaro del amanecer'],
+    ['heron', null, 'la garza: «fraank»'], ['shriek', .6, 'grito de la garza'], ['shriek', 1, 'grito grande de la garza'], ['heronHit', null, 'la garza recibe un golpe'], ['swoop', null, 'la garza se lanza'], ['gustWind', null, 'aletazo de viento'],
+    ['ruffle', null, 'eriza las plumas'], ['feathers', null, 'plumas que saltan'], ['stab', null, 'picotazo en el barro'], ['squelch', null, 'pico atascado en el barro'], ['bossDown', null, 'la garza cae vencida'],
+    ['pearl', null, 'rescatas una cría'], ['heart', null, 'corazón'], ['lantern', null, 'enciendes un farol'],
+    ['chomp', null, 'mordisco'], ['gulpBig', null, 'el gran trago'], ['heartbeat', null, 'latido'], ['shing', null, 'destello mágico'], ['powerRise', null, 'el poder sube'], ['powerBurst', null, 'el poder estalla'], ['learn', null, 'aprendes un truco'], ['win', null, 'el truco es tuyo'],
+    ['clear', null, 'fanfarria corta: superado'], ['fanfare', null, 'fanfarria de fin de nivel'], ['bell', null, 'campana del final'],
+    ['select', null, 'menú: mover'], ['confirm', null, 'menú: aceptar'], ['text', null, 'clic del carrete / apuntar'], ['talk', 150, 'voz de Ruca'], ['talk', 520, 'voz de Lumi'], ['talk', 120, 'voz de Don Anselmo'], ['talk', 280, 'voz de Don Pinzas'],
+    ['tick', 0, 'contador'], ['slam', 0, 'letrero que cae'], ['stamp', 0, 'sello'], ['stamp', 1, 'sello con premio'], ['kaching', null, '¡premio!'], ['bloop', 0, 'una cría salta del agua']];
+  // What each effect plays over time (loops and babble need a script): [[seconds, fn], ...].
+  function fxScript(name, arg) {
+    if (name === 'suck') return [[0, () => suck(true)], [1.2, () => { play('suckup', 2); suckLevel(2); }], [2.4, () => { play('suckup', 3); suckLevel(3); }], [3.6, () => suck(false)], [3.62, () => play('glup', 1)]];
+    if (name === 'jet') return [[0, () => jet(true)], [1.6, () => play('sputter')], [1.8, () => play('sputter')], [2, () => jet(false)]];
+    if (name === 'talk') return Array.from({ length: 22 }, (_, i) => [i * .075 + (i > 10 ? .25 : 0), () => play('talk', arg)]);
+    if (name === 'step') return Array.from({ length: 6 }, (_, i) => [i * .2, () => play('step')]);
+    if (name === 'tick') return Array.from({ length: 12 }, (_, i) => [i * .05, () => play('tick', i)]);
+    if (name === 'bloop') return Array.from({ length: 8 }, (_, i) => [i * .1, () => play('bloop', i)]);
+    return [[0, () => play(name, arg)]];
+  }
+  const fxLen = name => ({ suck: 4.4, jet: 2.8, fanfare: 3.6, bossDown: 3.6, thunder: 5.5, bell: 4, death: 2.4, learn: 2.6, gustWind: 2.6, powerRise: 2 }[name] || 2);
+  function efecto(name, arg) { if (!ctx) return; for (const [t, fn] of fxScript(name, arg)) setTimeout(fn, t * 1000); }
+  // renderFx('glup', 1.5) → an offline render of one effect through a fresh mixer (for tools/musica.js).
+  async function renderFx(name, arg, secs, sr = 44100) {
+    secs = secs || fxLen(name); PERF.fxErr = null; const oc = new OAC(2, Math.ceil(sr * secs), sr), X = buildMixer(oc);
+    const inside = fn => { const was = [ctx, M, sfxBus, noiseBuffer, muted, suckNode, jetNode]; [ctx, M, sfxBus, noiseBuffer, muted, suckNode, jetNode] = [oc, X, X.sfx, X.noise, false, X.suckNode || null, X.jetNode || null]; for (const k in FXLAST) delete FXLAST[k];
+      try { fn(); } finally { X.suckNode = suckNode; X.jetNode = jetNode; [ctx, M, sfxBus, noiseBuffer, muted, suckNode, jetNode] = was; } };
+    for (const [t, fn] of fxScript(name, arg)) { if (t === 0) inside(fn); else oc.suspend(Math.round(t * sr / 128) * 128 / sr).then(() => { inside(fn); oc.resume(); }); }
+    const buffer = await oc.startRendering(); return { buffer, log: PERF.fxErr ? [[0, 'ERROR', PERF.fxErr, null, '']] : [], hist: [] };
+  }
   async function render(what, secs = 60, o = {}) {
     if (!OAC) throw new Error('sin OfflineAudioContext');
+    if (what.startsWith('sfx:')) { const [, n, a] = what.split(':'); return renderFx(n, a === undefined || a === '' ? undefined : +a, o.secs0 ? null : secs, o.sr); }
     if (what.startsWith('inst:')) { SONGS.__inst = demoSong(what.slice(5)); delete SONGS.__inst._p; what = '__inst'; }
     const sr = o.sr || 44100, oc = new OAC(2, Math.ceil(sr * secs), sr), X = buildMixer(oc), log = [];
     const ambName = o.amb || (what.startsWith('amb:') ? what.slice(4) : null), song = SONGS[what];
@@ -1061,5 +1383,7 @@ const Sound = (() => {
     cancion(name, d) { SONGS[name] = d; delete d._p; }, definicion: name => SONGS[name], ambiente, estado, tocar, demo, info, validar, render,
     canciones: () => Object.keys(SONGS).map(k => ({ nombre: k, titulo: SONGS[k].titulo || k })), ambientes: () => Object.keys(AMBS).filter(k => k !== 'lluvia'),
     instrumentos: () => Object.keys(INST).filter(k => k !== 'bateria').map(k => ({ nombre: k, rango: INST[k].rango, desc: INST[k].d })), percusion: () => Object.keys(DR),
-    midi, freq, PERF, stats: () => Object.assign({ buffers: BUF.size, mb: +(bufBytes / 1e6).toFixed(1), estado: ctx && ctx.state }, stats) };
+    fxCoste: () => Object.keys(FX).map(k => { const t0 = clock(); let d = FX[k].gen(FX[k].hz || 44100, 0, 200); const ms = clock() - t0; d = Array.isArray(d) ? d : [d]; return [k, +ms.toFixed(1), Math.round(d.length * d[0].length * 4 * (FX[k].v || 1) / 1024)]; }),   // ms to render each effect's buffer, KB of all its variants
+    efectos: () => EFECTOS.map(([nombre, arg, desc]) => ({ nombre, arg, desc })), efecto, fxLen,
+    midi, freq, PERF, stats: () => Object.assign({ buffers: BUF.size, mb: +(bufBytes / 1e6).toFixed(1), fxmb: +([...BUF].reduce((a, [k, b]) => a + (k.includes('|fx:') ? b.length * b.numberOfChannels * 4 : 0), 0) / 1e6).toFixed(1), estado: ctx && ctx.state }, stats) };
 })();

@@ -1216,10 +1216,10 @@ const Item = {
     if (e.sucked > 0) { e.sucked--; e.resting = false; e.x += e.vx; e.y += e.vy; return; }
     e.vy = Math.min(e.vy + .3, 5); e.vx *= .8; if (Math.abs(e.vx) > .05) moveX(e, e.vx);
     const hit = moveY(e, e.vy);
-    if (hit) { if (e.vy > 1.5) { Sound.play('thud'); spawnParts(4, e.x + e.w / 2, e.y + e.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.4, speed: [.4, 1.2], life: [8, 14], g: .04 }); } e.vy = 0; e.resting = true; }
+    if (hit) { if (e.vy > 1.5) { Sound.play('thud', null, { x: e.x }); spawnParts(4, e.x + e.w / 2, e.y + e.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.4, speed: [.4, 1.2], life: [8, 14], g: .04 }); } e.vy = 0; e.resting = true; }
     else e.resting = false;
     if (e.kind === 'crate') { if (!L.solids.includes(e)) L.solids.push(e); if (e.ghost && !overlap(e, Player.rect())) e.ghost = false; }
-    if (waterAt(e.x + e.w / 2, e.y + e.h - 2)) { e.dead = true; Sound.play('splash'); spawnParts(10, e.x + e.w / 2, e.y + e.h, { color: ['#8fd9d0', '#c8f2ea'], angle: -Math.PI / 2, spread: 1, speed: [1, 3], life: [14, 26] }); }
+    if (waterAt(e.x + e.w / 2, e.y + e.h - 2)) { e.dead = true; Sound.play('splash', null, { x: e.x }); spawnParts(10, e.x + e.w / 2, e.y + e.h, { color: ['#8fd9d0', '#c8f2ea'], angle: -Math.PI / 2, spread: 1, speed: [1, 3], life: [14, 26] }); }
     if (e.y > L.h * TS + 40) e.dead = true;
   },
   plainDraw(e, g) { g.drawImage(e.sprite, Math.round(e.x - Cam.x + (e.w - e.sprite.width) / 2), Math.round(e.y - Cam.y + e.h - e.sprite.height)); },
@@ -1367,7 +1367,7 @@ const Enemy = {
     if (e.stun > 0) e.stun--; if (e.tug > 0) e.tug--;
     if (e.sucked > 0) { e.sucked--; e.x += e.vx; e.y += e.vy; if (rectSolid(e.x, e.y, e.w, e.h, e)) { e.x -= e.vx; e.y -= e.vy; } e.stretch = true; return true; }
     e.stretch = false;
-    if (waterAt(e.x + e.w / 2, e.y + e.h - 1) && !e.flying) { e.dead = true; Sound.play('splash'); spawnParts(8, e.x + e.w / 2, e.y + e.h, { color: ['#8fd9d0', '#c8f2ea'], angle: -Math.PI / 2, spread: 1, speed: [1, 2.5], life: [12, 22] }); return true; }
+    if (waterAt(e.x + e.w / 2, e.y + e.h - 1) && !e.flying) { e.dead = true; Sound.play('splash', null, { x: e.x }); spawnParts(8, e.x + e.w / 2, e.y + e.h, { color: ['#8fd9d0', '#c8f2ea'], angle: -Math.PI / 2, spread: 1, speed: [1, 2.5], life: [12, 22] }); return true; }
     if (e.y > L.h * TS + 40) { e.dead = true; return true; }
     return false;
   },
@@ -1431,8 +1431,8 @@ const Enemy = {
       const dx = Player.x + 5 - (e.x + 6); if (Math.abs(dx) < 110 && Math.abs(Player.y - e.y) < 60) {
         e.dir = dx > 0 ? 1 : -1; e.wait--;
         // Telegraph: a croak and a trembling crouch before every leap, so the jump is never a surprise.
-        if (e.wait <= 16 && e.wait > 0) { e.tug = 2; if (!e.warned) { e.warned = true; Sound.play('croak'); spawnParts(2, e.x + 6, e.y + e.h, { color: '#c9b08a', angle: -Math.PI / 2, spread: 1.4, speed: [.2, .6], life: [6, 10], g: .04 }); } }
-        if (e.wait <= 0) { e.state = 'jump'; e.warned = false; e.vx = e.dir * 1.5; e.vy = -4.6; e.onGround = false; Sound.play('frog'); }
+        if (e.wait <= 16 && e.wait > 0) { e.tug = 2; if (!e.warned) { e.warned = true; Sound.play('croak', null, { x: e.x }); spawnParts(2, e.x + 6, e.y + e.h, { color: '#c9b08a', angle: -Math.PI / 2, spread: 1.4, speed: [.2, .6], life: [6, 10], g: .04 }); } }
+        if (e.wait <= 0) { e.state = 'jump'; e.warned = false; e.vx = e.dir * 1.5; e.vy = -4.6; e.onGround = false; Sound.play('frog', null, { x: e.x }); }
       }
     }
     Enemy.touch(e);
@@ -1445,7 +1445,7 @@ const Enemy = {
     const range = 70; if (Math.abs(e.x - e.ox) > range) e.dir = e.x > e.ox ? -1 : 1;
     if (moveX(e, e.dir * .7)) e.dir = -e.dir;
     e.y = e.baseY + Math.sin(e.t / 14) * 8;
-    if (e.t % 90 === 0 && Math.abs(Player.x - e.x) < 120) Sound.play('buzz');
+    if (e.t % 90 === 0 && Math.abs(Player.x - e.x) < 120) Sound.play('buzz', null, { x: e.x });
     Enemy.touch(e);
   },
   mosquitoDraw(e, g) { let s = ART.mosquito[(e.t >> 2) % 2]; if (e.dir < 0) s = ART.flip(s); Enemy.drawSprite(e, g, s); },
@@ -1554,7 +1554,7 @@ const Proj = {
       const lx = hx ? (p.vx > 0 ? p.x + p.w + 1 : p.x - 1) : p.x + p.w / 2, ly = hy ? (p.vy > 0 ? p.y + p.h + 1 : p.y - 1) : p.y + p.h / 2;
       const tx = Math.floor(lx) >> 4, ty = Math.floor(ly) >> 4, ch = tileAt(tx, ty);
       if (ch === 'x' && p.kind !== 'agua') Game.breakCracked(tx, ty, 'x');
-      else if (ch === 'X' && p.kind !== 'agua') { if (p.charged) Game.breakCracked(tx, ty, 'X'); else { Sound.play('clang'); Game.word('¡CLONC!', tx * TS + 8, ty * TS - 4, '#9fa8b0', false); spawnParts(6, lx, ly, { color: ['#fff6d6', '#b98a3a'], speed: [.5, 2], life: [6, 12], g: .1 }); } }
+      else if (ch === 'X' && p.kind !== 'agua') { if (p.charged) Game.breakCracked(tx, ty, 'X'); else { Sound.play('clang', null, { x: tx * TS }); Game.word('¡CLONC!', tx * TS + 8, ty * TS - 4, '#9fa8b0', false); spawnParts(6, lx, ly, { color: ['#fff6d6', '#b98a3a'], speed: [.5, 2], life: [6, 12], g: .1 }); } }
       Proj.land(p, hx, hy); return;
     }
     const tx0 = Math.floor(p.x) >> 4, tx1 = Math.floor(p.x + p.w - 1) >> 4, ty0 = Math.floor(p.y) >> 4, ty1 = Math.floor(p.y + p.h - 1) >> 4;
@@ -1574,13 +1574,13 @@ const Proj = {
       if (p.kind !== 'rock' && p.kind !== 'crate' && !p.charged) { p.dead = true; Proj.splat(p); return; }
     }
     if (p.y > L.h * TS + 40 || p.x < -40 || p.x > L.w * TS + 40) p.dead = true;
-    if (waterAt(p.x + p.w / 2, p.y + p.h / 2)) { p.dead = true; if (p.kind !== 'agua') Game.word('SPLASH', p.x + p.w / 2, p.y - 6, '#8fd9d0', false); Sound.play('splash'); spawnParts(10, p.x + p.w / 2, p.y + p.h, { color: ['#8fd9d0', '#c8f2ea'], angle: -Math.PI / 2, spread: 1, speed: [1, 3], life: [14, 26] }); }
+    if (waterAt(p.x + p.w / 2, p.y + p.h / 2)) { p.dead = true; if (p.kind !== 'agua') Game.word('SPLASH', p.x + p.w / 2, p.y - 6, '#8fd9d0', false); Sound.play('splash', null, { x: p.x }); spawnParts(10, p.x + p.w / 2, p.y + p.h, { color: ['#8fd9d0', '#c8f2ea'], angle: -Math.PI / 2, spread: 1, speed: [1, 3], life: [14, 26] }); }
   },
   land(p, hx, hy) {
     if (p.kind === 'agua') { p.dead = true; Proj.splashOut(p, hy && p.vy > 0, hx ? Math.sign(p.vx) : 0); return; }
     if (p.kind === 'crate' || p.kind === 'rock') {
-      if (hy && p.vy > 0) { p.dead = true; Proj.dropAsItem(p); Sound.play('thud'); spawnParts(5, p.x + p.w / 2, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.4, speed: [.4, 1.2], life: [8, 14], g: .04 }); return; }
-      if (hx) { Sound.play(p.kind === 'rock' ? 'hit' : 'thud'); Cam.shake(p.kind === 'rock' ? (p.charged ? 4 : 2) : 1, 4); if (p.kind === 'crate') { p.vx = 0; p.vy = Math.max(p.vy, 0); } else { p.vx = -p.vx * .25; p.vy = Math.min(p.vy, -1.5); } p.charged = false; spawnParts(6, p.vx < 0 ? p.x + p.w : p.x, p.y + p.h / 2, { color: p.kind === 'rock' ? ['#a6abb8', '#7d8290'] : ['#c78d4e', '#e0a862'], speed: [.5, 2], life: [10, 20] }); return; }
+      if (hy && p.vy > 0) { p.dead = true; Proj.dropAsItem(p); Sound.play('thud', null, { x: p.x }); spawnParts(5, p.x + p.w / 2, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.4, speed: [.4, 1.2], life: [8, 14], g: .04 }); return; }
+      if (hx) { Sound.play(p.kind === 'rock' ? 'hit' : 'thud', null, { x: p.x }); Cam.shake(p.kind === 'rock' ? (p.charged ? 4 : 2) : 1, 4); if (p.kind === 'crate') { p.vx = 0; p.vy = Math.max(p.vy, 0); } else { p.vx = -p.vx * .25; p.vy = Math.min(p.vy, -1.5); } p.charged = false; spawnParts(6, p.vx < 0 ? p.x + p.w : p.x, p.y + p.h / 2, { color: p.kind === 'rock' ? ['#a6abb8', '#7d8290'] : ['#c78d4e', '#e0a862'], speed: [.5, 2], life: [10, 20] }); return; }
       if (hy && p.vy < 0) { p.vy = 0; return; }
     }
     p.dead = true; Proj.splat(p);
@@ -1870,7 +1870,7 @@ const Game = {
     for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (L.t[ty][tx] === 'F' && Math.random() < .08) L.parts.push({ x: tx * TS + rnd(3, 13), y: ty * TS + rnd(2, 10), vx: rnd(-.2, .2), vy: rnd(-.7, -.25), life: rnd(16, 34), color: ['#b4f8dc', '#5ed8b8', '#f0fff6'][(Math.random() * 3) | 0], size: 1, g: -.01, kind: 'dot' });
   },
   breakCracked(tx, ty, kind = 'x') {
-    const seen = new Set(), stack = [[tx, ty]]; let n = 0; Sound.play('crack'); Cam.shake(3, 8); Game.stop(3); Cam.punch(1.04); Game.word('¡CRAC!', tx * TS + 8, ty * TS - 6, '#d0d6da', true); Input.rumble(120, .7, .4);
+    const seen = new Set(), stack = [[tx, ty]]; let n = 0; Sound.play('crack', null, { x: tx * TS }); Cam.shake(3, 8); Game.stop(3); Cam.punch(1.04); Game.word('¡CRAC!', tx * TS + 8, ty * TS - 6, '#d0d6da', true); Input.rumble(120, .7, .4);
     while (stack.length) { const [x, y] = stack.pop(); const k = key(x, y); if (seen.has(k) || tileAt(x, y) !== kind) continue; seen.add(k); L.breakQueue.push({ x, y, d: 1 + Math.abs(x - tx) * 3 + Math.abs(y - ty) * 3 }); n++; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) stack.push([x + dx, y + dy]); }
     setTile(tx, ty, '.'); spawnParts(8, tx * TS + 8, ty * TS + 8, { color: ['#8a8f94', '#4f545a', '#a9aeb3'], speed: [1, 3], life: [16, 34], g: .18, bounce: .3 });
   },

@@ -1,13 +1,14 @@
 // GLUP — la gramola: index.html?gramola=1 (o ?escena=gramola). Escucha cada canción, cada
-// ambiente y cada instrumento del juego; muestra la sección y el compás que suenan. Con el
+// ambiente, cada instrumento y cada efecto del juego; muestra la sección y el compás que suenan. Con el
 // teclado: ←→ pestaña, ↑↓ elegir, Z/Enter tocar o parar, Esc para todo. En el móvil, tocar.
 'use strict';
 const Gramola = (() => {
-  const TABS = ['Canciones', 'Ambientes', 'Instrumentos'], ROW = 10, TOP = 32, ROWS = 12;
-  const INFO = {}, S = { tab: 0, sel: [0, 0, 0], scroll: [0, 0, 0], t: 0, playing: null, amb: null, flash: 0 };
+  const TABS = ['Canciones', 'Ambientes', 'Instrum.', 'Efectos'], NT = TABS.length, ROW = 10, TOP = 32, ROWS = 12;
+  const INFO = {}, S = { tab: 0, sel: [0, 0, 0, 0], scroll: [0, 0, 0, 0], t: 0, playing: null, amb: null, flash: 0 };
   function items(tab) {
     if (tab === 0) return Sound.canciones().filter(c => c.nombre !== 'prueba' && !c.nombre.startsWith('__')).map(c => ({ key: c.nombre, label: c.titulo, sub: c.nombre }));
     if (tab === 1) return Sound.ambientes().map(a => ({ key: a, label: a, sub: '' }));
+    if (tab === 3) return Sound.efectos().map(e => ({ key: e.nombre, arg: e.arg, label: e.nombre + (e.arg === null ? '' : ' ' + e.arg), sub: 'efecto', desc: e.desc }));
     return Sound.instrumentos().map(i => ({ key: i.nombre, label: i.nombre, sub: i.rango, desc: i.desc })).concat(Sound.percusion().map(d => ({ key: d, label: d, sub: 'percusión', drum: true })));
   }
   function start() { Game.state = 'gramola'; Sound.setMuted(false); }
@@ -15,6 +16,7 @@ const Gramola = (() => {
     const it = items(tab)[i]; if (!it) return; Sound.init(); Sound.setMuted(false);
     if (tab === 0) { if (S.playing === it.key) { Sound.stopMusic(); S.playing = null; } else { Sound.playMusic(it.key); S.playing = it.key; } }
     else if (tab === 1) { if (S.amb === it.key) { Sound.ambiente(null); S.amb = null; } else { Sound.ambiente(it.key); S.amb = it.key; } }
+    else if (tab === 3) { Sound.efecto(it.key, it.arg ?? undefined); S.flash = 30; }
     else { Sound.demo(it.key); S.flash = 30; }
   }
   function stopAll() { Sound.stopMusic(); Sound.ambiente(null); S.playing = null; S.amb = null; }
@@ -22,14 +24,14 @@ const Gramola = (() => {
   function update() {
     S.t++; if (S.flash > 0) S.flash--; const p = Input.pressed;
     if (p.up) move(-1); if (p.down) move(1);
-    if (p.left) S.tab = (S.tab + 2) % 3; if (p.right) S.tab = (S.tab + 1) % 3;
+    if (p.left) S.tab = (S.tab + NT - 1) % NT; if (p.right) S.tab = (S.tab + 1) % NT;
     if (p.jump || p.confirm || p.fish) activate(S.tab, S.sel[S.tab]);
     if (p.pause) stopAll();
     if (Game.tapped) Game.tapped = false;
   }
   function tap(pt) {
     Sound.init();
-    if (pt.y < TOP - 4) { const i = Math.floor(pt.x / (320 / 3)); if (i >= 0 && i < 3) S.tab = i; return; }
+    if (pt.y < TOP - 4) { const i = Math.floor(pt.x / (320 / NT)); if (i >= 0 && i < NT) S.tab = i; return; }
     if (pt.y >= 156) { stopAll(); return; }
     if (pt.x < 168) { const i = S.scroll[S.tab] + Math.floor((pt.y - TOP) / ROW), n = items(S.tab).length; if (i >= 0 && i < n) { S.sel[S.tab] = i; activate(S.tab, i); } return; }
     // The right column scrolls the list on a phone: top half up, bottom half down.
@@ -40,7 +42,7 @@ const Gramola = (() => {
   function draw(g) {
     Game.drawScene(g, S.t, S.tab === 1 && S.amb ? ({ noche: 'night', tormenta: 'storm', cueva: 'cave', rio: 'cave', nido: 'nest' }[S.amb] || 'dusk') : 'dusk');
     g.fillStyle = 'rgba(6,8,14,.78)'; g.fillRect(0, 0, W, H);
-    for (let i = 0; i < 3; i++) { const on = i === S.tab, x = i * W / 3; g.fillStyle = on ? '#2b3a52' : '#141a26'; g.fillRect(x + 2, 3, W / 3 - 4, 14); T(g, TABS[i], x + W / 6, 7, on ? '#fff3b8' : '#6f7f99', 'center'); }
+    for (let i = 0; i < NT; i++) { const on = i === S.tab, x = i * W / NT; g.fillStyle = on ? '#2b3a52' : '#141a26'; g.fillRect(x + 2, 3, W / NT - 4, 14); T(g, TABS[i], x + W / NT / 2, 7, on ? '#fff3b8' : '#6f7f99', 'center'); }
     const list = items(S.tab), t = S.tab, st = Sound.estado();
     for (let r = 0; r < ROWS; r++) {
       const i = S.scroll[t] + r, it = list[i]; if (!it) break; const y = TOP + r * ROW, sel = i === S.sel[t], on = (t === 0 && it.key === S.playing) || (t === 1 && it.key === S.amb);
@@ -65,7 +67,7 @@ const Gramola = (() => {
     } else if (it) {
       T(g, clip(it.label, 136), x, TOP + 2, '#fff3b8'); if (it.sub) T(g, it.sub, x, TOP + 14, '#8fa6cc');
       if (it.desc) ART.wrap(it.desc, 132).slice(0, 7).forEach((ln, k) => T(g, ln, x, TOP + 28 + k * 10, '#b8c2d6'));
-      if (t === 2 && S.flash) T(g, '★', W - 12, TOP + 2, '#a8f0a0');
+      if (t >= 2 && S.flash) T(g, '★', W - 12, TOP + 2, '#a8f0a0');
     }
     // Bottom: what plays, and how to stop it.
     g.fillStyle = '#0c1018'; g.fillRect(0, 156, W, 24);
