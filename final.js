@@ -249,7 +249,7 @@ const Final = (() => {
   const CAST = [['ruca', 300], ['lumi', 328], ['lapa', 368], ['olga', 390], ['anselmo', 412], ['canto', 434], ['pinzas', 456], ['alga', 480]];
   function teacherSprite(id, t, talking, seed, sleep) {
     if (typeof Maestros === 'undefined' || !Maestros.QUIEN || !Maestros.QUIEN[id] || !Maestros.frame) return null;
-    try { const a = sleep && Maestros.build ? Maestros.build()[id] : null; return a && a.blink ? a.blink : Maestros.frame(Maestros.QUIEN[id], t, talking, seed); } catch (e) { return null; }
+    try { return Maestros.frame(Maestros.QUIEN[id], t, talking, seed, sleep); } catch (e) { return null; }
   }
   function teacher(g, id, x, y, t, o = {}) {
     const f = teacherSprite(id, t, o.talk, o.seed || 0, o.sleep); if (!f) return;

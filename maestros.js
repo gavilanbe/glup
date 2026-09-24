@@ -833,10 +833,20 @@ const Maestros = (() => {
   }
   // Ruca's three classic poses baked into canvases, for ART.ruca (the sprite sheets use them).
   let rf = null;
+  // One pose of a teacher baked into a canvas, for scenes outside a level (the ending): talking, asleep, or at rest.
+  const fcache = new Map();
+  function frame(who, t, talking, seed = 0, sleep = false) {
+    const id = typeof who === 'string' ? who : who.id, a = art(id), [w, h] = a.size, top = a.top || 0, T = (t + seed * 37) | 0, m = mood(T, !!talking, false, false, -1);
+    if (sleep) { m.eye = 'blink'; m.mouth = 'shut'; }
+    const key = id + '|' + (T >> 2) + '|' + m.eye + m.mouth + m.breath + (sleep ? 'z' : '');
+    let c = fcache.get(key); if (c) return c;
+    if (fcache.size > 240) fcache.clear();
+    c = ART.canvas(w + 2, h - top); drawPose(c.getContext('2d'), a, a.pose(m), 0, -top, 1); fcache.set(key, c); return c;
+  }
   function rucaFrames() {
     if (rf) return rf; const a = art('ruca'), [w, h] = a.size, top = a.top || 0;
     const bake = s => { const c = ART.canvas(w + 2, h - top), g = c.getContext('2d'); drawPose(g, a, a.pose(s), 0, -top, 1); c.w = c.width; c.h = c.height; return c; };
     return rf = { idle: bake(mood(20, false, false, false, -1)), blink: bake(mood(0, false, false, false, -1)), talk: bake(mood(0, true, true, false, -1)) };
   }
-  return { QUIEN, spawn, busy, updateModal, drawOverlay, drawGuide, portrait, capture, sheet, reset, quest, force, build, rucaFrames };
+  return { QUIEN, spawn, busy, updateModal, drawOverlay, drawGuide, portrait, capture, sheet, reset, quest, force, build, rucaFrames, frame };
 })();
