@@ -1774,7 +1774,7 @@ const Game = {
       const i = Game.sel;
       if (i > Save.reached()) Sound.play('hurt');
       else if (Save.locked(i)) { Sound.play('hurt'); Mapa.shake(i); Game.explainWall(i, true); }
-      else { Sound.play('confirm'); Game.transition(() => Game.startLevel(i, true)); }
+      else { Sound.play('confirm'); Mapa.enter(i); Game.transition(() => Game.startLevel(i, true)); }
     }
     if (Input.pressed.pause) { Sound.play('select'); Game.transition(() => Game.title()); }
   },
@@ -1975,7 +1975,8 @@ const Game = {
       case 'icon': Game.drawIcon(g); break;
       case 'gramola': Gramola.draw(g); break;
     }
-    if (Game.fade > 0) { g.fillStyle = 'rgba(8,10,16,' + Game.fade + ')'; g.fillRect(0, 0, W, H); }
+    // On the map the fade is an iris round Nila (mapa.js).
+    if (Game.fade > 0) { if (Game.state === 'select') Mapa.iris(g, Game.fade); else { g.fillStyle = 'rgba(8,10,16,' + Game.fade + ')'; g.fillRect(0, 0, W, H); } }
   },
   drawBackground(g, camX, camY, bg) {
     const w = Game.weather, bolt = Game.state === 'play' && w && w.bolt > 0 && L.def && L.def.theme === 'storm' ? gg => Game.drawBolt(gg, w) : null;
