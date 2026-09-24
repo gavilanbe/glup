@@ -9,6 +9,10 @@
 //   III La furia — ojos rojos y sube el agua por los lados. Lluvia de piedras con sombras, doble picado
 //       (el segundo la deja clavada) y abanico desde el aire.
 // Cada golpe le hace escupir una cría; el último, a cámara lenta y con destello, suelta todas las que quedan.
+// No es un sprite fijo sino una marioneta articulada que se pinta píxel a píxel: cuello en S que se enrosca
+// y se dispara, pico que se abre, ojo que parpadea y sigue a Nila, penacho que ondea, alas que baten con las
+// primarias a la zaga, patas que andan y se doblan, plumas que se erizan. Cada ataque tiene su amago y su
+// inercia; los golpes la encogen y le cierran el ojo; mareada le cuelga el cuello; furiosa echa humo.
 'use strict';
 const Boss = (() => {
   const MAX_HP = 8, CRIAS = 10, PHASE_HP = [8, 6, 3], HOVER_Y = 64, SONGS = ['heron', 'heron2', 'heron3'];
@@ -433,14 +437,14 @@ const Boss = (() => {
   function vulnerable(b) { return !!(b.fight && !b.dead && VULN[b.state] && b.inv === 0); }
 
   // ---------------------------------------------------------------- Actualizar
-  function update(b) {
+  function update(b) { tick(b); if (!b.dead && b.state !== 'wait') anim(b); }
+  function tick(b) {
     b.t++; b.st++; if (b.flash > 0) b.flash--; if (b.inv > 0) b.inv--; if (b.shriek > 0) b.shriek--; if (b.whiteT > 0) b.whiteT--; if (b.redT > 0) b.redT--;
     if (b.card) { b.card.t++; if (b.card.t > b.card.life) b.card = null; }
     const A = arena(b.phase), P = Player, px = P.x + 5;
     if (DODGE[b.state] && b.inv === 0 && !(b.phase === 1 && b.hp === MAX_HP)) dodge(b, A);
     S[b.state](b, A, px, P);
     if (b.dead || b.state === 'wait') return;
-    if (b.rage && b.t % 5 === 0) spawnParts(1, b.x + (b.dir < 0 ? 11 : 20), b.y + 3, { color: ['#ff5a3a', '#ffb070'], speed: [.1, .4], life: [8, 16], g: -.03 });
     // A belly flop onto her while she is open counts as a blow.
     const body = { x: b.x + 3, y: b.y + 4, w: b.w - 6, h: b.h - 6 };
     if (P.pound && P.vy > 2 && vulnerable(b) && overlap(body, P.rect())) {
@@ -487,53 +491,448 @@ const Boss = (() => {
       shadow(g, e.x + 6, 4 + 7 * k, .3 + .35 * k, (Game.t >> 2) % 2 ? '#ff5a3a' : null);
     }
   }
+  // ---------------------------------------------------------------- La garza, articulada
+  // She is a puppet, not a sprite: every frame pose() turns her state into joints (body tilt and squash,
+  // where the head is, how the neck curls, the beak's gape, the eye, wing spread and beat, the feet) and
+  // figure() paints them pixel by pixel into a small canvas facing right, then stamps an ink outline round it.
+  // Her own frame: x forward, y down, origin in the middle of the body when she stands (b.x + 15, b.y + 13).
+  const FL = 17, RW = 176, RH = 136, AX = 88, AY = 76;
+  const HC = { G: '#8196b0', g: '#5a6488', L: '#b9c9da', W: '#f2efe8', w: '#c9c3cc', k: '#3a3d56', K: '#2a2638', Y: '#f0c444', y: '#b8782a', d: '#7a4e22',
+    E: '#ffd23a', e: '#1d1a26', R: '#ff3a2a', r: '#ffe0b0', m: '#6a5a4a', M: '#8a7058', t: '#8a2a3a' };
+  const INK = '#23202e', RAGE_INK = '#3e1426';
+  const k01 = k => k < 0 ? 0 : k > 1 ? 1 : k, eo = k => 1 - Math.pow(1 - k01(k), 3), io = k => { k = k01(k); return k * k * (3 - 2 * k); };
+  // A spring settling from 0 to 1, with an overshoot.
+  const spr = k => k >= 1 ? 1 : 1 - Math.exp(-k * 5) * Math.cos(k * 9);
+  const AN0 = { fl: 0, wk: 0, mv: 0, lt: 99, vx: 0, vy: 0, trail: [] };
+  const facing = (b, P) => P.flip ? -b.dir : b.dir;
+
+  // ---- Poses
+  function pose(b) {
+    const st = b.state, s = b.st, t = b.t, an = b.an || AN0, rg = b.rage ? 1 : 0, ph = b.phase;
+    const br = Math.sin(t / 22);
+    const P = { bx: 0, by: br * .6, ba: -.3, sx: 1, sy: 1 + br * .03, hx: 9, hy: -15, ha: 0, curl: .6, gape: 0, eye: 1, look: 1, pl: 0,
+      wo: 0, wf: 0, wl: 0, sw: 0, fs: 0, f1x: 4, f1y: FL, f2x: 0, f2y: FL, tuck: 0, tail: 0, fan: 0, puff: rg * .35, crest: rg * .6, clip: 0, flip: 0, rot: 0, mud: 0, spd: 0, jx: 0 };
+    const fly = (sp, bob = 1.2) => { P.ba = .06; P.hx = 12; P.hy = -8; P.curl = 1; P.wo = 1; P.wf = Math.sin(an.fl); P.wl = Math.cos(an.fl); P.fs = sp; P.by = -P.wf * bob; P.sy = 1 + P.wl * .03; P.f1x = -24; P.f1y = 4; P.f2x = -23; P.f2y = 6; P.tuck = 1; P.tail = .1; };
+    const dangle = (k, sway = 1) => { P.f1x = lerp(P.f1x, -3 + Math.sin(t / 9) * sway, k); P.f1y = lerp(P.f1y, 15, k); P.f2x = lerp(P.f2x, -6 + Math.sin(t / 9 + 1) * sway, k); P.f2y = lerp(P.f2y, 14, k); P.tuck = 1 - k; };
+    const stab = k => { P.hx = lerp(1, 15.5, k); P.hy = lerp(-14, 7, k); P.ha = lerp(.35, .72, k); P.curl = lerp(1.5, -.35, k); P.ba = lerp(-.6, .38, k); P.bx = lerp(-2, 3, k); P.f1x = 10; P.f2x = -8; P.tail = -.5 * k; P.clip = 1; P.look = 0; };
+    switch (st) {
+      case 'intro':
+        if (s < 100) {
+          fly(s < 36 ? .2 : .22);
+          if (s > 80) { const k = io((s - 80) / 20); P.wf = lerp(P.wf, -.95, k); P.fs = .22 * (1 - k); P.ba = lerp(P.ba, -.45, k); P.hy -= 5 * k; P.f1x = lerp(P.f1x, 7, k); P.f1y = lerp(P.f1y, 14, k); P.f2x = lerp(P.f2x, 4, k); P.f2y = lerp(P.f2y, 15, k); P.tuck = 1 - k; }
+        } else {
+          const k = (s - 100) / 14;
+          if (k < 1) { const q = Math.exp(-k * 3) * Math.cos(k * 7); P.by += 4 * Math.max(0, q); P.sy -= .2 * q; P.sx += .14 * q; P.wo = 1 - io(k); P.wf = .3; P.wl = -1; }
+        }
+        break;
+      case 'return': fly(.24); break;
+      case 'hover': {
+        fly(ph === 3 ? .3 : .2);
+        // Now and then a glide on still wings; the feet reach down as she lets go of a stone.
+        if (ph !== 3 && s % 110 > 70) { P.fs = .06; }
+        if (ph === 1) for (const d of [30, 100]) if (s > d - 10 && s < d + 6) { const k = Math.sin((s - d + 10) / 16 * Math.PI); P.f1x = lerp(P.f1x, 0, k); P.f1y = lerp(P.f1y, 15, k); P.f2x = lerp(P.f2x, -2, k); P.f2y = lerp(P.f2y, 15, k); P.tuck = 1 - k; P.hy += 3 * k; P.ha += .5 * k; }
+        break;
+      }
+      case 'aim': fly(.32, 1.6); P.hx = 13; P.hy = -3; P.ha = .8; P.curl = .8; P.look = .5; P.crest = Math.max(P.crest, .6); break;
+      case 'lock': {
+        const k = eo(s / 12); fly(.02);
+        P.wf = lerp(Math.sin(an.fl), -1, k) + Math.sin(s * 2.1) * .05; P.wl = 0; P.sw = .5 * k; P.ba = .2 * k; P.hx = 12 - 3 * k; P.hy = -8 - 4 * k; P.curl = 1 + .5 * k; P.ha = .7 + .5 * k; P.look = 0;
+        P.crest = 1; P.puff = Math.max(P.puff, .5 * k); P.sy = 1 - .1 * k; P.sx = 1 + .07 * k; P.f1x = -15; P.f1y = 1; P.f2x = -14; P.f2y = 3; P.eye = s > 10 && (s >> 1) % 2 ? 3 : 1; P.jx = Math.sin(s * 1.9) * (s > 14 ? 1 : 0);
+        break;
+      }
+      case 'plunge': {
+        P.wo = .6; P.wf = -.95; P.sw = 1.2; P.ba = 1.3; P.sx = 1.2; P.sy = .82; P.hx = 5; P.hy = 11; P.ha = 1.5; P.curl = -.3; P.crest = 1; P.look = 0; P.spd = 1;
+        P.f1x = -12; P.f1y = -8; P.f2x = -10; P.f2y = -10; P.tuck = 1; P.tail = -.4;
+        break;
+      }
+      case 'land': {
+        const n = ph === 1 ? 30 : 10, q = Math.exp(-s / 4) * Math.cos(s * .8), r = spr(s / 16);
+        P.by += 5 * Math.max(0, q) + 2 * Math.exp(-s / 6); P.sy -= .22 * q; P.sx += .16 * q;
+        P.wo = Math.max(0, 1 - s / 14); P.wf = .55; P.wl = -1; P.sw = -.2;
+        P.hx = lerp(14, 9, r); P.hy = lerp(6, -15, r); P.ha = lerp(1.2, 0, r); P.curl = lerp(-.2, .6, r); P.look = r;
+        P.f1x = 7; P.f2x = -4;
+        // Phase I: a dazed shake of the head; then a crouch before taking off.
+        if (ph === 1 && s > 12 && s < 26) { P.ha += Math.sin(s * 1.3) * .3; P.hx += Math.sin(s * 1.3) * 1.5; P.eye = 0; }
+        if (s > n - 7) { const k = io((s - n + 7) / 7); P.by += 3 * k; P.sy -= .08 * k; P.wo = Math.max(P.wo, .8 * k); P.wf = lerp(P.wf, -.8, k); P.ba -= .1 * k; }
+        break;
+      }
+      case 'rise': {
+        fly(ph === 3 ? .42 : .36, 2); P.sy += .08; P.ba = -.12; const k = io(s / 26); dangle(1 - k, .5); P.hy -= 2;
+        break;
+      }
+      case 'reel': {
+        fly(.5, 1.5); const k = s / 40;
+        P.rot = Math.sin(s * .32) * .9 * (1 - k); P.eye = s < 26 ? -1 : 1; P.gape = s < 22 ? .9 : 0; P.hx = 5 + 7 * io(k); P.hy = -14 + 6 * io(k); P.ha = -.4 + .4 * io(k); P.curl = .2 + .8 * k; P.crest = 1; P.look = k;
+        P.wf = Math.sin(an.fl) * (1 - k * .3); dangle(1 - k, 3); P.puff = Math.max(P.puff, .8 * (1 - k));
+        break;
+      }
+      case 'rainUp': {
+        fly(.34, 1.5);
+        if (s > 16 && s < 44) { const k = Math.sin((s - 16) / 28 * Math.PI); P.gape = Math.min(1, k * 1.5); P.ha = -.6 * k; P.hy -= 5 * k; P.hx += 2 * k; P.crest = 1; P.curl = 1 - .7 * k; P.look = 1 - k; }
+        if (s >= 30 && s < 96) { const u = (s - 30) % 12; if (u < 5) { const k = Math.sin(u / 5 * Math.PI); P.ha += .45 * k; P.hy += 2 * k; } }
+        break;
+      }
+      case 'fanAir': {
+        fly(s < 40 ? .1 : .3); const k = eo(s / 12);
+        if (s < 40) { P.wf = lerp(P.wf, -.75 + Math.sin(t * 1.7) * .08, k); P.puff = Math.max(P.puff, k); P.crest = 1; P.sx += .08 * k; P.sy += .08 * k; P.fan = k; P.hx = 13; P.hy = -6; P.ha = .3; P.jx = s > 20 ? Math.sin(t * 2.3) * .7 : 0; }
+        else { const u = k01((s - 40) / 8); P.wf = lerp(1, P.wf, io(u)); P.wl = 0; P.by -= 2 * (1 - u); P.hx = 15 - 3 * u; P.hy = -6; P.gape = .7 * (1 - u); P.puff = Math.max(P.puff, 1 - (s - 40) / 20); P.fan = 1 - u; }
+        break;
+      }
+      case 'walk': {
+        if (an.mv) {
+          const w = an.wk, sw = Math.sin(w), cw = Math.cos(w);
+          P.f1x = 3 + sw * 5; P.f1y = FL - Math.max(0, cw) * 4; P.f2x = 1 - sw * 5; P.f2y = FL - Math.max(0, -cw) * 4;
+          P.by = -Math.abs(cw) * 1.2 + .8; P.ba = -.3 + Math.sin(w * 2) * .04;
+          // Birds walk with the head held still, then thrust forward.
+          const f = (w / Math.PI) % 1; P.hx = f < .2 ? 7 + 15 * f : 10 - 3 * (f - .2) / .8; P.hy = -15 + (f < .2 ? -1 : 0); P.tail = Math.sin(w) * .12;
+        } else {
+          // Standing: breathing, a tilt of the head now and then, a shift of weight.
+          const tl = Math.sin(t / 47) > .7 ? (Math.sin(t / 47) - .7) / .3 : 0; P.ha += Math.sin(t / 53) * .06 - tl * .25; P.hy += tl * 1.5; P.hx += Math.sin(t / 61) * .8;
+          P.f1x = 4 + Math.sin(t / 90) * .7;
+        }
+        // Just back on her feet: she shakes her feathers out.
+        if (s < 18) { const k = 1 - s / 18; P.puff = Math.max(P.puff, .9 * k); P.jx = Math.sin(s * 2.4) * k; P.wo = .25 * k; P.wf = .2; P.wl = Math.sin(s * 2.4); }
+        break;
+      }
+      case 'windup': {
+        const k = eo(s / 10);
+        P.ba = -.3 - .32 * k; P.bx = -2 * k; P.hx = 9 - 6 * k; P.hy = -15 - 3 * k; P.curl = .6 + 1.1 * k; P.ha = .35 * k; P.look = 0; P.wo = .3 * k; P.wf = -.3; P.sw = .4;
+        P.sy -= .06 * k; P.sx += .04 * k; P.f1x = 4 + 5 * k; P.f2x = -4 * k; P.crest = Math.max(P.crest, .3 + .7 * k); P.puff = Math.max(P.puff, .3 * k); P.tail = .3 * k;
+        if (s > 18) { P.jx = Math.sin(s * 1.9); P.curl += .1 * Math.sin(s * 2.5); }
+        break;
+      }
+      case 'stab': {
+        const k = eo(s / 3); stab(k); P.sx += .16 * k * (1 - s / 12); P.wo = .45; P.wf = -.55; P.sw = .5; P.wl = 1;
+        if (s >= 3 && s < 7) P.hy += 1; P.eye = s > 1 ? -1 : 1; P.mud = s >= 3 ? 1 : 0; P.crest = 1;
+        break;
+      }
+      case 'pull': {
+        const k = io(s / 20); stab(1); P.mud = 0;
+        P.hx = lerp(15.5, 9, k); P.hy = lerp(7, -15, k); P.ha = lerp(.72, 0, k); P.curl = lerp(-.35, .6, k); P.ba = lerp(.38, -.3, k); P.bx = lerp(3, 0, k); P.tail = lerp(-.5, 0, k);
+        P.f1x = lerp(10, 4, k); P.f2x = lerp(-8, 0, k); P.clip = 0; P.gape = s > 9 && s < 15 ? .6 : 0; P.crest = 1 - k * .5; P.look = k;
+        break;
+      }
+      case 'stuck': {
+        stab(1); P.mud = 1; const cyc = s % 38, burst = cyc < 16 && s > 4, w = burst ? Math.sin(cyc / 16 * Math.PI) : 0;
+        // Tugging: the beak stays put, the body pulls back and the neck stretches; wings beat, feet scrabble.
+        P.bx = 3 - 3 * w; P.ba = .38 + .12 * w; P.hx = 15.5 - .5 * w; P.hy = 7 - .4 * w;
+        if (burst) { P.wo = .95; P.wf = Math.sin(t * .85); P.wl = Math.cos(t * .85); P.f1x = 8 + Math.sin(t * 1.2) * 3; P.f1y = FL - Math.max(0, Math.sin(t * 1.2)) * 3; P.f2x = -8 - Math.sin(t * 1.2) * 2; P.f2y = FL - Math.max(0, -Math.sin(t * 1.2)) * 3; P.eye = -1; P.tail = -.4 + Math.sin(t * .9) * .3; P.puff = Math.max(P.puff, .5); }
+        else { P.wo = .45; P.wf = .65 + Math.sin(t / 7) * .05; P.wl = 0; P.eye = (t % 60) < 5 ? 0 : 1; P.sy += Math.sin(t / 5) * .05; P.tail = -.3; }
+        P.crest = burst ? 1 : .2 + Math.sin(t / 6) * .2;
+        break;
+      }
+      case 'yank': {
+        stab(1); P.clip = 0; P.mud = 0; const k = eo(s / 5), wh = Math.sin(k01(s / 9) * Math.PI);
+        P.hx = lerp(15.5, 9, k) - 3 * wh; P.hy = lerp(7, -15, k) - 5 * wh; P.ha = s < 5 ? lerp(.72, -.45, k) : lerp(-.45, 0, io((s - 5) / 13)); P.curl = lerp(-.35, .6, k);
+        P.gape = s < 13 ? .85 : 0; P.eye = s < 4 ? -1 : 1; P.ba = -.3 - .35 * wh; P.bx = lerp(3, -1, k); P.wo = .7 * (1 - s / 18); P.wf = -.4; P.sw = .3;
+        P.f1x = lerp(10, 4, io(s / 12)); P.f2x = lerp(-8, 0, io((s - 6) / 10)); P.f2y = FL - (s > 5 && s < 14 ? Math.sin((s - 5) / 9 * Math.PI) * 4 : 0); P.crest = 1; P.tail = .4 * wh; P.look = 0;
+        break;
+      }
+      case 'gustWind': {
+        const k = eo(s / 20);
+        P.puff = Math.max(P.puff, .6 * k); P.sy += .1 * k; P.sx -= .03 * k; P.ba = -.3 - .25 * k; P.hx = 9 - 3 * k; P.hy = -15 - 3 * k; P.ha = -.5 * k; P.gape = s > 8 && s < 34 ? .35 : 0; P.look = 0;
+        P.wo = k; P.wf = -.95 + (s > 26 ? Math.sin(t * 2) * .06 : 0); P.sw = .6 * k; P.wl = 0; P.crest = 1; P.f1x = 4 + 5 * k; P.f2x = -5 * k; P.fan = k;
+        break;
+      }
+      case 'gust': {
+        const e = s > 108 ? io((s - 108) / 12) : 0, a = s * .62;
+        const sn = Math.sin(a); P.wo = 1 - e; P.wf = Math.sign(sn) * Math.pow(Math.abs(sn), .45); P.wl = Math.cos(a); P.sw = -.2 - 1.3 * Math.max(0, P.wf); P.ba = -.5 + e * .2; P.bx = -1; P.by = -P.wf * .8; P.hx = 11; P.hy = -11; P.ha = .15; P.curl = .9; P.gape = .25 * (1 - e);
+        P.puff = Math.max(P.puff, .5); P.f1x = 10; P.f2x = -6; P.look = 0; P.fan = .6;
+        break;
+      }
+      case 'stagger': {
+        const k = k01(s / 14), sw = Math.sin(t / 9);
+        if (s < 14) { P.wo = 1 - k * .5; P.wf = Math.sin(t * .7); P.wl = Math.cos(t * .7); P.hx = 3; P.hy = -17; P.ha = -.4; P.eye = -1; P.gape = .8; P.ba = -.55; P.f1x = 6 - 8 * Math.sin(s * .45); P.f2x = -3 + 6 * Math.sin(s * .45); P.crest = 1; }
+        else {
+          P.bx = sw * 1.5; P.ba = -.15 + Math.sin(t / 11) * .15; P.by += 1.5 + Math.abs(sw); P.hx = 7 + Math.cos(t / 8) * 4; P.hy = -8 + Math.sin(t / 8) * 2.5; P.curl = .1; P.ha = .7 + Math.sin(t / 10) * .35;
+          P.eye = 2; P.gape = .35 + Math.sin(t / 13) * .15; P.wo = .45; P.wf = .75 + Math.sin(t / 9) * .1; P.wl = 0; P.tail = .4; P.crest = -.6; P.look = 0;
+          P.f1x = 5 + sw * 3; P.f2x = -1 - sw * 3;
+          if (s > 118) { const u = (s - 118) / 22; P.ha += Math.sin(s * 1.6) * .3 * (1 - u); P.hy = lerp(P.hy, -15, io(u)); P.hx = lerp(P.hx, 9, io(u)); P.eye = 1; P.gape *= 1 - u; P.wo *= 1 - u; }
+        }
+        break;
+      }
+      case 'reel2': {
+        const k = s < 12 ? 0 : io((s - 12) / 22);
+        P.hx = lerp(1, 9, k); P.hy = lerp(-18, -15, k); P.ha = lerp(-.5, 0, k); P.eye = s < 20 ? -1 : 1; P.gape = .9 * (1 - k); P.ba = lerp(-.62, -.3, k); P.curl = lerp(.2, .6, k);
+        P.wo = .9 * (1 - k); P.wf = -.3 + Math.sin(t * .8) * .4; P.wl = Math.cos(t * .8); P.crest = 1; P.puff = Math.max(P.puff, .8 * (1 - k)); P.look = 0;
+        P.f1x = s < 16 ? 4 - 6 * Math.sin(s * .4) : 4; P.f2x = s < 16 ? 6 * Math.sin(s * .4) - 2 : 0; P.f1y = FL - (s < 16 ? Math.max(0, Math.sin(s * .4)) * 3 : 0);
+        break;
+      }
+      case 'fanWind': {
+        const k = eo(s / 20);
+        P.puff = Math.max(P.puff, k); P.sx = 1 + .1 * k; P.sy = 1 + .1 * k; P.wo = .55 * k; P.wf = -.55 + (s > 12 && (t & 1) ? .08 : 0); P.wl = 0; P.sw = .3; P.ha = .2; P.hx = 10; P.hy = -13; P.crest = 1; P.fan = k; P.tail = -.2;
+        P.gape = s > 30 ? .4 : 0; P.jx = s > 12 && (t & 1) ? 1 : 0; P.look = .5;
+        break;
+      }
+      case 'fanPost': {
+        if (s < 10) { const u = s / 10; P.wo = 1 - .7 * u; P.wf = .9; P.wl = -1; P.sw = -.6; P.hx = 13; P.hy = -11; P.gape = .7 * (1 - u); P.ba = -.15; P.bx = 1; }
+        P.puff = Math.max(P.puff, 1 - s / 22); P.fan = Math.max(0, 1 - s / 16);
+        if (s > 20 && s < 36) { P.jx = Math.sin(s * 2.4) * .7; P.puff = Math.max(P.puff, .5); }
+        break;
+      }
+      case 'trans1': {
+        if (b.air && s < 92) { fly(.28); if (s > 40) { const k = io((s - 40) / 12); P.wf = lerp(P.wf, -.9, k); P.fs = .28 * (1 - k); P.ba = lerp(P.ba, -.4, k); P.f1x = lerp(P.f1x, 7, k); P.f1y = lerp(P.f1y, 14, k); P.f2x = lerp(P.f2x, 3, k); P.f2y = lerp(P.f2y, 15, k); P.tuck = 1 - k; } }
+        else if (s < 92) {
+          // Two stamps on the nest: the foot goes up, the neck up with it, and down it all comes.
+          P.wo = .5; P.wf = -.45 + Math.sin(t * .5) * .05; P.gape = .3; P.crest = 1; P.puff = Math.max(P.puff, .4);
+          for (const d of [60, 78]) {
+            if (s >= d - 9 && s < d) { const u = (s - d + 9) / 9, l = u < .7 ? eo(u / .7) : 1 - (u - .7) / .3; P.f1x = 6; P.f1y = FL - 8 * l; P.hy -= 3 * l; P.ha -= .3 * l; P.ba -= .1 * l; }
+            if (s >= d && s < d + 7) { const q = Math.exp(-(s - d) / 2.5); P.by += 3 * q; P.sy -= .18 * q; P.sx += .12 * q; P.gape = 1; }
+          }
+        } else if (b.air) { fly(.55, 2); P.gape = .7 + Math.sin(t * .9) * .3; P.eye = (t >> 3) % 2 ? -1 : 1; P.crest = 1; dangle(.8, 3); P.ba = -.2; P.hy -= 3; }
+        break;
+      }
+      case 'trans2': {
+        fly(.3); const k = k01(s / 40);
+        if (s < 40) { P.jx = Math.sin(s * 2.7) * k * 1.3; P.puff = Math.max(P.puff, k); P.sx += .06 * k; P.sy += .06 * k; P.crest = k; P.hy += 2 * k; P.ha = .3 * k; P.eye = s > 30 ? 4 : 1; }
+        else if (s < 72) { const u = Math.sin(k01((s - 40) / 32) * Math.PI); P.fs = .05; P.wf = lerp(P.wf, -1, u) + Math.sin(t * 1.8) * .04 * u; P.wl = 0; P.gape = u; P.ha = -.65 * u; P.hy -= 6 * u; P.hx += 2 * u; P.curl = 1 - .8 * u; P.crest = 1; P.puff = 1; P.look = 1 - u; P.jx = Math.sin(t * 2.2) * u; }
+        break;
+      }
+      case 'final': {
+        fly(.18, 1); P.rot = s * .15; P.wf = .2 + Math.sin(t * .3) * .6; P.eye = 2; P.gape = .7; P.hx = 8; P.hy = -8; P.ha = .4; P.curl = .2; P.crest = -.5; dangle(1, 3); P.look = 0; P.puff = .8;
+        break;
+      }
+      case 'dying': {
+        const up = io((s - 66) / 24), q = Math.exp(-s / 5) * Math.cos(s * .9), tw = s % 28 < 3 && s < 66;
+        P.by = lerp(10, 0, up) + 2 * Math.max(0, q); P.ba = lerp(.12, -.3, up); P.sy = 1 + Math.sin(t / 7) * .05 - .15 * Math.max(0, q); P.sx = 1 + .1 * Math.max(0, q);
+        P.hx = lerp(20, 9, up) + (tw ? 1 : 0); P.hy = lerp(12, -13, up); P.ha = lerp(.12, .25, up); P.curl = lerp(-.2, .3, up); P.eye = s > 60 && (t >> 3) % 3 ? .5 : 0; P.gape = lerp(.25, 0, up);
+        P.wo = .7 * (1 - up); P.wf = tw ? .55 : .95; P.wl = 0; P.sw = .4; P.crest = -.7; P.tail = .5; P.look = 0;
+        P.f1x = lerp(6, 4, up); P.f1y = FL; P.f2x = lerp(-3, 0, up); P.f2y = FL;
+        break;
+      }
+      case 'leave': {
+        fly(.14 + (Math.sin(t / 9) > 0 ? .08 : 0), 2); P.flip = 1; P.ba = -.18; P.hx = 11; P.hy = -5; P.ha = .3; P.eye = .5; P.crest = -.5; P.look = 0;
+        P.f1x = -4 + Math.sin(t / 7) * 3; P.f1y = 15; P.tuck = .4; P.by += Math.sin(t / 13) * 1.5;
+        break;
+      }
+    }
+    // Sidestepping a stone: a sharp bank with the wings swept.
+    if (b.dodge > 0) { const k = Math.sin(b.dodge / 14 * Math.PI), d = b.dodgeDir === b.dir ? 1 : -1; P.ba += .45 * d * k; P.wf = lerp(P.wf, -.9, k); P.sw += .6 * k; P.wl = 0; P.hx -= 2 * d * k; P.crest = 1; }
+    // Turning round: a squeeze through the flip.
+    if (an.turn > 0) { P.sx *= 1 - an.turn * .05; P.hx *= 1 - an.turn * .08; }
+    // Screaming: the neck shoots up, the beak opens wide; on the ground she spreads her wings as well.
+    if (b.shriek > 0 && !P.clip && st !== 'plunge' && st !== 'final' && st !== 'dying') {
+      const w = Math.min(1, b.shriek / 8);
+      P.gape = Math.max(P.gape, w * (.8 + Math.sin(t * 1.5) * .2)); P.ha = lerp(P.ha, -.45, w); P.hy -= 5 * w; P.hx += 3 * w; P.crest = Math.max(P.crest, w); P.curl = lerp(P.curl, .15, w); P.look = 1 - w;
+      if (!b.air) { P.wo = Math.max(P.wo, .85 * w); P.wf = lerp(P.wf, -.65 + Math.sin(t * .6) * .08, w); P.wl = 0; P.puff = Math.max(P.puff, .6 * w); P.fan = Math.max(P.fan, w); }
+    }
+    // A blow: eye squeezed shut, beak open, head whipped back.
+    if (b.flash > 0) {
+      const w = b.flash / 14; P.eye = -1; P.gape = Math.max(P.gape, .8 * w); P.sx += .12 * w; P.sy -= .1 * w; P.hx -= 5 * w; P.hy -= 4 * w; P.ha -= .5 * w; P.bx -= 2 * w; P.crest = 1; P.puff = Math.max(P.puff, w); P.look = 0;
+    }
+    // Back down on the ground: squash.
+    if (!b.air && an.lt < 12 && st !== 'land' && st !== 'dying' && st !== 'stuck' && st !== 'intro') { const q = Math.exp(-an.lt / 4) * Math.cos(an.lt * .7); P.sy -= .2 * q; P.sx += .15 * q; P.by += 3 * Math.max(0, q); }
+    // The eye (and a little of the head) follows Nila.
+    const dir = facing(b, P), hwx = b.x + 15 + dir * (P.bx + P.hx), hwy = b.y + 13 + P.by + P.hy, ldx = (Player.x + 5 - hwx) * dir, ldy = Player.y + 10 - hwy;
+    P.pl = ldx > 3 ? 1 : ldx < -3 ? -1 : 0;
+    if (P.look > 0 && ldx > -4) P.ha += clamp(Math.atan2(ldy, Math.max(4, ldx)), -.45, .8) * P.look * .6;
+    // Blinking (never while furious).
+    if (P.eye === 1 && ((t + 23) % 157 < 4 || (t + 23) % 471 === 12 || (t + 23) % 471 === 13)) P.eye = 0;
+    return P;
+  }
+
+  // ---- Painting
+  let RA = null, RO = null, ra = null, ro = null, OX = 0, OY = 0, OV = null, FC = null, CLIP = 999;
+  // Where her beak tip, eye and head ended up (in her own frame), for the effects drawn around her.
+  const TIP = [0, 0], EYE = [0, 0], HEAD = [0, 0];
+  function R(x, y, w, h, c) { const col = OV || c; if (col !== FC) { ra.fillStyle = col; FC = col; } ra.fillRect(AX + x + OX, AY + y + OY, w, h); }
+  function dot(x, y, c) { x = Math.round(x); y = Math.round(y); if (y <= CLIP) R(x, y, 1, 1, c); }
+  function line(x0, y0, x1, y1, c, w = 1) {
+    const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))));
+    for (let i = 0; i <= n; i++) { const x = Math.round(x0 + (x1 - x0) * i / n), y = Math.round(y0 + (y1 - y0) * i / n); if (y <= CLIP) R(x, y, w, w, c); }
+  }
+  // A filled ellipse turned by a, row by row (crisp, no smoothing).
+  function ell(cx, cy, rx, ry, a, c) {
+    rx = Math.max(.5, rx); ry = Math.max(.5, ry);
+    const ca = Math.cos(a), sa = Math.sin(a), A = ca * ca / (rx * rx) + sa * sa / (ry * ry), Bq = 2 * sa * ca * (1 / (rx * rx) - 1 / (ry * ry)), Cq = sa * sa / (rx * rx) + ca * ca / (ry * ry), r = Math.max(rx, ry);
+    for (let yy = Math.floor(cy - r); yy <= Math.ceil(cy + r); yy++) {
+      const Y = yy + .5 - cy, B = Bq * Y, D = B * B - 4 * A * (Cq * Y * Y - 1); if (D < 0) continue;
+      const q = Math.sqrt(D), xa = Math.round(cx + (-B - q) / (2 * A)), xb = Math.round(cx + (-B + q) / (2 * A)); if (xb > xa) R(xa, yy, xb - xa, 1, c);
+    }
+  }
+  function poly(p, c) {
+    let y0 = 1e9, y1 = -1e9; for (const q of p) { if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1]; }
+    const xs = [];
+    for (let yy = Math.floor(y0); yy <= Math.ceil(y1); yy++) {
+      const Y = yy + .5; xs.length = 0;
+      for (let i = 0, j = p.length - 1; i < p.length; j = i++) { const a = p[i], q = p[j]; if ((a[1] > Y) !== (q[1] > Y)) xs.push(a[0] + (Y - a[1]) / (q[1] - a[1]) * (q[0] - a[0])); }
+      xs.sort((u, v) => u - v);
+      for (let k = 0; k + 1 < xs.length; k += 2) { const xa = Math.round(xs[k]), xb = Math.round(xs[k + 1]); if (xb > xa) R(xa, yy, xb - xa, 1, c); }
+    }
+  }
+  // Paints f with its own ink line around it (for parts that overlap the body: the near wing, the neck and head).
+  function inked(f, ink) { OV = ink; OX = -1; OY = 0; f(); OX = 1; f(); OX = 0; OY = -1; f(); OY = 1; f(); OV = null; OY = 0; f(); }
+  const lp = (a, q, k) => [a[0] + (q[0] - a[0]) * k, a[1] + (q[1] - a[1]) * k];
+
+  // A wing: folded along the back (wo 0) or open, beating from up (wf -1) to down (wf 1); the long dark
+  // primaries trail behind the beat (wl), sw sweeps it back.
+  function wing(P, bf, far) {
+    const o = P.wo, f = clamp(P.wf - (far ? .35 : 0), -1, 1), fd = f > 0 ? .75 : 1, m = 1 - Math.abs(f), sw = P.sw, lag = P.wl * o * 5 * (far ? .8 : 1), sc = far ? .92 : 1;
+    const Wo = [-3 - 2 * m - sw * 4, f * 14 * fd - m * 3], To = [Wo[0] - 7 - 13 * m - sw * 7, Wo[1] + f * 12 * fd - m - lag];
+    const S = lp([6, -2], [5, -4], o), W = lp([-1, -6], Wo, o), T = lp([-21, -1], To, o), Sb = lp([2, 1], [-8, -3], o);
+    const Sm = lp([-11, 2], [(Wo[0] - 8) / 2 - 5, (Wo[1] - 3) / 2 + 4 * m + f * 2], o);
+    const q = p => bf((p[0] + (far ? 1 : 0)) * sc, (p[1] - (far ? 2.5 : 0)) * sc);
+    const s = q(S), w = q(W), t = q(T), sb = q(Sb), sm = q(Sm), tp = lp(w, t, .45);
+    let ax = t[0] - w[0], ay = t[1] - w[1]; const al = Math.hypot(ax, ay) || 1; ax /= al; ay /= al;
+    let px = -ay, py = ax; if (px * (sm[0] - w[0]) + py * (sm[1] - w[1]) < 0) { px = -px; py = -py; }
+    const tips = []; for (let i = 0; i < 5; i++) tips.push([t[0] + px * i * 1.9 - ax * i * 1.5, t[1] + py * i * 1.9 - ay * i * 1.5]);
+    const c1 = far ? HC.g : HC.G, c2 = far ? HC.k : HC.g, c3 = far ? HC.K : HC.k;
+    poly([s, w, t, tips[4], sm, sb], c1);
+    // The flight feathers: a dark hand at the tip, a row of secondaries along the trailing edge.
+    poly([tp, t, tips[4], lp(sm, tips[4], .5)], c3);
+    for (let i = 1; i < 5; i++) { const a = lp(tp, w, i * .12); line(a[0], a[1], tips[i][0], tips[i][1], i % 2 ? c2 : c3); }
+    line(tp[0], tp[1], t[0], t[1], c3);
+    if (o > .3) for (let i = 1; i < 4; i++) { const a = lp(s, w, i / 4), e = lp(sb, sm, i / 3); line(lp(a, e, .55)[0], lp(a, e, .55)[1], e[0], e[1], c2); }
+    // A pale leading edge (the shoulder coverts).
+    if (!far) { line(s[0], s[1], w[0], w[1], HC.L); line(w[0], w[1], tp[0], tp[1], HC.L); const k = lp(s, w, .75); dot(k[0], k[1] + 1, HC.K); dot(w[0], w[1] + 1, HC.K); }
+  }
+  function leg(hx, hy, fx, fy, near, tuck) {
+    const a = 7, c = 8; let dx = fx - hx, dy = fy - hy, d = Math.hypot(dx, dy);
+    if (d > a + c - .3) { const k = (a + c - .3) / d; dx *= k; dy *= k; d = a + c - .3; fx = hx + dx; fy = hy + dy; }
+    d = Math.max(d, 3);
+    const an = Math.atan2(dy, dx) + Math.acos(clamp((a * a + d * d - c * c) / (2 * a * d), -1, 1)), jx = hx + Math.cos(an) * a, jy = hy + Math.sin(an) * a;
+    const col = near ? HC.y : HC.d;
+    line(hx, hy, jx, jy, near ? HC.g : HC.k); line(jx, jy, fx, fy, col);
+    if (tuck > .5) { dot(fx - 1, fy + 1, col); dot(fx - 2, fy, col); }
+    else { line(fx, fy, fx + 3, fy, col); dot(fx - 1, fy, col); if (near) dot(fx + 2, fy - 1, col); }
+  }
+  function figure(b, P, white, ink) {
+    if (!RA) {
+      RA = document.createElement('canvas'); RA.width = RW; RA.height = RH; ra = RA.getContext('2d');
+      RO = document.createElement('canvas'); RO.width = RW; RO.height = RH; ro = RO.getContext('2d');
+    }
+    ra.clearRect(0, 0, RW, RH); FC = null; CLIP = 999;
+    const t = b.t, ca = Math.cos(P.ba), sa = Math.sin(P.ba), bf = (x, y) => [P.bx + x * P.sx * ca - y * P.sy * sa, P.by + x * P.sx * sa + y * P.sy * ca];
+    const flying = P.wo > .04;
+    // Far wing, legs, tail, then the body over their roots.
+    if (flying) wing(P, bf, true);
+    const tk = P.tuck, h2 = bf(-1 - 5 * tk, 4.5 - 1.5 * tk), h1 = bf(2 - 5 * tk, 5 - 1.5 * tk);
+    leg(h2[0], h2[1], P.f2x, P.f2y, false, P.tuck); leg(h1[0], h1[1], P.f1x, P.f1y, true, P.tuck);
+    const tr = bf(-10, 0);
+    for (let i = 0; i < 4; i++) { const a = Math.PI + P.ba - .15 + P.tail + (i - 1.5) * (.12 + P.fan * .22), l = 6 + (i % 2) + P.fan * 2, wv = Math.sin(t / 5 + i) * .06; line(tr[0], tr[1], tr[0] + Math.cos(a + wv) * l, tr[1] + Math.sin(a + wv) * l, i % 2 ? HC.k : HC.g); }
+    const c = bf(0, 0), rx = 11 * P.sx, ry = 6 * P.sy;
+    // Ruffled: tufts stand up along the back.
+    if (P.puff > .05) for (let i = 0; i < 8; i++) {
+      const th = -2.9 + i * .34, e = bf(11 * Math.cos(th), 6 * Math.sin(th)), nx = e[0] - c[0], ny = e[1] - c[1], nl = Math.hypot(nx, ny) || 1, l = P.puff * (2 + ((i + (t >> 2)) % 3));
+      line(e[0], e[1], e[0] + nx / nl * l, e[1] + ny / nl * l, i % 2 ? HC.G : HC.L);
+    }
+    ell(c[0], c[1], rx, ry, P.ba, HC.G);
+    const be = bf(2, 3); ell(be[0], be[1], 8 * P.sx, 2.8 * P.sy, P.ba, HC.L);
+    const ch = bf(7, .5); ell(ch[0], ch[1], 4.5 * P.sx, 4.4 * P.sy, P.ba, HC.W);
+    for (let x = -7; x <= 6; x++) { const p = bf(x, -6 * Math.sqrt(1 - (x / 11) * (x / 11)) + 1.2); dot(p[0], p[1], HC.L); }
+    for (let i = 0; i < 3; i++) { const p = bf(8 + i * .5, -1 + i * 2); dot(p[0], p[1], HC.K); }
+    inked(() => wing(P, bf, false), ink);
+    // Neck, head and beak, as one inked piece.
+    const n0 = bf(8, -3.5), H = [P.bx + P.hx, P.by + P.hy], dx = Math.cos(P.ha), dy = Math.sin(P.ha), cu = P.curl;
+    const p1 = [n0[0] - 2 - 5 * cu, n0[1] - 5 - 2 * cu], p2 = [H[0] - dx * (3 + 5 * cu), H[1] - dy * (3 + 5 * cu) + 3 + 3 * cu];
+    const N = 9, pts = [];
+    for (let i = 0; i <= N; i++) { const u = i / N, v = 1 - u; pts.push([v * v * v * n0[0] + 3 * v * v * u * p1[0] + 3 * v * u * u * p2[0] + u * u * u * H[0], v * v * v * n0[1] + 3 * v * v * u * p1[1] + 3 * v * u * u * p2[1] + u * u * u * H[1]]); }
+    const rh = (x, y) => [H[0] + x * dx - y * dy, H[1] + x * dy + y * dx];
+    HEAD[0] = H[0]; HEAD[1] = H[1];
+    inked(() => {
+      for (let i = 0; i <= N; i++) { const r = 3 - 1.2 * i / N; ell(pts[i][0], pts[i][1], r, r, 0, i < 3 ? HC.G : HC.L); }
+      for (let i = 0; i <= N; i++) {
+        const q = pts[Math.min(N, i + 1)], p = pts[Math.max(0, i - 1)], tx = q[0] - p[0], ty = q[1] - p[1], tl = Math.hypot(tx, ty) || 1, fx = -ty / tl, fy = tx / tl, r = 3 - 1.2 * i / N;
+        ell(pts[i][0] + fx * .9, pts[i][1] + fy * .9, r - .9, r - .9, 0, HC.W);
+        if (i > 1 && i < N - 1 && i % 2 === 0) dot(pts[i][0] + fx * (r - .6), pts[i][1] + fy * (r - .6), HC.k);
+      }
+      // Beak: a long yellow dagger; the lower half drops as she opens it.
+      const bb = rh(2.6, .4), g2 = P.gape * .6, lx = Math.cos(P.ha + g2), ly = Math.sin(P.ha + g2);
+      if (P.clip) CLIP = FL - 1;
+      if (P.gape > .15) line(bb[0], bb[1] + .5, bb[0] + (dx + lx) * 3, bb[1] + (dy + ly) * 3 + .5, HC.t);
+      line(bb[0], bb[1] + 1, bb[0] + lx * 10.5, bb[1] + 1 + ly * 10.5, HC.y);
+      line(bb[0], bb[1], bb[0] + dx * 12, bb[1] + dy * 12, HC.Y); line(bb[0] + dy * .9, bb[1] - dx * .9, bb[0] + dx * 6 + dy * .9, bb[1] + dy * 6 - dx * .9, HC.Y);
+      CLIP = 999; TIP[0] = bb[0] + dx * 12; TIP[1] = bb[1] + dy * 12;
+      if (P.mud) { const mx = Math.min(TIP[0], bb[0] + dx * ((FL - 1 - bb[1]) / Math.max(.2, dy))); ell(mx, FL - .5, 3.2, 1.6, 0, HC.m); dot(mx - 2, FL - 2, HC.M); dot(mx + 2, FL - 2, HC.m); }
+      ell(H[0], H[1], 3.6, 2.8, P.ha, HC.W);
+      // The black crown stripe running back from the eye into the plumes.
+      line(...rh(1.8, -1.6), ...rh(-3, -1.8), HC.K); dot(...rh(-3, -.8), HC.K);
+      // Crest: two long black plumes that lag behind the head and flutter.
+      const an = b.an || AN0, cr = P.crest;
+      for (let j = 0; j < 2; j++) {
+        const base = rh(-3, -1.5 + j), a0 = Math.PI + P.ha - cr * .9 + .15 * j + Math.sin(t / 6 + j * 2) * .12, l = 8 - j * 2;
+        let ex = base[0] + Math.cos(a0) * l - clamp(an.vx, -3, 3) * 1.4, ey = base[1] + Math.sin(a0) * l - clamp(an.vy, -3, 3) * 1.4 + (cr < 0 ? -cr * 3 : 0);
+        const mx = (base[0] + ex) / 2 + Math.sin(t / 4 + j) * .7, my = (base[1] + ey) / 2 + Math.cos(t / 5 + j) * .7;
+        line(base[0], base[1], mx, my, HC.K); line(mx, my, ex, ey, j ? HC.k : HC.K);
+      }
+    }, ink);
+    // The eye, over everything on the head.
+    const ep = rh(1.3, -.6), ex = Math.round(ep[0]), ey = Math.round(ep[1]); EYE[0] = ex; EYE[1] = ey;
+    const eye = P.eye, red = b.rage;
+    if (eye === 1 || eye === 3 || eye === 4) {
+      R(ex - 1, ey, 2, 1, eye === 3 ? '#ffffff' : red ? HC.R : HC.E); R(ex + (P.pl < 0 ? -1 : 0), ey, 1, 1, red ? HC.r : HC.e);
+      R(ex - 1, ey - 1, 3, 1, HC.K);
+    } else if (eye === .5) { R(ex - 1, ey, 2, 1, red ? HC.R : HC.E); R(ex - 1, ey - 1, 3, 1, HC.K); R(ex, ey, 1, 1, HC.e); }
+    else if (eye === 0) R(ex - 1, ey, 3, 1, HC.K);
+    else if (eye === -1) { R(ex - 1, ey - 1, 1, 1, HC.K); R(ex, ey, 1, 1, HC.K); R(ex - 1, ey + 1, 1, 1, HC.K); R(ex + 1, ey - 1, 1, 1, HC.K); R(ex + 1, ey + 1, 1, 1, HC.K); }
+    else if (eye === 2) { const k = (t >> 2) % 4, o = [[-1, -1], [0, -1], [0, 0], [-1, 0]][k]; R(ex - 1, ey - 1, 2, 2, HC.w); R(ex + o[0], ey + o[1], 1, 1, HC.K); }
+    if (white) { ra.globalCompositeOperation = 'source-atop'; ra.fillStyle = '#ffffff'; ra.fillRect(0, 0, RW, RH); ra.globalCompositeOperation = 'source-over'; FC = null; }
+    // The outline of the whole silhouette.
+    ro.clearRect(0, 0, RW, RH); ro.globalCompositeOperation = 'source-over';
+    ro.drawImage(RA, -1, 0); ro.drawImage(RA, 1, 0); ro.drawImage(RA, 0, -1); ro.drawImage(RA, 0, 1);
+    ro.globalCompositeOperation = 'source-in'; ro.fillStyle = ink; ro.fillRect(0, 0, RW, RH); ro.globalCompositeOperation = 'source-over';
+  }
+  // Stamps her figure at a point of the screen (the middle of her body), facing dir.
+  function stamp(g, x, y, dir, rot) {
+    g.save(); g.imageSmoothingEnabled = false; g.translate(x, y); if (dir < 0) g.scale(-1, 1); if (rot) g.rotate(rot);
+    g.drawImage(RO, -AX, -AY); g.drawImage(RA, -AX, -AY); g.restore();
+  }
+
+  // ---- Cosmetic life: flap and walk phases, head velocity for the plumes, landings, the eye trail, breath.
+  function anim(b) {
+    const an = b.an || (b.an = { fl: 0, wk: 0, mv: 0, lt: 99, vx: 0, vy: 0, hx: null, hy: 0, px: b.x, air: b.air, trail: [] });
+    const P = pose(b), dir = facing(b, P);
+    an.fl += P.fs; const mv = b.x - an.px; an.mv = !b.air && Math.abs(mv) > .05 ? 1 : 0; if (an.mv) an.wk += Math.abs(mv) * .21; an.px = b.x;
+    if (an.dir !== undefined && an.dir !== dir) an.turn = 5; else if (an.turn > 0) an.turn--; an.dir = dir;
+    if (b.air !== an.air) { if (!b.air) an.lt = 0; an.air = b.air; } if (an.lt < 99) an.lt++;
+    const hx = b.x + 15 + dir * (P.bx + P.hx), hy = b.y + 13 + P.by + P.hy;
+    if (an.hx !== null) { an.vx = lerp(an.vx, clamp((hx - an.hx) * dir, -4, 4), .35); an.vy = lerp(an.vy, clamp(hy - an.hy, -4, 4), .35); }
+    an.hx = hx; an.hy = hy;
+    // A puff of dust under each foot as it comes down.
+    if (an.mv) { const c = Math.cos(an.wk); if (an.cs !== undefined && Math.sign(c) !== Math.sign(an.cs)) spawnParts(2, b.x + 15 + dir * (Math.sin(an.wk) * 5 + 2), b.y + 30, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.2, speed: [.2, .7], life: [8, 14] }); an.cs = c; }
+    // Furious: the red eye leaves a trail and she snorts steam.
+    const ex = b.x + 15 + dir * (P.bx + P.hx + 1.3), ey = b.y + 13 + P.by + P.hy - .6;
+    if (b.rage) {
+      an.trail.unshift(ex, ey); if (an.trail.length > 12) an.trail.length = 12;
+      if (b.t % 5 === 0) spawnParts(1, ex, ey, { color: ['#ff5a3a', '#ffb070'], speed: [.1, .4], life: [8, 16], g: -.03 });
+      if (b.t % 16 === 0 && b.state !== 'stuck') { const nx = b.x + 15 + dir * (P.bx + P.hx + 3 + Math.cos(P.ha) * 2), ny = b.y + 13 + P.by + P.hy + 1; for (let i = 0; i < 2; i++) L.parts.push({ x: nx, y: ny, vx: dir * rnd(.3, .8), vy: -rnd(.2, .5), life: 18, max: 18, color: '#dfe6ee', size: 1, g: -.01, kind: 'mist' }); }
+    } else an.trail.length = 0;
+    // A loose feather now and then while she flaps hard or is knocked about.
+    if ((b.state === 'leave' && b.t % 12 === 0) || (b.state === 'stuck' && b.st % 38 < 16 && b.t % 7 === 0)) feathers(b.x + 15 - dir * 4, b.y + 10, 1);
+  }
+
+  // Just her, at a point of the screen (for tests and scenes).
+  function puppet(g, b, x, y) { const P = pose(b); figure(b, P, false, b.rage ? RAGE_INK : INK); stamp(g, x, y, facing(b, P), P.rot); }
   function draw(b, g) {
     const A = arena(b.phase);
     drawNest(g, A);
     if (b.state === 'wait') return;
     drawShadows(b, g, A);
-    const x = Math.round(b.x - Cam.x), y = Math.round(b.y - Cam.y), faceLeft = b.dir < 0, st = b.state, t = b.t;
-    const flying = b.air && st !== 'final';
-    const body = flying ? ART.heronFly : ART.heronBody;
-    const white = b.flash > 0 && (b.flash >> 1) % 2;
-    const put = (s, dx, dy) => { const sp = faceLeft ? s : ART.flip(s); const ox = faceLeft ? dx : (body.width - dx - s.width); g.drawImage(white ? ART.tint(sp, '#ffffff') : sp, x + ox, y + dy); };
-    const wings = [ART.wingUp, ART.wingMid, ART.wingDown, ART.wingMid];
-    // How far she leans: back for the wind-up, beak down for the stab and while stuck.
-    let pitch = 0, jx = 0, jy = 0, scale = 1;
-    if (st === 'windup') { pitch = -.24 * Math.min(1, b.st / 10); jx = Math.sin(b.st * 1.9) * (b.st > 18 ? 1 : 0); }
-    else if (st === 'stab') pitch = .8 * Math.min(1, b.st / 3);
-    else if (st === 'stuck') { pitch = .8 + Math.sin(t * .7) * .06; jx = Math.sin(t * 1.3) * .8; }
-    else if (st === 'yank') pitch = .8 * (1 - b.st / 18) - (b.st > 9 ? .12 : 0);
-    else if (st === 'pull') pitch = .6 * (1 - b.st / 24);
-    else if (st === 'land' && b.phase !== 1) pitch = .3;
-    else if (st === 'stagger') pitch = Math.sin(t / 5) * .18;
-    else if (st === 'reel2') pitch = -.3;
-    else if (st === 'fanWind') { scale = 1 + Math.min(1, b.st / 20) * .1; jx = (b.st > 12 && (t & 1)) ? 1 : 0; }
-    else if (st === 'dying') pitch = Math.sin(t / 6) * .18;
-    else if (st === 'final') pitch = b.st * .15;
-    else if (st === 'reel') pitch = Math.sin(b.st * .5) * .5;
-    const pvx = x + (faceLeft ? 19 : 12), pvy = y + 30;
-    g.save();
-    g.translate(Math.round(jx), Math.round(jy));
-    if (pitch || scale !== 1) { g.translate(pvx, pvy); g.rotate(faceLeft ? -pitch : pitch); g.scale(scale, scale); g.translate(-pvx, -pvy); }
-    if (flying) {
-      const fast = b.phase === 3 || st === 'reel' ? 2 : 3;
-      const wf = st === 'plunge' ? 2 : st === 'lock' || st === 'aim' || st === 'intro' && b.st > 90 ? 0 : ((t >> fast) % 4);
-      put(wings[wf], 6, wf === 0 ? -10 : wf === 2 ? 8 : 2);
-    }
-    else if (st === 'gustWind') put(ART.wingUp, 4, -8);
-    else if (st === 'gust') { const wf = (t >> 2) % 2 ? 0 : 2; put(wings[wf], 4, wf === 0 ? -8 : 8); }
-    put(body, 0, 0);
-    if (!flying && st !== 'gustWind' && st !== 'gust') put(st === 'stagger' || st === 'dying' ? ART.wingDown : ART.wingMid, 4, st === 'stagger' || st === 'dying' ? 10 : 6);
-    // Eyes: red with fury in phase III.
-    if (b.rage && !white) { const ex = faceLeft ? 11 : 19; g.fillStyle = 'rgba(255,60,40,.35)'; g.fillRect(x + ex - 1, y + 2, 4, 3); g.fillStyle = '#ff3a2a'; g.fillRect(x + ex, y + 3, 2, 1); g.fillStyle = '#ffd0a0'; g.fillRect(x + (faceLeft ? ex : ex + 1), y + 3, 1, 1); }
-    // The glint on the beak just before the stab.
-    if (st === 'windup' && b.st > 16 && (b.st >> 1) % 2) { const bx = faceLeft ? x + 1 : x + 30, by = y + 4; g.fillStyle = '#ffffff'; g.fillRect(bx - 2, by, 5, 1); g.fillRect(bx, by - 2, 1, 5); }
-    g.restore();
+    const P = pose(b), dir = facing(b, P), st = b.state, t = b.t;
+    const cx = Math.round(b.x + 15 - Cam.x + P.jx), cy = Math.round(b.y + 13 - Cam.y);
+    const white = b.flash > 0 && (b.flash >> 1) % 2, ink = b.rage ? RAGE_INK : INK;
+    const W2 = (x, y) => [cx + dir * x, cy + y];
+    // The eye's red trail, behind her.
+    if (b.an && b.an.trail.length > 2) { const tr = b.an.trail; for (let i = 2; i < tr.length; i += 2) { g.globalAlpha = .5 * (1 - i / tr.length); g.fillStyle = '#ff5a3a'; g.fillRect(Math.round(tr[i] - Cam.x), Math.round(tr[i + 1] - Cam.y), 1, 1); } g.globalAlpha = 1; }
+    // Diving: speed lines streaming up behind her.
+    if (P.spd) { g.fillStyle = '#dff2fb'; for (let i = 0; i < 5; i++) { const ox = (i * 7) % 22 - 11, ln = 8 + (i * 5) % 9, oy = -18 - ((t * 5 + i * 13) % 20); g.globalAlpha = .45; g.fillRect(cx + ox, cy + oy, 1, ln); } g.globalAlpha = 1; }
+    figure(b, P, white, ink);
+    // Furious: a red glow round the eye.
+    if (b.rage && !white) { const e = W2(EYE[0], EYE[1]); g.globalAlpha = .3 + Math.sin(t / 4) * .1; g.fillStyle = '#ff3a2a'; g.fillRect(e[0] - 2, e[1] - 1, 5, 3); g.globalAlpha = 1; }
+    stamp(g, cx, cy, dir, P.rot);
+    // The blow lands: a burst of white rays from her body.
+    if (b.flash > 8) { const k = (14 - b.flash) / 6; g.fillStyle = '#fff6d6'; for (let i = 0; i < 8; i++) { const a = i * .785 + .3, r0 = 10 + k * 10, r1 = r0 + 5 - k * 3; for (let r = r0; r < r1; r++) g.fillRect(Math.round(cx + Math.cos(a) * r * 1.3), Math.round(cy + Math.sin(a) * r), 1, 1); } }
+    // The glint on the beak just before the stab (and on the eye as she locks on for a dive).
+    const tip = W2(TIP[0], TIP[1]);
+    if (st === 'windup' && b.st > 16 && (b.st >> 1) % 2) { g.fillStyle = '#ffffff'; g.fillRect(tip[0] - 2, tip[1], 5, 1); g.fillRect(tip[0], tip[1] - 2, 1, 5); }
+    if (st === 'lock' && b.st > 10 && (b.st >> 1) % 2) { const e = W2(EYE[0], EYE[1]); g.fillStyle = '#ffffff'; g.fillRect(e[0] - 3, e[1], 7, 1); g.fillRect(e[0], e[1] - 3, 1, 7); }
+    const hd = W2(HEAD[0], HEAD[1]);
     // A big "!" over her head while she winds up a stab.
-    if (st === 'windup' && (b.st >> 2) % 3) { const ex = x + 15, ey = y - 14 - (b.st < 6 ? 6 - b.st : 0); g.fillStyle = '#1b1020'; g.fillRect(ex - 2, ey - 1, 5, 11); g.fillStyle = '#ffec8a'; g.fillRect(ex - 1, ey, 3, 6); g.fillRect(ex - 1, ey + 7, 3, 2); g.fillStyle = '#ffffff'; g.fillRect(ex - 1, ey, 1, 5); }
-    if ((st === 'stuck' || st === 'stagger') && (t >> 3) % 2) for (let i = 0; i < 3; i++) g.drawImage(ART.star, x + 6 + i * 8 + Math.round(Math.sin(t / 5 + i) * 3), y - 4 + Math.round(Math.cos(t / 5 + i) * 2));
-    if (b.shriek > 0) { g.fillStyle = '#fff'; const sx = faceLeft ? x - 4 : x + body.width + 2; for (let i = 0; i < 3; i++) { const r = 2 + (b.shriek % 10) * .4; g.fillRect(Math.round(sx + (faceLeft ? -i * 3 - r : i * 3 + r)), y + 2 + i * 3 - 4, 2, 1); } }
+    if (st === 'windup' && (b.st >> 2) % 3) { const ex = hd[0], ey = Math.min(cy - 32, hd[1] - 16) - (b.st < 6 ? 6 - b.st : 0); g.fillStyle = '#1b1020'; g.fillRect(ex - 2, ey - 1, 5, 11); g.fillStyle = '#ffec8a'; g.fillRect(ex - 1, ey, 3, 6); g.fillRect(ex - 1, ey + 7, 3, 2); g.fillStyle = '#ffffff'; g.fillRect(ex - 1, ey, 1, 5); }
+    // Dizzy: stars circling her head.
+    if (st === 'stuck' || (st === 'stagger' && b.st > 10) || st === 'final') for (let i = 0; i < 3; i++) { const a = t / 9 + i * 2.09, sx = hd[0] + Math.round(Math.cos(a) * 9) - 3, sy = hd[1] - 7 + Math.round(Math.sin(a) * 3); if (Math.sin(a) > -.2 || (t >> 2) % 2) g.drawImage(ART.star, sx, sy); }
+    // Screaming: lines coming out of the open beak.
+    if (b.shriek > 0) { g.fillStyle = '#fff'; for (let i = 0; i < 3; i++) { const r = 3 + (b.shriek % 10) * .6, a = -.7 + i * .5, px = tip[0] + dir * Math.cos(a) * r, py = tip[1] + Math.sin(a) * r; g.fillRect(Math.round(px + dir * 1), Math.round(py), 2, 1); g.fillRect(Math.round(px + dir * 3), Math.round(py + Math.sin(a) * 2), 2, 1); } }
   }
   // In front of everything: the letterbox of the intro, the wind lines, the aim lines of a fan, and the flashes.
   function drawFront(g) {
@@ -585,5 +984,5 @@ const Boss = (() => {
     L.ents.push(Item.boat((L.w - 4) * TS + 2, A.floor + 14)); L.boatSpawned = true;
     spawnParts(16, A.x1 - 16, A.floor - 8, { color: ['#8fd9d0', '#c8f2ea'], angle: -Math.PI / 2, spread: 1.2, speed: [1, 3], life: [14, 30] });
   }
-  return { CRIAS, MAX_HP, PHASE_HP, create, update, draw, drawFront, hit, won, cam, skip, restart, song, arena, vulnerable };
+  return { CRIAS, MAX_HP, PHASE_HP, create, update, draw, drawFront, puppet, hit, won, cam, skip, restart, song, arena, vulnerable };
 })();
