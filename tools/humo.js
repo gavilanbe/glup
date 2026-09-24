@@ -9,6 +9,21 @@ const g = load();
 const draw = () => g.ev("Game.draw(document.createElement('canvas').getContext('2d'))");
 let fails = 0;
 const step = (label, fn) => { try { fn(); console.log('ok   ' + label); } catch (e) { fails++; console.log('FAIL ' + label + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } };
+
+// The page itself: the inline scripts of index.html must compile (the simulator loads the files on its own and
+// would not notice a broken loader), and every file they load must exist and be in the service worker's list.
+step('index.html: scripts en línea y lista de archivos', () => {
+  const fs = require('fs'), path = require('path'), vm = require('vm'), root = path.join(__dirname, '..');
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8'), sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+  if (!scripts.length) throw new Error('no hay scripts en línea');
+  for (const src of scripts) new vm.Script(src, { filename: 'index.html' });
+  const loader = scripts.find(s => s.includes('document.write')); if (!loader) throw new Error('no encuentro el cargador');
+  const written = []; const fake = { location: { protocol: 'https:', search: '' }, navigator: {}, document: { write: t => written.push(/src="([^"?]+)/.exec(t)[1]) }, addEventListener() {} };
+  vm.runInNewContext(loader, fake);
+  if (written.length < 20) throw new Error('el cargador solo escribe ' + written.length + ' scripts');
+  for (const f of written) { if (!fs.existsSync(path.join(root, f))) throw new Error('falta el archivo ' + f); if (!sw.includes("'./" + f + "'")) throw new Error(f + ' no está en SHELL de sw.js'); }
+});
 g.LEVELS.forEach((lv, i) => {
   step((i + 1) + ' ' + lv.id + ': nivel', () => { g.start(i, g.NIVEL.poderesAntes(i)); for (let n = 0; n < 40; n++) { g.frame({ right: n % 3 === 0 ? 1 : 0 }); if (n % 10 === 0) draw(); } });
   if (!lv.maestro) return;

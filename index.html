@@ -38,10 +38,10 @@
 <div id="hint" hidden>Flechas o WASD · Z salta (otra vez en el aire: aleteo) · X: mantén para sorber, pulsa para escupir · C: soplar · ↑ apunta arriba · ↓ agacha, desliza, suelta; ↓ y Z: planchazo · Esc pausa · M sonido</div>
 <script>
 (function () {
-  const version = location.protocol === 'file:' ? Date.now() : '33';
+  const version = location.protocol === 'file:' ? Date.now() : '34';
   const niveles = ['01-embarcadero', '02-juncos', '03-raices', '04-molino', '05-muelle', '06-turbera', '07-cueva', '08-rio', '09-nido'].map(n => 'niveles/' + n + '.js');
   // The songs: one file each in musica/ (see musica/LEEME.md); add new ones here and in sw.js.
-  const musica = ['marsh', 'dock', 'omen', 'sad', 'march', 'victoria', 'alba', 'creditos', 'heron', 'heron2', 'heron3', 'turbera', 'cueva', 'rio', 'juncos', 'raices', 'molino', 'muelle'].map(n => 'musica/ + n + '.js');
+  const musica = ['marsh', 'dock', 'omen', 'sad', 'march', 'victoria', 'alba', 'creditos', 'heron', 'heron2', 'heron3', 'turbera', 'cueva', 'rio', 'juncos', 'raices', 'molino', 'muelle'].map(n => 'musica/' + n + '.js');
   for (const src of ['art.js', 'mundo.js', 'audio.js', ...musica, 'levels.js', ...niveles, 'cine.js', 'titulo.js', 'mapa.js', 'hud.js', 'aprende.js', 'letra.js', 'maestros.js', 'barca.js', 'victoria.js', 'garza.js', 'final.js', 'gramola.js', 'game.js']) document.write('<script src="' + src + '?v=' + version + '"><\/script>');
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !location.search.includes('escena')) {
     // Look for a new version on start, whenever the app comes back to the front, and every 20 minutes.
