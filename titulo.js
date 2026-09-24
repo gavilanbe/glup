@@ -1,7 +1,9 @@
 // GLUP — pantalla de título. El logotipo está dibujado a trazos gordos con la piel de
 // Bigotes (oliva moteado, relieve y brillo) y la G es su cabeza: la abertura es la boca,
 // con ojo y bigotes. Sigue a la cinemática: Nila llega corriendo a un otero sobre el pantano,
-// la cámara sube al cielo y Bigotes, en alto, escupe las letras una a una.
+// la cámara sube al cielo y Bigotes, en alto, escupe las letras una a una: caen estiradas, se aplastan
+// salpicando babas y tiemblan como gelatina; luego respiran, gotean, echan burbujas, y el ojo de la G mira
+// a todas partes. Al pulsar para empezar, las letras se agachan y saltan.
 'use strict';
 const Title = (() => {
   const INTRO = 170;                 // frames until everything is in place
@@ -84,31 +86,39 @@ const Title = (() => {
     const t0 = SPIT0 + b.i * SPIT_GAP, k = (t - t0) / FLY;
     if (t < t0) return null;
     if (k < 1) {
-      const m = mouth(), mx = m.x - b.w / 2, my = m.y - b.h / 2, e = k * (2 - k);
-      return { x: mx + (b.slotX - mx) * e, y: my + (b.slotY - my) * e - Math.sin(k * Math.PI) * 30, s: .3 + .7 * k, rot: (1 - k) * (b.i % 2 ? 1 : -1) * 2.4, sx: 1, sy: 1 };
+      const m = mouth(), mx = m.x - b.w / 2, my = m.y - b.h / 2, e = k * (2 - k), st = k > .5 ? (k - .5) * 2 : 0;
+      // Stretched along the drop as it comes down on its slot.
+      return { x: mx + (b.slotX - mx) * e, y: my + (b.slotY - my) * e - Math.sin(k * Math.PI) * 30, s: .3 + .7 * k, rot: (1 - k) * (b.i % 2 ? 1 : -1) * 2.4, sx: 1 - .22 * st, sy: 1 + .34 * st };
     }
-    const land = t - t0 - FLY, sq = land < 16 ? Math.exp(-land / 5) * Math.cos(land / 1.6) : 0;
+    // The landing: a splat flat, then a jelly wobble that takes its time to settle.
+    const land = t - t0 - FLY, sq = land < 44 ? Math.exp(-land / 6.5) * Math.cos(land / 1.5) : 0, wob = land < 44 ? Math.exp(-land / 9) * Math.sin(land / 2.2) * .06 * (b.i % 2 ? 1 : -1) : 0;
     const bob = t > INTRO ? Math.round(Math.sin((t + b.i * 23) / 28) * 1.2) : 0;
     const j = S.jig[b.i] * Math.exp(-(t - S.jigT[b.i]) / 8) * Math.cos((t - S.jigT[b.i]) / 1.5);
     // A hop: stretched on the way up, squashed when it lands.
-    const hk = (t - S.hop[b.i]) / 16; let hy = 0, hs = 0; if (hk >= 0 && hk < 1) { hy = -Math.sin(hk * Math.PI) * 9; hs = hk < .5 ? .14 : .08; } else if (hk >= 1 && hk < 1.5) hs = -.22 * Math.sin((hk - 1) * 2 * Math.PI);
-    const breath = t > INTRO ? Math.sin(t / 40 + b.i * 1.3) * .025 : 0;
-    return { x: b.slotX, y: b.slotY + bob + hy, s: 1, rot: hk >= 0 && hk < 1 ? Math.sin(hk * Math.PI * 2) * .06 * (b.i % 2 ? 1 : -1) : 0, sx: 1 + sq * .28 + j * .22 - hs * .7 - breath, sy: 1 - sq * .28 - j * .22 + hs + breath };
+    const amp = S.hopAmp[b.i], hk = (t - S.hop[b.i]) / 16; let hy = 0, hs = 0; if (hk >= 0 && hk < 1) { hy = -Math.sin(hk * Math.PI) * 9 * amp; hs = (hk < .5 ? .14 : .08) * amp; } else if (hk >= 1 && hk < 1.5) hs = -.22 * amp * Math.sin((hk - 1) * 2 * Math.PI);
+    // A press: the letters crouch together before they jump.
+    const pk = t - S.pressT; if (pk >= 0 && pk < 5) hs -= Math.sin(pk / 5 * Math.PI) * .3;
+    const breath = t > INTRO ? Math.sin(t / 34 + b.i * 1.3) * .035 : 0;
+    return { x: b.slotX, y: b.slotY + bob + hy, s: 1, rot: (hk >= 0 && hk < 1 ? Math.sin(hk * Math.PI * 2) * .06 * (b.i % 2 ? 1 : -1) : 0) + wob, sx: 1 + sq * .45 + j * .22 - hs * .7 - breath, sy: 1 - sq * .4 - j * .22 + hs + breath };
   }
 
   // ---------------------------------------------------------------- Partículas y sonido
-  const S = { parts: [], drops: [], lastT: -1, whiteIn: false, jig: [0, 0, 0, 0], jigT: [0, 0, 0, 0], hop: [-99, -99, -99, -99], shake: 0, flash: 0, rings: [], sparks: [], bubbles: [], sign: null };
+  const S = { parts: [], goo: [], hang: [], bubs: [], lastT: -1, whiteIn: false, jig: [0, 0, 0, 0], jigT: [0, 0, 0, 0], hop: [-99, -99, -99, -99], hopAmp: [1, 1, 1, 1], pressT: -99, shake: 0, flash: 0, rings: [], sparks: [], bubbles: [], sign: null,
+    eye: { lx: 1, ly: 0, tx: 1, ty: 0, blink: -99 } };
+  // The top of the knoll at x, where falling goo lands (the camera is down by the time any falls).
+  const groundAt = x => GROUND + Math.round(Math.max(0, (x - 190) * .35) + Math.max(0, (40 - x) * .15) + Math.sin(x / 13) * 1.5) - 1;
+  function splat(x, y, n, spd) { for (let i = 0; i < n; i++) { const s = i % 2 ? 1 : -1; S.goo.push({ x: x + s * Math.random() * 10, y: y - Math.random() * 4, vx: s * (.4 + Math.random() * spd), vy: -(.8 + Math.random() * spd * 1.3), r: Math.random() < .35 ? 1 : 0, life: 60 + Math.random() * 30 }); } }
   // A letter jiggles like jelly after a hit, and hops when a wave runs along the word.
   function jiggle(i, amp, t) { S.jig[i] = Math.max(S.jig[i] * Math.exp(-(t - S.jigT[i]) / 8), amp); S.jigT[i] = t; }
-  function hop(i, t) { S.hop[i] = t; }
+  function hop(i, t, amp = 1) { S.hop[i] = t; S.hopAmp[i] = amp; }
   function burst(x, y, n, col, spd, up) { for (let i = 0; i < n; i++) { const a = up ? -Math.PI / 2 + (Math.random() - .5) * 1.6 : Math.random() * Math.PI * 2, v = spd * (.4 + Math.random() * .8); S.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 16 + Math.random() * 16, col: col[(Math.random() * col.length) | 0], g: .12 }); } }
   function update(t) {
-    if (t === 1 || t < S.lastT) { S.parts = []; S.drops = []; S.rings = []; S.sparks = []; S.bubbles = []; S.sign = null; S.hop = [-99, -99, -99, -99]; S.jig = [0, 0, 0, 0]; }
+    if (t === 1 || t < S.lastT) { S.parts = []; S.goo = []; S.hang = []; S.bubs = []; S.rings = []; S.sparks = []; S.bubbles = []; S.sign = null; S.hop = [-99, -99, -99, -99]; S.hopAmp = [1, 1, 1, 1]; S.jig = [0, 0, 0, 0]; S.pressT = -99; }
     S.lastT = t; const L = build();
     if (t < ARRIVE && t % 5 === 0) Sound.play('step');
     if (t === ARRIVE) { Sound.play('land', .8); burst(NILA.x + 4, GROUND, 10, ['#c9b08a', '#a08a6a', '#e0c8a0'], 1.6, true); }
     if (t === RAISE) Sound.play('charge');
-    for (let i = 0; i < 4; i++) { const t0 = SPIT0 + i * SPIT_GAP; if (t === t0) { Sound.play('spit', .5 + i * .2); const m = mouth(); burst(m.x, m.y, 6, ['#fff3b8', '#dccd68'], 1.4, false); } if (t === t0 + FLY) { Sound.play('thud'); const b = L[i]; burst(b.slotX + b.w / 2, b.slotY + b.h - 4, 14, ['#fff3b8', '#9ca044', '#ffffff'], 1.9, true); S.shake = 5; S.rings.push({ x: b.slotX + b.w / 2, y: b.slotY + b.h - 3, t: 0 }); jiggle(i, 1, t); if (i > 0) jiggle(i - 1, .55, t); if (i < 3 && t >= SPIT0 + (i + 1) * SPIT_GAP + FLY) jiggle(i + 1, .55, t); } }
+    for (let i = 0; i < 4; i++) { const t0 = SPIT0 + i * SPIT_GAP; if (t === t0) { Sound.play('spit', .5 + i * .2); const m = mouth(); burst(m.x, m.y, 6, ['#fff3b8', '#dccd68'], 1.4, false); } if (t === t0 + FLY) { Sound.play('thud'); Sound.play('bloop', i * 2); const b = L[i]; burst(b.slotX + b.w / 2, b.slotY + b.h - 4, 14, ['#fff3b8', '#9ca044', '#ffffff'], 1.9, true); splat(b.slotX + b.w / 2, b.slotY + b.h - 6, 6, 1.8); S.shake = 5; S.rings.push({ x: b.slotX + b.w / 2, y: b.slotY + b.h - 3, t: 0 }); jiggle(i, 1, t); if (i > 0) jiggle(i - 1, .55, t); if (i < 3 && t >= SPIT0 + (i + 1) * SPIT_GAP + FLY) jiggle(i + 1, .55, t); } }
     // The last letter home: the whole word jumps for joy with a flash.
     if (t === SPIT0 + 3 * SPIT_GAP + FLY + 6) { Sound.play('glup', 1.2); S.flash = 6; S.shake = 7; for (let i = 0; i < 4; i++) hop(i, t + i * 3); }
     if (t > INTRO) {
@@ -125,9 +135,23 @@ const Title = (() => {
     if (t === INTRO - 30) S.sign = { y: 30, vy: 0, a: .22, va: 0 };
     if (S.sign) { const q = S.sign; q.vy += (66 - q.y) * .09; q.vy *= .84; q.y += q.vy; q.va += -q.a * .03 - q.va * .06 + Math.sin(t / 70) * .0009; q.a += q.va; }
     if (t === LOWER) Sound.play('glup', 1);
-    // After the intro, now and then a drop of swamp slides off a letter and falls.
-    if (t > INTRO && Math.random() < .02) { const b = L[(Math.random() * 4) | 0]; if (b.drips.length) { const d = b.drips[(Math.random() * b.drips.length) | 0]; S.drops.push({ x: b.slotX + d.x, y: b.slotY + d.y, vy: 0, grow: 0 }); } }
-    for (let i = S.drops.length - 1; i >= 0; i--) { const d = S.drops[i]; if (d.grow < 24) d.grow++; else { d.vy += .12; d.y += d.vy; } if (d.y > 170) S.drops.splice(i, 1); }
+    // After the intro, now and then a drip swells under a letter until it lets go; the letter springs back
+    // and the drop splashes on the knoll.
+    if (t > INTRO && S.hang.length < 3 && Math.random() < .015) { const i = (Math.random() * 4) | 0, b = L[i]; if (b.drips.length) { const d = b.drips[(Math.random() * b.drips.length) | 0]; if (!S.hang.some(h => h.d === d)) S.hang.push({ i, d, len: 0, max: 7 + Math.random() * 5, v: .06 + Math.random() * .06 }); } }
+    for (let k = S.hang.length - 1; k >= 0; k--) {
+      const h = S.hang[k]; h.len += h.len > h.max * .75 ? h.v * 2.5 : h.v; if (h.len < h.max) continue;
+      const b = L[h.i], st = letterAt(b, t); S.hang.splice(k, 1); jiggle(h.i, .3, t);
+      if (st) S.goo.push({ x: st.x + h.d.x, y: st.y + h.d.y + h.len - 2, vx: 0, vy: .6, r: 1, life: 400, drop: true });
+    }
+    Glup.gooStep(S.goo, groundAt);
+    // Bubbles of swamp gas rise off the letters.
+    if (t > INTRO && t % 41 === 0) { const b = L[(Math.random() * 4) | 0]; S.bubs.push({ x: b.slotX + M + 6 + Math.random() * (b.w - M * 2 - 12), y: b.slotY + M + 2, vy: -(.2 + Math.random() * .2), r: 0, max: 1.2 + Math.random() * 1.6, t: 0, life: 50 + Math.random() * 50, ph: Math.random() * 6 }); }
+    for (let k = S.bubs.length - 1; k >= 0; k--) { const u = S.bubs[k]; u.t++; u.y += u.vy; u.r = Math.min(u.max, u.t / 10); if (u.t > u.life + 5) S.bubs.splice(k, 1); }
+    // The G's eye looks about: at Nila, at the moon, at the sign, at a bubble; it blinks, sometimes twice.
+    const e = S.eye; if (t > INTRO && t % 110 === 0) { const L2 = [[-1, 1], [1, -1], [0, 1], [1, 0], [-1, -1], [1, 1]]; [e.tx, e.ty] = L2[(Math.random() * L2.length) | 0]; }
+    if (t < INTRO) { e.tx = -1; e.ty = 1; }
+    e.lx += (e.tx - e.lx) * .25; e.ly += (e.ty - e.ly) * .25;
+    if (t % 190 === 100 || (t % 570 === 110)) e.blink = t;
     for (let i = S.parts.length - 1; i >= 0; i--) { const p = S.parts[i]; p.vy += p.g; p.x += p.vx; p.y += p.vy; if (--p.life <= 0) S.parts.splice(i, 1); }
   }
 
@@ -168,15 +192,22 @@ const Title = (() => {
       const bx = (sw / 60) * (W + 80) - 40 - (b.slotX - (letters[0].slotX)) - 20;
       g.save(); g.beginPath(); for (let y = 0; y < b.h; y++) g.rect(-b.w / 2 + bx + y * .5, -b.h + y, 5, 1); g.clip(); g.globalAlpha = .75; g.drawImage(b.face, -b.w / 2, -b.h); g.restore();
     }
+    // Drips: a nub under every drip point, and the ones swelling now, bead and all, in the letter's own squash.
+    if (st.s >= 1) {
+      const P = Glup.PAL.musgo; for (const d of b.drips) { const h = S.hang.find(q => q.d === d); Glup.drip(g, -b.w / 2 + d.x, -b.h + d.y - 1, 1 + (d.x % 2) + (h ? h.len : 0), P); }
+      if (b.i === 0) { g.save(); g.translate(-b.w / 2, -b.h); drawFace(g, b, { x: 0, y: 0, s: 1, rot: 0 }, t); g.restore(); }
+    }
     g.restore();
   }
   // The G is Bigotes' head: an eye over the mouth and two whiskers hanging from its corners.
   function drawFace(g, b, st, t) {
-    if (st.s < 1 || Math.abs(st.rot) > .1) return;
-    const ox = Math.round(st.x), oy = Math.round(st.y), ex = ox + M + 24, ey = oy + M + 10, blink = (t % 210) < 6;
+    if (st.s < 1) return;
+    const ox = Math.round(st.x), oy = Math.round(st.y), ex = ox + M + 24, ey = oy + M + 10, e = S.eye, bd = t - e.blink, blink = bd >= 0 && bd < 6;
+    const happy = t - S.pressT >= 0 && t - S.pressT < 60 || t - (SPIT0 + 3 * SPIT_GAP + FLY + 6) >= 0 && t - (SPIT0 + 3 * SPIT_GAP + FLY + 6) < 34;
     g.fillStyle = '#1a1420'; g.fillRect(ex - 3, ey - 3, 7, 7); g.fillRect(ex - 2, ey - 4, 5, 9); g.fillRect(ex - 4, ey - 2, 9, 5);
-    if (blink) { g.fillStyle = '#9ca044'; g.fillRect(ex - 3, ey - 2, 7, 5); g.fillStyle = '#1a1420'; g.fillRect(ex - 3, ey, 7, 1); }
-    else { g.fillStyle = '#fffbe6'; g.fillRect(ex - 2, ey - 2, 5, 5); g.fillRect(ex - 3, ey - 1, 7, 3); g.fillRect(ex - 1, ey - 3, 3, 7); const lx = t % 400 < 200 ? 1 : 0; g.fillStyle = '#1a1420'; g.fillRect(ex - 1 + lx, ey - 1, 2, 3); g.fillStyle = '#ffffff'; g.fillRect(ex - 1 + lx, ey - 1, 1, 1); }
+    if (happy) { g.fillStyle = '#9ca044'; g.fillRect(ex - 3, ey - 2, 7, 5); g.fillStyle = '#1a1420'; g.fillRect(ex - 3, ey + 1, 1, 1); g.fillRect(ex - 2, ey, 1, 1); g.fillRect(ex - 1, ey - 1, 3, 1); g.fillRect(ex + 2, ey, 1, 1); g.fillRect(ex + 3, ey + 1, 1, 1); }
+    else if (blink) { const k = bd < 3 ? bd : 5 - bd; g.fillStyle = '#fffbe6'; g.fillRect(ex - 2, ey - 2, 5, 5); g.fillStyle = '#9ca044'; g.fillRect(ex - 3, ey - 3, 7, 2 + k * 2); g.fillStyle = '#1a1420'; g.fillRect(ex - 3, ey - 2 + k * 2, 7, 1); }
+    else { g.fillStyle = '#fffbe6'; g.fillRect(ex - 2, ey - 2, 5, 5); g.fillRect(ex - 3, ey - 1, 7, 3); g.fillRect(ex - 1, ey - 3, 3, 7); const lx = Math.max(-1, Math.min(1, Math.round(e.lx * 1.3))), ly = Math.max(-1, Math.min(1, Math.round(e.ly * 1.3))); g.fillStyle = '#1a1420'; g.fillRect(ex - 1 + lx, ey - 1 + ly, 2, 3); g.fillStyle = '#ffffff'; g.fillRect(ex - 1 + lx, ey - 1 + ly, 1, 1); }
     // Whiskers: pixel chains that curl down and sway.
     const whisk = (x, y, len, ph, a0) => {
       const pts = []; let px = x, py = y; for (let i = 0; i < len; i++) { const a = a0 + i * .1 + Math.sin(t / 24 + ph + i * .22) * (.05 + i * .012); px += Math.cos(a); py += Math.sin(a); pts.push([Math.round(px), Math.round(py), i]); }
@@ -248,8 +279,11 @@ const Title = (() => {
       g.globalAlpha = .25 * glow; g.fillStyle = '#f2f5a0'; g.fillRect(fx - 2, fy - 2, 5, 5); g.globalAlpha = glow; g.fillStyle = '#ffffe0'; g.fillRect(fx, fy, 1, 1); g.globalAlpha = 1;
     }
   }
-  // A press on the title: the letters hop and the sign swings before the fade.
-  function press(t) { for (let i = 0; i < 4; i++) hop(i, t + i * 2); if (S.sign) S.sign.va += .05; S.flash = 4; }
+  // A press on the title: the letters crouch, then jump high flinging goo, the G grins and the sign swings before the fade.
+  function press(t) {
+    S.pressT = t; for (let i = 0; i < 4; i++) hop(i, t + 4 + i * 2, 1.6); if (S.sign) S.sign.va += .05; S.flash = 4; S.shake = 4;
+    Sound.play('glup', .7); for (const b of build()) splat(b.slotX + b.w / 2, b.slotY + b.h - 6, 5, 1.6);
+  }
   function draw(g, t) {
     const L = build(), cy = camY(t);
     vista(g, t, cy);
@@ -270,10 +304,9 @@ const Title = (() => {
     for (const sp of S.sparks) { const st = letterAt(sp.b, t); if (!st) continue; const k = sp.t / 18, r = Math.round(Math.sin(k * Math.PI) * 3), x = Math.round(st.x + sp.x), y = Math.round(st.y + sp.y); g.fillStyle = '#ffffff'; g.fillRect(x - r, y, r * 2 + 1, 1); g.fillRect(x, y - r, 1, r * 2 + 1); if (r > 1) { g.fillStyle = '#fff3b8'; g.fillRect(x - 1, y - 1, 3, 3); g.fillStyle = '#ffffff'; g.fillRect(x, y, 1, 1); } }
     // The G blows a bubble that drifts up and pops.
     for (const bu of S.bubbles) { const st = letterAt(L[0], t); if (!st) continue; const bx = st.x + M + 38 + Math.sin(bu.t / 9) * 3, by = st.y + M + 20 - Math.max(0, bu.t - 30) * .6, r = Math.min(4, bu.t / 8); if (bu.t < 100) { g.strokeStyle = '#cfeef8'; g.globalAlpha = .9; g.beginPath(); g.arc(bx, by, r, 0, 7); g.stroke(); g.globalAlpha = 1; g.fillStyle = '#ffffff'; g.fillRect(Math.round(bx - r * .5), Math.round(by - r * .5), 1, 1); } else { g.fillStyle = '#cfeef8'; for (let a = 0; a < 6; a++) g.fillRect(Math.round(bx + Math.cos(a) * (bu.t - 98)), Math.round(by + Math.sin(a) * (bu.t - 98)), 1, 1); } }
+    Glup.gooDraw(g, S.goo); for (const u of S.bubs) Glup.bubble(g, u);
     g.restore();
-    { const st = letterAt(L[0], t); if (st) { g.save(); if (S.shake) g.translate(0, 0); drawFace(g, L[0], st, t); g.restore(); } }
     if (S.flash) { g.globalAlpha = S.flash / 6 * .5; g.fillStyle = '#fff6d6'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
-    for (const d of S.drops) { const r = d.grow < 24 ? d.grow / 12 : 2; g.fillStyle = '#7c883a'; g.fillRect(Math.round(d.x), Math.round(d.y), 1, Math.max(1, Math.round(r))); g.fillStyle = '#dccd68'; g.fillRect(Math.round(d.x), Math.round(d.y), 1, 1); }
     for (const p of S.parts) { g.fillStyle = p.col; g.fillRect(Math.round(p.x), Math.round(p.y + (p.col === '#c9b08a' || p.col === '#a08a6a' || p.col === '#e0c8a0' ? cy : 0)), 1, 1); }
     // The sign drops in on its ropes once the letters are home.
     if (S.sign) drawSign(g, t, S.sign);

@@ -583,11 +583,13 @@ const Final = (() => {
   function drawFin(g, lt, t) {
     backdrop(g, t, 1);
     g.globalAlpha = Math.min(.28, lt / 60); g.fillStyle = '#140e22'; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
-    const word = 'FIN', S = 4;
-    for (let i = 0; i < 3; i++) {
-      const t0 = 20 + i * 14, k = clamp01((lt - t0) / 22); if (k <= 0) continue;
-      const y = lerp(-40, 44, outBack(k)), x = W / 2 + (i - 1) * 28, bob = lt > 120 ? Math.sin((lt + i * 20) / 24) * 1.5 : 0;
-      g.save(); g.translate(R(x), R(y + bob)); g.scale(S, S); ART.title(g, word[i], 0, 0, '#f2c46a', 'center'); g.restore();
+    // In golden goo (the Letra GLUP): each letter drops, splats, wobbles like jelly and then breathes.
+    const L = Glup.layout('FIN', 'huge', 'oro'), off = R(W / 2 - L.w / 2);
+    for (const it of L.items) {
+      const i = it.i, t0 = 20 + i * 14, k = clamp01((lt - t0) / 22); if (k <= 0) continue;
+      const d = lt - t0 - 22, sq = d >= 0 && d < 40 ? Math.exp(-d / 6) * Math.cos(d / 1.5) : 0, br = lt > 120 ? Math.sin(lt / 20 - i) * .03 : 0;
+      const y = lerp(-60, 36, outBack(k)), bob = lt > 120 ? Math.sin((lt + i * 20) / 24) * 1.5 : 0;
+      Glup.letter(g, it.gl, off + it.x, R(y + bob) - it.gl.top, { sx: 1 + sq * .3 - br, sy: 1 - sq * .26 + br, drips: lt > 90 ? Math.max(0, Math.sin(lt / 50 + i * 2) * 4) : 0 });
     }
     if (lt > 70) { const a = clamp01((lt - 70) / 30); g.globalAlpha = a; plank(g, W / 2, 104, 'Nila y el pez gato', t); g.globalAlpha = 1; }
     for (let i = 0; i < 12; i++) { const k = ((lt + i * 23) % 120) / 120; if (lt < 60) continue; const an = i / 12 * Math.PI * 2 + lt / 200, r = 30 + k * 60, x = W / 2 + Math.cos(an) * r * 1.6, y = 64 + Math.sin(an) * r * .6; g.globalAlpha = Math.sin(k * Math.PI) * .8; g.fillStyle = i % 3 ? '#fff4a8' : '#ffffff'; const s = R(Math.sin(k * Math.PI) * 2); g.fillRect(R(x) - s, R(y), s * 2 + 1, 1); g.fillRect(R(x), R(y) - s, 1, s * 2 + 1); }

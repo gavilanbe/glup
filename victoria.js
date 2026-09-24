@@ -3,7 +3,9 @@
 //     barca dando una vuelta, Bigotes asoma feliz, las crías rescatadas saltan del agua alrededor
 //     en arcos y chapuzones, llueve confeti de gotas y luciérnagas, y la barca se va con estela
 //     mientras Nila saluda.
-//  2. El recuento: «¡NIVEL SUPERADO!» cae letra a letra, una cinta con el nombre del nivel, y las
+//  2. El recuento: «¡NIVEL SUPERADO!» en la letra GLUP: cada letra cuelga como una gota, se suelta,
+//     cae estirada, se aplasta con un ¡plof! que sube de tono y tiembla como gelatina; la palabra
+//     respira, gotea, echa burbujas y brilla, y el ojo de Bigotes asoma en la O. Luego la cinta con el nombre del nivel, y las
 //     líneas cuentan con tic-tic: crías (cada una salta a su hueco), tiempo contra el par, trucos
 //     aprendidos (los bocados se estampan) y los puntos; al final cae el sello con la medalla.
 //     Nila baila a un lado con Bigotes. Al estilo Sonic, las bonificaciones se vacían a la vez en los
@@ -175,35 +177,19 @@ const Victoria = (() => {
   }
 
   // ================================================================ 2. El recuento
-  // Big letters in the logo's skin: a pixel glyph blown up 3×, outlined, with a yellow-to-olive fill and a dark extrusion.
-  const FILL = ['#fffbe6', '#fff3b8', '#f2e08a', '#dccd68', '#bdb452', '#9ca044', '#7c883a'];
-  const bigCache = new Map();
-  function bigGlyph(ch, S = 3) {
-    const k = ch + S; if (bigCache.has(k)) return bigCache.get(k);
-    const src = ART.glyph(ch, '#000'); if (!src) return null;
-    let d; try { d = src.getContext('2d').getImageData(0, 0, src.width, src.height).data; } catch (e) { d = new Uint8ClampedArray(src.width * src.height * 4); }
-    const gw = src.width, gh = src.height, on = (x, y) => x >= 0 && y >= 0 && x < gw && y < gh && d[(y * gw + x) * 4 + 3] > 0;
-    const P = 2, EX = 3, w = gw * S + P * 2, h = gh * S + P * 2 + EX, c = ART.canvas(w, h), g = c.getContext('2d');
-    const at = (x, y) => on(Math.floor((x - P) / S), Math.floor((y - P) / S)) && x >= P && y >= P;
-    const solid = (x, y) => { if (at(x, y)) return 1; for (let e = 1; e <= EX; e++) if (at(x, y - e)) return 2; return 0; };
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const s = solid(x, y);
-      if (s === 1) {
-        const f = (y - P) / (gh * S) * (FILL.length - 1), i = Math.min(FILL.length - 2, Math.max(0, f | 0)), fr = f - i;
-        let col = fr > .66 || (fr > .33 && ((x + y) & 1)) ? FILL[i + 1] : FILL[i];
-        if (!at(x, y - 1)) col = '#ffffff'; else if (!at(x + 1, y) || !at(x, y + 1)) col = '#5f6e30';
-        g.fillStyle = col; g.fillRect(x, y, 1, 1);
-      } else if (s === 2) { g.fillStyle = solid(x, y - 2) === 1 || at(x, y - 1) ? '#48522a' : '#2f3820'; g.fillRect(x, y, 1, 1); }
-      else { let near = false; for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1 && !near; dx++) if (solid(x + dx, y + dy)) near = true; if (near) { g.fillStyle = '#1a1420'; g.fillRect(x, y, 1, 1); } }
-    }
-    const out = { c, w, h, adv: gw * S + S }; bigCache.set(k, out); return out;
-  }
-  const TITLE = '¡NIVEL SUPERADO!';
+  // «¡NIVEL SUPERADO!» in the Letra GLUP (letra.js): every letter swells as a drop hanging from the top of the screen,
+  // lets go, falls stretched and lands with a splat, wobbles like jelly and settles; then the word breathes, drips,
+  // blows bubbles and shines, and Bigotes' eye peeks out of the O and follows the count.
+  const TITLE = '¡NIVEL SUPERADO!', TY = 6, FALL = 7;
   function titleLayout() {
-    const items = []; let x = 0, n = 0;
-    for (const ch of TITLE) { if (ch === ' ') { x += 8; continue; } const b = bigGlyph(ch); if (!b) continue; items.push({ ch, b, x, i: n++ }); x += b.adv; }
-    const off = Math.round((W - (x - 3)) / 2); for (const it of items) it.x += off;
-    return items;
+    const L = Glup.layout(TITLE, 'big', 'musgo'), off = Math.round((W - L.w) / 2);
+    return L.items.map(it => ({ ch: it.ch, gl: it.gl, x: off + it.x, cx: off + it.cx, i: it.i, y: TY - it.gl.top }));
+  }
+  // A letter plopping in: it falls h pixels in n frames, stretched, then lands squashed and wobbles back (false before it starts).
+  function plop(d, h = 14, n = 5) {
+    if (d < 0) return false;
+    if (d < n) { const k = d / n; return { y: -h * (1 - k * k), sx: 1 - .25 * k, sy: 1 + .4 * k }; }
+    const e = d - n, q = e < 30 ? Math.exp(-e / 5) * Math.cos(e / 1.4) : 0; return { y: 0, sx: 1 + q * .45, sy: 1 - q * .4 };
   }
   const MEDALS = {
     bronce: { name: 'BRONCE', stars: 1, rim: '#7a4424', face: '#c07a44', hi: '#f0b27a', lo: '#8e5230' },
@@ -227,7 +213,9 @@ const Victoria = (() => {
     const bank = { crias: pts.crias + pts.all, time: pts.time, tricks: pts.tricks + pts.boss }, sum = bank.crias + bank.time + bank.tricks;
     const rate = Math.max(10, Math.ceil(sum / 80)), D = Math.ceil(Math.max(bank.crias, bank.time, bank.tricks, 1) / rate);
     T.total = T.tricksEnd + 20; T.page = T.total; T.drain0 = T.page + 40; T.drainEnd = T.drain0 + D; T.rank = T.drainEnd + 18; T.end = T.rank + 40; T.auto = T.end + 170;
-    V.clear = { s, par, fast, rank, tricks, boss, items, T, pts, bank, rate, target: 0, shown: 0, shake: 0, parts: [], rings: [], jig: {}, flash: 0, record: s.prevBest !== undefined && s.prevBest !== null && s.secs < s.prevBest, skipped: false, doneT: -1 };
+    V.clear = { s, par, fast, rank, tricks, boss, items, T, pts, bank, rate, target: 0, shown: 0, shake: 0, parts: [], rings: [], jig: {}, flash: 0, record: s.prevBest !== undefined && s.prevBest !== null && s.secs < s.prevBest, skipped: false, doneT: -1,
+      goo: [], bubs: [], punch: null, drip: items.map(() => ({ a: 0, len: -R(20, 150), max: R(6, 11), v: R(.05, .11) })), eye: { lx: 0, ly: .5, tx: 0, ty: .5, blink: -99, glance: 0 },
+      bannerW: ART.textWidth((Game.level + 1) + ' · ' + s.name) + 30 };
   }
   // How much of each bonus has drained into the score by frame t, and what's left in each.
   function drained(c, t) { const k = Math.max(0, t - c.T.drain0) * c.rate, b = c.bank; return { crias: Math.min(b.crias, k), time: Math.min(b.time, k), tricks: Math.min(b.tricks, k) }; }
@@ -241,9 +229,14 @@ const Victoria = (() => {
     const c = V.clear; if (Game.frozen) return;
     Game.clearT++;
     const t = Game.clearT, T = c.T, s = c.s;
-    // Title letters slam in.
-    for (const it of c.items) if (t === LT0 + it.i * LGAP + 7) { Sound.play('slam', it.i); c.shake = Math.max(c.shake, 3); c.jig[it.i] = t; burst(c, it.x + it.b.w / 2, 30, 5, ['#fff3b8', '#dccd68', '#c9b08a'], 1.4, true); }
-    if (t === T.banner - 4) { Sound.play('clear'); c.flash = 5; c.hopT = t; burst(c, W / 2, 20, 20, CONFETTI, 2.6, false, 'conf'); }
+    // Title letters splat in, each a note higher; the last one lands with a punch and the whole word jumps.
+    for (const it of c.items) if (t === LT0 + it.i * LGAP + FALL) splatLetter(c, it, t);
+    if (t === T.banner - 4) {
+      Sound.play('clear'); Sound.play('glup', 1.3); c.flash = 5; c.hopT = t; c.shake = Math.max(c.shake, 5); c.punch = { t, x: W / 2, y: TY + 16, a: .07 }; Input.rumble(160, .7, .4);
+      burst(c, W / 2, 20, 20, CONFETTI, 2.6, false, 'conf');
+      for (const it of c.items) for (let k = 0; k < 2; k++) c.goo.push({ x: it.cx + R(-3, 3), y: TY + R(0, 10), vx: R(-1.2, 1.2), vy: -R(1.5, 3.2), r: Math.random() < .4 ? 1 : 0, life: R(30, 60) });
+    }
+    updateGoo(c, t);
     if (t === T.banner + 2) Sound.play('whoosh');
     // Crías hop into their slots.
     for (let i = 0; i < s.pearls; i++) if (t === T.crias0 + i * CGAP) { Sound.play('tick', i); const q = slotPos(c, i); burst(c, q.x + 4, q.y + 4, 6, ['#e8fbff', '#8fd9d0', '#ffffff'], 1.4, false, 'spark'); }
@@ -285,7 +278,8 @@ const Victoria = (() => {
   }
   function landMedal(c) {
     if (c.landed) return; c.landed = true;
-    Sound.play('stamp', 1); c.shake = 8; c.flash = 4;
+    Sound.play('stamp', 1); Sound.play('splash'); c.shake = 8; c.flash = 4; c.punch = { t: Game.clearT, x: medalPos.x, y: medalPos.y, a: .05 }; c.splat = splatCanvas();
+    for (let k = 0; k < 12; k++) { const a = R(0, Math.PI * 2), v = R(1.2, 3); c.goo.push({ x: medalPos.x + Math.cos(a) * 14, y: medalPos.y + Math.sin(a) * 14, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1.5, r: Math.random() < .5 ? 1 : 0, life: R(30, 55) }); }
     burst(c, medalPos.x, medalPos.y, 26, ['#ffffff', '#fff4a8', MEDALS[c.rank].face], 2.6, false, 'spark');
     if (c.rank === 'perfecto' || c.rank === 'oro') burst(c, medalPos.x, medalPos.y - 10, 30, CONFETTI, 3, true, 'conf');
     c.rings.push({ x: medalPos.x, y: medalPos.y, t: 0, big: true });
@@ -303,32 +297,124 @@ const Victoria = (() => {
     g.fillStyle = '#e79b3f'; g.fillRect(x + 2, y, w - 4, 1); g.fillRect(x + 2, y + h - 1, w - 4, 1);
     g.fillStyle = '#3a4a5e'; g.fillRect(x, y + 2, 1, h - 4); g.fillRect(x + w - 1, y + 2, 1, h - 4);
   }
-  function drawTitle(g, c, t) {
-    const hopK = c.hopT !== undefined ? t - c.hopT : -1, idle = t > c.T.banner + 60 ? (t - c.T.banner) % 240 : -1;
+  // ---- the goo: landing splats, drips that let go and splash where they land, bubbles
+  const BANNER_Y = 41, PANEL_Y = 54;
+  function splatLetter(c, it, t) {
+    Sound.play('bloop', Math.round(it.i * 9 / Math.max(1, c.items.length - 1))); Sound.play('pop');
+    c.shake = Math.max(c.shake, 2); c.jig[it.i - 1] = t; c.jig[it.i + 1] = t;
+    const by = it.y + it.gl.base - 2;
+    for (let k = 0; k < 7; k++) { const s = k % 2 ? 1 : -1; c.goo.push({ x: it.cx + s * R(2, 8), y: by - R(0, 5), vx: s * R(.5, 2.2), vy: -R(.8, 2.8), r: Math.random() < .3 ? 1 : 0, life: R(24, 40) }); }
+    burst(c, it.cx, by, 4, ['#fff3b8', '#dccd68', '#ffffff'], 1.3, true);
+    c.rings.push({ x: it.cx, y: by + 2, t: 0, splat: true });
+  }
+  // Where a falling drop lands: on the ribbon, on the panel, or off the bottom.
+  function floorAt(c, x, t) {
+    if (t >= c.T.banner + 12 && Math.abs(x - W / 2) < c.bannerW / 2) return BANNER_Y;
+    if (t >= c.T.crias0 - 2 && x > ROW.x0 - 6 && x < ROW.x1 + 6) return PANEL_Y;
+    return H + 8;
+  }
+  function updateGoo(c, t) {
+    const T = c.T;
+    // Drips swell under the landed letters and let go; the letter springs back a hair.
     for (const it of c.items) {
-      const t0 = LT0 + it.i * LGAP, k = (t - t0) / 7; if (k < 0) continue;
-      let y = 8, sx = 1, sy = 1, a = 1;
-      if (k < 1) { y = 8 - 46 * (1 - k) * (1 - k); sx = .8; sy = 1.35; a = Math.min(1, k * 2); }
-      else {
-        const d = t - t0 - 7, sq = d < 18 ? Math.exp(-d / 5) * Math.cos(d / 1.6) : 0; sx = 1 + sq * .35; sy = 1 - sq * .35;
-        const jd = c.jig[it.i + 1] !== undefined ? t - c.jig[it.i + 1] : 99; if (jd < 10) { sy -= Math.exp(-jd / 3) * .12; sx += Math.exp(-jd / 3) * .08; }
-        const hk = hopK >= 0 ? (hopK - it.i * 2) / 14 : -1; if (hk >= 0 && hk < 1) y -= Math.sin(hk * Math.PI) * 6;
-        const ik = idle >= 0 ? (idle - it.i * 3) / 14 : -1; if (ik >= 0 && ik < 1) y -= Math.sin(ik * Math.PI) * 4;
-        y += Math.round(Math.sin((t + it.i * 9) / 24));
+      const q = c.drip[it.i], n = it.gl.drips.length; if (!n || t < LT0 + it.i * LGAP + FALL + 14) continue;
+      q.len += q.len > q.max * .75 ? q.v * 2.5 : q.v;
+      if (q.len >= q.max) {
+        const a = it.gl.drips[q.a] || it.gl.drips[0]; c.goo.push({ x: it.x + a.x, y: it.y + a.y + q.len - 1, vx: 0, vy: .6, r: 1, life: 400, drop: true });
+        c.jig[it.i] = t; q.len = -R(40, 160); q.a = (Math.random() * n) | 0; q.max = R(6, 11); q.v = R(.05, .11);
       }
-      const cx = it.x + it.b.w / 2, by = y + it.b.h;
-      g.save(); g.globalAlpha = a; g.translate(cx, by); g.scale(sx, sy); g.drawImage(it.b.c, -it.b.w / 2, -it.b.h); g.restore();
     }
+    Glup.gooStep(c.goo, x => floorAt(c, x, t));
+    // Bubbles rise off the letters now and then and pop.
+    if (t > T.banner + 10 && t % 29 === 0) { const it = pick(c.items); c.bubs.push({ x: it.cx + R(-3, 3), y: TY + R(0, 6), vy: -R(.22, .4), r: 0, max: R(1.2, 2.8), t: 0, life: R(50, 95), ph: R(0, 6) }); }
+    for (let i = c.bubs.length - 1; i >= 0; i--) { const b = c.bubs[i]; b.t++; b.y += b.vy; b.r = Math.min(b.max, b.t / 10); if (b.t > b.life + 5 || b.y < -6) c.bubs.splice(i, 1); }
+    // Bigotes' eye in the O: it follows the count, then glances about; it blinks.
+    const e = c.eye;
+    if (t < T.crias0) { e.tx = -.2; e.ty = .8; }
+    else if (t < T.page) { e.tx = -.7; e.ty = 1; }
+    else if (t < T.rank - 4) { e.tx = .5; e.ty = 1; }
+    else if (t < T.rank + 70) { e.tx = 1; e.ty = .6; }
+    else if (t % 90 === 0) { const L = [[-1, .8], [1, .6], [0, -1], [0, 0], [-.6, -.6], [.8, 1]]; [e.tx, e.ty] = pick(L); }
+    e.lx += (e.tx - e.lx) * .2; e.ly += (e.ty - e.ly) * .2;
+    if (t % 150 === 70 || (t % 150 === 80 && (t / 150 | 0) % 3 === 0) || t === T.rank + 2) e.blink = t;
+  }
+  // The splat of goo behind the medal: a blob with spokes and beads, drawn once.
+  function splatCanvas() {
+    const S = 90, c = ART.canvas(S, S), g = c.getContext('2d'), P = Glup.PAL.musgo, m = S / 2;
+    const spokes = []; for (let i = 0; i < 9; i++) spokes.push({ a: i / 9 * Math.PI * 2 + R(-.25, .25), len: R(6, 20), r: R(2, 4.2) });
+    const disc = (x, y, r) => { const R2 = Math.max(0, r); for (let dy = -Math.ceil(R2); dy <= Math.ceil(R2); dy++) { const hw = Math.round(Math.sqrt(Math.max(0, R2 * R2 - dy * dy))); g.fillRect(Math.round(x - hw), Math.round(y + dy), hw * 2 + 1, 1); } };
+    const shape = (grow, dy) => { disc(m, m + dy, 23 + grow); for (const s of spokes) { const n = 8; for (let k = 0; k <= n; k++) { const d = 18 + s.len * k / n, r = (4 - 2.2 * k / n) * (k === n ? s.r / 3 + .6 : 1); disc(m + Math.cos(s.a) * d, m + Math.sin(s.a) * d + dy, r + grow); } } };
+    g.fillStyle = Glup.OUT; shape(1, 0); g.fillStyle = P.ext[0]; shape(0, 0); g.fillStyle = P.drip[1]; shape(-1, -1); g.fillStyle = P.drip[0]; shape(-2, -2);
+    g.fillStyle = P.drip[2]; for (const s of spokes) { const d = 18 + s.len; g.fillRect(Math.round(m + Math.cos(s.a) * d - 1), Math.round(m + Math.sin(s.a) * d - 2), 1, 1); }
+    return c;
+  }
+  function drawGoo(g, c) { Glup.gooDraw(g, c.goo); for (const b of c.bubs) Glup.bubble(g, b); }
+  // Bigotes' eye set in the O, like the G of the logo: a round eyeball whose pupil follows the count, and a lid of goo.
+  function drawEye(g, gl, c, t, landT) {
+    const H = gl.hole; if (!H) return; const d = t - landT; if (d < 0) return;
+    const e = c.eye, bd = t - e.blink, ex = Math.round((H.x0 + H.x1) / 2), ey = H.y0 + 5;
+    let lid = d < 8 ? 1 : d < 14 ? 1 - (d - 8) / 6 : 0; if (bd >= 0 && bd < 8) lid = Math.max(lid, 1 - Math.abs(bd - 3.5) / 4);
+    g.fillStyle = '#1a1420'; g.fillRect(ex - 3, ey - 3, 7, 7); g.fillRect(ex - 2, ey - 4, 5, 9); g.fillRect(ex - 4, ey - 2, 9, 5);
+    g.fillStyle = '#fffbe6'; g.fillRect(ex - 2, ey - 2, 5, 5); g.fillRect(ex - 3, ey - 1, 7, 3); g.fillRect(ex - 1, ey - 3, 3, 7);
+    g.fillStyle = '#d8d0b8'; g.fillRect(ex - 1, ey + 3, 3, 1); g.fillRect(ex + 2, ey + 1, 1, 2);
+    const lx = Math.max(-1, Math.min(1, Math.round(e.lx * 1.3))), ly = Math.max(-1, Math.min(1, Math.round(e.ly * 1.3)));
+    g.fillStyle = '#1a1420'; g.fillRect(ex - 1 + lx, ey - 1 + ly, 2, 3); g.fillStyle = '#ffffff'; g.fillRect(ex - 1 + lx, ey - 1 + ly, 1, 1);
+    if (lid > .05) { const rows = Math.max(1, Math.round(7 * lid)); g.fillStyle = gl.P.fill[4]; g.fillRect(ex - 3, ey - 3, 7, rows); g.fillRect(ex - 2, ey - 4, 5, 1); g.fillStyle = gl.P.fill[1]; g.fillRect(ex - 2, ey - 4, 5, 1); g.fillStyle = '#1a1420'; g.fillRect(ex - 3, ey - 4 + rows, 7, 1); }
+  }
+  // One title letter: falling stretched, splatting, wobbling, nudged by its neighbours, hopping and breathing.
+  function letterPose(c, it, t) {
+    const T = c.T, d = t - (LT0 + it.i * LGAP), side = it.i % 2 ? 1 : -1;
+    if (d < 0) return null;
+    if (d < FALL) { const k = d / FALL; return { y: -70 * (1 - k * k), sx: 1 - .3 * k, sy: 1 + .55 * k, rot: (1 - k) * .3 * side }; }
+    const dd = d - FALL, sq = dd < 40 ? Math.exp(-dd / 6) * Math.cos(dd / 1.45) : 0;
+    let y = 0, sx = 1 + sq * .55, sy = 1 - sq * .45, rot = dd < 40 ? Math.exp(-dd / 9) * Math.sin(dd / 2.3) * .09 * side : 0;
+    const jd = c.jig[it.i] !== undefined ? t - c.jig[it.i] : 99; if (jd >= 0 && jd < 16) { const j = Math.exp(-jd / 4) * Math.cos(jd / 1.3) * .14; sy -= j; sx += j * .8; }
+    // The word jumps for joy together, then now and then again as a wave.
+    const hopK = c.hopT !== undefined ? t - c.hopT - 8 : -1, hk = hopK >= 0 ? (hopK - it.i * 2) / 16 : -1;
+    if (hk >= 0 && hk < 1) { y -= Math.sin(hk * Math.PI) * 9; if (hk < .5) { sy += .14; sx -= .1; } }
+    else if (hk >= 1 && hk < 1.6) { const q = Math.sin((hk - 1) / .6 * Math.PI); sy -= q * .25; sx += q * .2; }
+    const idle = t > T.banner + 60 ? (t - T.banner) % 240 : -1, ik = idle >= 0 ? (idle - it.i * 3) / 14 : -1;
+    if (ik >= 0 && ik < 1) { y -= Math.sin(ik * Math.PI) * 5; if (ik < .5) { sy += .08; sx -= .06; } }
+    else if (ik >= 1 && ik < 1.5) { const q = Math.sin((ik - 1) * 2 * Math.PI); sy -= q * .16; sx += q * .12; }
+    // Breathing: a slow wave runs along the word.
+    if (t > T.banner) { const b = Math.sin(t / 16 - it.i * .55) * .04; sy += b; sx -= b * .7; y += Math.round(Math.sin((t + it.i * 9) / 24)); }
+    return { y, sx, sy, rot };
+  }
+  function drawTitle(g, c, t) {
+    const T = c.T;
+    // Each letter first swells as a drop hanging from the top of the screen, then lets go.
+    for (const it of c.items) { const d = t - (LT0 + it.i * LGAP); if (d >= -9 && d < 4) Glup.drip(g, Math.round(it.cx), 0, d < 0 ? (d + 9) / 9 * 13 : 6 * (1 - d / 4), it.gl.P); }
+    // A shine sweeps along the word every few seconds.
+    const sk = t > T.banner + 20 ? ((t - T.banner - 20) % 200) / 45 : 2, sweep = sk < 1 ? -40 + sk * (W + 80) : null;
+    const poses = c.items.map(it => letterPose(c, it, t));
+    c.items.forEach((it, k) => { const p = poses[k]; if (p && p.y > -20) Glup.letter(g, it.gl, it.x + 2, it.y + p.y + 3, { sx: p.sx, sy: p.sy, rot: p.rot, tint: '#140c1c', alpha: .35 }); });
+    c.items.forEach((it, k) => {
+      const p = poses[k]; if (!p) return; const q = c.drip[it.i], dr = []; if (q.len > 0) dr[q.a] = q.len;
+      const landT = LT0 + it.i * LGAP + FALL;
+      Glup.letter(g, it.gl, it.x, it.y + p.y, { sx: p.sx, sy: p.sy, rot: p.rot, drips: dr, shine: sweep === null ? null : sweep - it.x, extra: it.ch === 'O' ? (gg, gl) => drawEye(gg, gl, c, t, landT) : null });
+    });
   }
   function drawBanner(g, c, t) {
-    const k = ease((t - c.T.banner) / 14); if (k <= 0) return;
-    const label = (Game.level + 1) + ' · ' + c.s.name, tw = ART.textWidth(label), w = Math.round((tw + 30) * k), x = Math.round(W / 2 - w / 2), y = 36;
+    const d = t - c.T.banner, k = ease(d / 14); if (k <= 0) return;
+    const label = (Game.level + 1) + ' · ' + c.s.name, tw = ART.textWidth(label), w = Math.round((tw + 30) * k), x = Math.round(W / 2 - w / 2), y = BANNER_Y;
+    // The band gulps open: it overshoots, squashes and springs back like the letters.
+    const j = d > 10 && d < 44 ? Math.exp(-(d - 10) / 6) * Math.sin((d - 10) / 1.6) : 0;
+    g.save(); g.translate(W / 2, y + 6); g.scale(1 - j * .05, 1 + j * .4); g.translate(-W / 2, -(y + 6));
     // Folded ribbon tails, then the band.
     g.fillStyle = '#8a3a2a'; g.fillRect(x - 8, y + 3, 10, 9); g.fillRect(x + w - 2, y + 3, 10, 9);
     g.fillStyle = '#1b2430'; g.fillRect(x - 8, y + 7, 3, 1); g.fillRect(x - 7, y + 6, 1, 3); g.fillRect(x + w + 5, y + 7, 3, 1); g.fillRect(x + w + 6, y + 6, 1, 3);
     g.fillStyle = '#5a2418'; g.fillRect(x, y + 11, 3, 1); g.fillRect(x + w - 3, y + 11, 3, 1);
     g.fillStyle = '#c8543a'; g.fillRect(x, y, w, 11); g.fillStyle = '#e8785a'; g.fillRect(x, y, w, 1); g.fillStyle = '#9a3a28'; g.fillRect(x, y + 10, w, 1);
-    if (k > .8) ART.text(g, label, W / 2, y + 2, '#fff6d6', 'center', '#5a2418');
+    // The name types itself in, each letter popping up from below.
+    if (k > .8) Letra.text(g, label, Math.round(W / 2 - tw / 2), y + 2, { color: '#fff6d6', shadow: '#5a2418', shown: Game.still ? undefined : Math.max(0, (d - 11) * 1.5) });
+    g.restore();
+  }
+  // A value that gulps in: squashed flat when it changes, then it springs back taller and settles.
+  function gulpText(g, str, x, y, col, align, d, amp = 1, shadow = '#1b2430') {
+    const w = ART.textWidth(str), ax = Math.round(align === 'right' ? x - w / 2 : align === 'center' ? x : x + w / 2);
+    const q = d >= 0 && d < 18 ? Math.exp(-d / 4) * Math.cos(d / 1.3) * amp : 0;
+    if (!q) { ART.text(g, str, ax, y, col, 'center', shadow); return; }
+    g.save(); g.translate(ax, y + 7); g.scale(1 + q * .4, 1 - q * .4); ART.text(g, str, 0, -7, col, 'center', shadow); g.restore();
   }
   function drawRows(g, c, t) {
     const T = c.T, s = c.s, x0 = ROW.x0, x1 = ROW.x1;
@@ -340,22 +426,30 @@ const Victoria = (() => {
     if (t >= T.page) { const out = Math.min(1, (t - T.page) / 10); g.save(); g.beginPath(); g.rect(x0 - 5, 55, x1 - x0 + 10, 96); g.clip(); if (out < 1) { g.translate(-Math.round(ease(out) * 180), 0); g.globalAlpha = 1 - out; drawRowsBody(g, c, t); g.globalAlpha = 1; g.translate(Math.round(ease(out) * 180), 0); } drawBonusPage(g, c, t); g.restore(); return; }
     drawRowsBody(g, c, t);
   }
-  // The Sonic-style bonus page: each bonus counts down while the score counts up, all at once.
+  // The Sonic-style bonus page: each bonus counts down while the score counts up, all at once. Headings and numbers
+  // plop in letter by letter in the Letra GLUP; the numbers wobble while they drain and gulp when they hit zero.
   function drawBonusPage(g, c, t) {
-    const T = c.T, x0 = ROW.x0, x1 = ROW.x1, d = drained(c, t);
-    const rows = [['crias', 'BONUS CRÍAS', 64], ['time', 'BONUS TIEMPO', 82], ['tricks', c.boss ? 'BONUS GARZA' : 'BONUS TRUCOS', 100]];
+    const T = c.T, x0 = ROW.x0, x1 = ROW.x1, d = drained(c, t), rolling = t > T.drain0 && t <= T.drainEnd;
+    const rows = [['crias', 'CRÍAS', 62], ['time', 'TIEMPO', 79], ['tricks', c.boss ? 'GARZA' : 'TRUCOS', 96]];
     rows.forEach(([key, label, y], i) => {
-      const k = ease(Math.min(1, Math.max(0, (t - T.page - 4 - i * 6) / 10))); if (k <= 0) return;
-      const ox = Math.round((1 - k) * 160), left = c.bank[key] - d[key], z = c.zero && c.zero[key], flash = z && t - z < 12 && ((t - z) >> 1) % 2;
-      ART.text(g, label, x0 + ox, y, left ? '#f2c46a' : '#8a94a8');
-      ART.text(g, String(left), x1 + ox, y + (t > T.drain0 && left && (t & 2) ? -1 : 0), flash ? '#ffffff' : left ? '#fff6d6' : '#5f7899', 'right', '#1b2430');
+      const dt = t - (T.page + 4 + i * 6); if (dt < 0) return;
+      const left = c.bank[key] - d[key], zd = c.zero && c.zero[key] ? t - c.zero[key] : 99, empty = !left && t > T.drain0;
+      const q = zd >= 0 && zd < 18 ? Math.exp(-zd / 4) * Math.cos(zd / 1.3) : 0;
+      if (dt > 3) ART.text(g, 'bonus', x0, y + 5, '#5f7899');
+      ART.glup(g, label, x0 + 27, y, { size: 'small', pal: empty ? 'gris' : 'musgo', each: k => plop(dt - k * 1.5, 12, 4) });
+      ART.glup(g, String(left), x1, y, { size: 'small', pal: empty ? 'gris' : 'oro', align: 'right', each: k => {
+        const p = plop(dt - 6 - k * 1.5, 10, 4); if (!p) return false;
+        if (rolling && left) p.y += ((t >> 1) + k) % 3 === 0 ? -1 : 0;
+        p.sx += q * .45; p.sy -= q * .45; return p; } });
     });
     if (t >= T.page + 22) {
-      g.fillStyle = '#3a4a5e'; for (let x = x0; x <= x1; x += 3) g.fillRect(x, 114, 2, 1);
-      const pop = c.totalPop && t - c.totalPop < 14 ? Math.exp(-(t - c.totalPop) / 4) * Math.cos((t - c.totalPop) / 1.6) : 0, rolling = t > T.drain0 && t <= T.drainEnd;
-      ART.text(g, 'PUNTOS', x0, 124, '#f2c46a');
-      const str = String(Math.floor(c.shown)).padStart(5, '0');
-      g.save(); g.translate(x1, 124); g.scale(1 + pop * .5, 1 + pop * .5); ART.text(g, str, 0, rolling && (t & 2) ? -1 : 0, rolling ? '#ffffff' : '#ffe36a', 'right', '#1b2430'); g.restore();
+      const dt = t - (T.page + 22), pd = c.totalPop ? t - c.totalPop : 99, pop = pd >= 0 && pd < 24 ? Math.exp(-pd / 5) * Math.cos(pd / 1.4) : 0;
+      g.fillStyle = '#3a4a5e'; for (let x = x0; x <= x1; x += 3) g.fillRect(x, 115, 2, 1);
+      ART.glup(g, 'PUNTOS', x0, 126, { size: 'small', pal: 'oro', each: k => plop(dt - k * 1.5, 12, 4) });
+      ART.glup(g, String(Math.floor(c.shown)).padStart(5, '0'), x1, 120, { size: 'mid', pal: 'oro', align: 'right', shadow: true, each: k => {
+        const p = plop(dt - 4 - k * 2, 14, 5); if (!p) return false;
+        if (rolling) { const w = Math.sin(t / 2 + k * 1.3); p.y += Math.round(w); p.sy += w * .06; p.sx -= w * .04; }
+        p.sx += pop * .35; p.sy -= pop * .35; return p; } });
     }
   }
   function drawRowsBody(g, c, t) {
@@ -363,8 +457,7 @@ const Victoria = (() => {
     // Crías.
     const got = Math.min(s.pearls, Math.max(0, Math.floor((t - T.crias0) / CGAP) + 1) * (t >= T.crias0 ? 1 : 0));
     ART.text(g, 'Crías', x0, ROW.crias, '#9fc0cc');
-    const bump = got && t - (T.crias0 + (got - 1) * CGAP) < 8 ? 1 : 0;
-    ART.text(g, got + '/' + s.total, x1, ROW.crias - bump, got >= s.total && s.total ? '#ffe36a' : '#e8fbff', 'right');
+    gulpText(g, got + '/' + s.total, x1, ROW.crias, got >= s.total && s.total ? '#ffe36a' : '#e8fbff', 'right', got ? t - (T.crias0 + (got - 1) * CGAP) : 99, 1, null);
     for (let i = 0; i < s.total; i++) {
       const q = slotPos(c, i), d = t - (T.crias0 + i * CGAP);
       if (i < got) {
@@ -376,7 +469,7 @@ const Victoria = (() => {
     // Time against the par.
     if (t >= T.time0) {
       const secs = Math.round(s.secs * Math.min(1, (t - T.time0) / (T.timeEnd - T.time0)));
-      ART.text(g, 'Tiempo', x0, ROW.time, '#9fc0cc'); ART.text(g, Game.fmtTime(secs), x1, ROW.time, '#e8fbff', 'right');
+      ART.text(g, 'Tiempo', x0, ROW.time, '#9fc0cc'); gulpText(g, Game.fmtTime(secs), x1, ROW.time, '#e8fbff', 'right', t < T.timeEnd ? (t - T.time0) % 3 : t - T.timeEnd + 30, .45, null);
       ART.text(g, 'Par ' + Game.fmtTime(c.par), x0, ROW.time + 10, '#5f7899');
       if (t >= T.bonus) {
         const d = t - T.bonus;
@@ -426,6 +519,8 @@ const Victoria = (() => {
     else if (d < 20) { s = 1 + Math.exp(-d / 4) * Math.cos(d / 1.3) * .22; }
     rot += Math.sin(t / 30) * .05;
     const { x, y } = medalPos, r = 20;
+    // The splat of goo it landed in: it bursts out with the stamp, wobbles and then breathes.
+    if (c.splat && d >= 0) { const k = d < 10 ? outBack(d / 10) : 1, j = d < 30 ? Math.exp(-d / 6) * Math.sin(d / 1.5) * .12 : 0, b = Math.sin(t / 22) * .02; g.save(); g.translate(x, y + 4); g.scale(k * (1 + j + b), k * (1 - j - b)); g.drawImage(c.splat, -45, -45); g.restore(); }
     g.save(); g.globalAlpha = Math.max(0, Math.min(1, a)); g.translate(x, y); g.rotate(rot); g.scale(s, s);
     // Ribbon tails behind.
     g.fillStyle = '#2a5a9a'; g.fillRect(-12, 10, 8, 20); g.fillStyle = '#c8543a'; g.fillRect(4, 10, 8, 20);
@@ -449,9 +544,13 @@ const Victoria = (() => {
       g.save(); g.translate(Math.round(sx), Math.round(sy)); g.rotate(sd2 < 8 ? (1 - sd2 / 8) * 1.5 : Math.sin(t / 20 + i) * .08); g.scale(sc, sc);
       if (rim) { g.drawImage(rim, -2.5, -1.5); g.drawImage(rim, -3.5, -2.5); g.drawImage(rim, -1.5, -2.5); } if (big) g.drawImage(big, -2.5, -2.5); g.restore();
     }
+    // The medal's name plops in in goo of its own metal (a rainbow of goo for a perfect run).
     if (d >= 0) {
-      const lab = M.name, col = M.rainbow ? ['#f07080', '#ffe36a', '#8fd9d0', '#fff6d6'][(t >> 3) % 4] : '#fff6d6';
-      stampText(g, lab, Math.min(x, W - ART.textWidth(lab) / 2 - 5), y + 34, d, col, 0, 'center');
+      const lab = c.rank === 'perfecto' ? 'PERFECTO' : M.name, pal = { bronce: 'cobre', plata: 'gris', oro: 'oro' }[c.rank] || 'oro', w = Glup.width(lab, 'small', 0);
+      ART.glup(g, lab, Math.min(x, W - 1 - w / 2), y + 30, { size: 'small', pal, align: 'center', gap: 0, shadow: true, each: i => {
+        const p = plop(d - 2 - i * 2, 16, 5); if (!p) return false;
+        if (M.rainbow) p.pal = ['fresa', 'oro', 'agua', 'lila'][(i + (t >> 3)) % 4];
+        p.y += Math.round(Math.sin(t / 10 + i * .8) * .8); return p; } });
     }
   }
   function drawDancer(g, c, t) {
@@ -476,6 +575,8 @@ const Victoria = (() => {
     const theme = L.def ? L.def.theme : 'dusk';
     const sh = c.shake > 0 && !Game.still ? c.shake * .6 : 0, ox = Math.round(R(-sh, sh)), oy = Math.round(R(-sh, sh));
     g.save(); g.translate(ox, oy);
+    // A punch: the picture jumps closer around the hit (the last letter, the medal) and eases back.
+    const pd = c.punch ? t - c.punch.t : 99; if (pd >= 0 && pd < 24 && !Game.still) { const z = 1 + c.punch.a * Math.exp(-pd / 5); g.translate(c.punch.x, c.punch.y); g.scale(z, z); g.translate(-c.punch.x, -c.punch.y); }
     Game.drawScene(g, Game.t, theme);
     g.fillStyle = 'rgba(8,10,16,.5)'; g.fillRect(-4, -4, W + 8, H + 8);
     // Sunburst behind the title.
@@ -487,7 +588,9 @@ const Victoria = (() => {
     drawMedal(g, c, t);
     drawBanner(g, c, t);
     drawTitle(g, c, t);
-    for (const q of c.rings) { const rr = (q.big ? 8 : 4) + q.t * (q.big ? 2.4 : 1.2); g.strokeStyle = '#fff4a8'; g.globalAlpha = 1 - q.t / 16; g.beginPath(); g.arc(q.x, q.y, rr, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1; }
+    drawGoo(g, c);
+    for (const q of c.rings) if (q.splat) { const k = q.t / 16, rx = 4 + k * 16; g.globalAlpha = (1 - k) * .8; g.fillStyle = '#dccd68'; for (let a = 0; a < 28; a++) { const an = a / 28 * Math.PI * 2; g.fillRect(Math.round(q.x + Math.cos(an) * rx), Math.round(q.y + Math.sin(an) * rx * .25), 1, 1); } g.globalAlpha = 1; }
+    for (const q of c.rings) if (!q.splat) { const rr = (q.big ? 8 : 4) + q.t * (q.big ? 2.4 : 1.2); g.strokeStyle = '#fff4a8'; g.globalAlpha = 1 - q.t / 16; g.beginPath(); g.arc(q.x, q.y, rr, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1; }
     for (const p of c.parts) {
       const x = Math.round(p.x), y = Math.round(p.y); g.globalAlpha = Math.min(1, p.life / 12); g.fillStyle = p.col;
       if (p.kind === 'spark') { g.fillRect(x, y, 1, 1); if (p.life > 12) { g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3); } }

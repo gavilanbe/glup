@@ -1692,7 +1692,7 @@ const Game = {
     if (c.scene === 'aprende') { Game.startLevel(0); Game.banner = 0; for (let i = 0; i < 40; i++) Game.updatePlay(); Aprende.start(POWER_ORDER[c.n]); for (let i = 0; i < c.t; i++) { Input.pressed = {}; Aprende.update(); } Game.frozen = true; return; }
     if (c.scene === 'llegada') { Game.startLevel(c.n); Barca.start(); for (let i = 0; i < c.t; i++) { Input.pressed = {}; Game.updatePlay(); } Game.frozen = true; return; }
     if (c.scene === 'cine') { Cine.start(() => { }); Cine.state.t = c.t; Game.frozen = true; return; }
-    if (c.scene === 'titulo') { Game.title(); for (let i = 0; i < c.t; i++) Game.updateTitle(); Game.frozen = true; return; }
+    if (c.scene === 'titulo') { Game.title(); for (let i = 0; i < c.t; i++) { if (i === c.x) Title.press(Game.titleT); Game.updateTitle(); } Game.frozen = true; return; }
     if (c.scene === 'icono') { Game.state = 'icon'; return; }
     if (c.scene === 'gramola') { Gramola.start(); return; }
     if (c.scene === 'victoria') { Victoria.capture(c); return; }
