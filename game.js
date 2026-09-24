@@ -294,7 +294,7 @@ const POWERS = {
   mordisco: { name: 'Mordisco', food: 'un anzuelo viejo', text: 'Bigotes pica los anzuelos como un pez: sorbe hacia uno (con {up} si está arriba) y el sedal os izará. Salta para soltarte.' },
   panzazo: { name: 'Panzazo', food: 'un canto de río', text: 'En el aire, {down} y {jump}: Bigotes cae de panza. Rompe suelo agrietado, aturde y rebota en las setas.' },
   guindilla: { name: 'Escupitajo picante', food: 'una guindilla del pantano', text: 'Mantén {fish} con la boca llena y suelta: el escupitajo cargado sale recto, atraviesa bichos y rompe piedra reforzada.' },
-  resbalon: { name: 'Resbalón', food: 'un alga resbaladiza', text: 'Corriendo, {down}: Nila se desliza sobre Bigotes. Pasa huecos bajos a toda velocidad.' } };
+  resbalon: { name: 'Resbalón', food: 'un alga resbaladiza', text: 'Agachada con {down}, pulsa {puff}: Bigotes se hace trineo y salís disparados. También corriendo y {down}. Pasa huecos bajos a toda velocidad.' } };
 const POWER_ORDER = ['soplido', 'aleteo', 'ventosa', 'chorro', 'mordisco', 'panzazo', 'guindilla', 'resbalon'];
 
 // ---------------------------------------------------------------- Nila
@@ -326,7 +326,20 @@ const Player = {
     if (p.mantleT > 0) { p.mantleT--; p.vx = 0; p.vy = 0; Player.fish(); p.animT++; return; }
     // Running + down = a slide; standing + down = a crouch. Both shorten the hitbox; standing up needs headroom.
     if (Input.pressed.down && p.onGround && Math.abs(p.vx) > 1.2 && !p.slide && !p.crouch && !p.hover && !p.grapple && Game.has('resbalon')) { p.slide = 20; p.vx = p.dir * 2.8; Sound.play('step'); Cam.shake(1, 3); spawnParts(6, p.x + 5 - p.dir * 4, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2 - p.dir * .9, spread: .5, speed: [.5, 1.5], life: [10, 18], g: .03 }); }
+    // Crouched, a tap of SOPLO: Bigotes turns sled under her and they shoot off.
+    if (Input.pressed.puff && p.onGround && p.crouch && !p.slide && !p.held && !p.sucking && Game.has('resbalon')) {
+      Input.pressed.puff = false; p.slide = 26; p.vx = p.dir * 3.3; p.slideGo = 10; Sound.play('whoosh'); Sound.play('flap'); Cam.punch(1.04); Cam.shake(2, 5); Input.rumble(90, .5, .4);
+      spawnParts(10, p.x + 5 - p.dir * 6, p.y + p.h, { color: ['#c9b08a', '#a08a6a', '#fff6d6'], angle: -Math.PI / 2 - p.dir * 1.1, spread: .6, speed: [.8, 2.2], life: [10, 20], g: .06 });
+      L.parts.push({ x: p.x + 5 - p.dir * 8 - 8, y: p.y + p.h - 4, vx: 0, vy: 0, life: 8, color: '#fff6d6', size: 1, g: 0, kind: 'ring' });
+    }
+    const wasSlide = p.slide > 0;
     if (p.slide > 0) { p.slide--; if (!p.onGround) p.slide = 0; else if (p.slide < 2 && p.crouch && rectSolid(p.x, p.y - 6, p.w, 18, p)) p.slide = 2; /* under a low roof the algae keeps her gliding */ }
+    if (p.slideGo > 0) p.slideGo--;
+    // While sliding: after-images, sparks off the ground; at the end Bigotes shakes himself and she pops up.
+    if (p.slide > 0) { if (p.slide % 3 === 0) { p.slideTrail = (p.slideTrail || []).concat([{ x: p.x, y: p.y + p.h }]).slice(-3); } if (p.slide % 2 === 0) L.parts.push({ x: p.x + 5 - p.dir * 8, y: p.y + p.h - 1, vx: -p.dir * rnd(.6, 1.6), vy: -rnd(.3, 1), life: rnd(6, 12) | 0, color: Math.random() < .5 ? '#ffe36a' : '#fff6d6', size: 1, g: .08 }); }
+    if (!(p.slide > 0) && p.slideTrail) p.slideTrail = null;
+    else if (wasSlide && p.onGround) { p.sx = .85; p.sy = 1.18; Sound.play('step'); spawnParts(6, p.x + 5, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.4, speed: [.3, 1.2], life: [8, 16], g: .05 }); p.slideEnd = 12; }
+    if (p.slideEnd > 0) p.slideEnd--;
     const wantCrouch = (Input.held.down || p.slide > 0) && p.onGround && !p.hover && !p.grapple;
     if (wantCrouch && !p.crouch) { p.crouch = true; p.y += 6; p.h = 12; p.sx = 1.15; }
     else if (!wantCrouch && p.crouch && !rectSolid(p.x, p.y - 6, p.w, 18, p)) { p.crouch = false; p.y -= 6; p.h = 18; p.sy = 1.1; }
@@ -695,12 +708,31 @@ const Player = {
     let lean = p.sucking && !p.aimUp && !p.grapple ? p.dir * .05 : p.charge > 8 ? p.dir * .06 : 0;
     if (p.slide > 0) lean = p.dir * .18; else if (p.onWall) lean = p.onWall * -.12; else if (p.onGround && Math.abs(p.vx) > 1.2 && !p.sucking) lean = -p.dir * .06;
     const recoil = p.spitT > 8 ? -p.dir * 1 : 0;
+    if (p.slide > 0) { Player.drawSled(g, cx, by, spr); return; }
     const fish = Player.drawFish(g, fx, fy); fish.back();
     g.save(); g.translate(cx, by); g.scale(p.sx, p.sy); if (lean) g.transform(1, 0, lean, 1, 0, 0); g.translate(-cx, -by);
     g.drawImage(spr, cx - 8 + recoil, by - spr.height);
     g.restore();
     fish.front();
     Player.drawWater(g);
+  },
+  // The slide: Bigotes lies flat as a sled, head first and grinning, tail beating hard; Nila rides on his
+  // belly. Speed lines stream behind them.
+  drawSled(g, cx, by, spr) {
+    const p = Player, t = p.animT, d = p.dir, fs = p.slideGo > 0 ? ART.fish.open : (t >> 2) % 2 ? ART.fish.open : ART.fish.full;
+    const speed = Math.min(1, Math.abs(p.vx) / 3.3), go = p.slideGo > 0 ? p.slideGo / 10 : 0;
+    // Speed lines.
+    for (let i = 0; i < 6; i++) { const len = 10 + ((i * 7 + t * 3) % 14) * speed, y = by - 3 - i * 3 - (i % 2), x0 = cx - d * (10 + ((t * 5 + i * 11) % 9)); g.globalAlpha = .25 + speed * .5; g.fillStyle = i % 2 ? '#fff6d6' : '#dff2fb'; g.fillRect(Math.round(d > 0 ? x0 - len : x0), y, Math.round(len), 1); } g.globalAlpha = 1;
+    // After-images: where they were a moment ago, fading.
+    (p.slideTrail || []).forEach((q, i, a) => { const ax = Math.round(q.x - Cam.x) + 5, ay = Math.round(q.y - Cam.y); g.globalAlpha = .12 + .1 * i; g.save(); g.translate(ax, ay - 7); g.transform(1, 0, d * .22, 1, 0, 0); g.drawImage(spr, -8, -spr.height + 2); g.restore(); g.save(); g.translate(ax, ay - 5); g.scale(d, 1); g.drawImage(ART.fish.open, -11, -6); g.restore(); }); g.globalAlpha = 1;
+    // Bigotes: stretched when launching, tail wagging, a little tilt with each beat.
+    g.save(); g.translate(cx, by - 5); g.scale(d * (1 + go * .25), 1 - go * .15); g.rotate(Math.sin(t * .9) * .05);
+    g.drawImage(fs, -11, -6); Player.fishOverlay(g, fs, -11, -6, t, { mood: 'happy', lx: 1 });
+    // The tail beating: a few pixels of fin swishing at the back.
+    const w = Math.sin(t * 1.4) * 3; g.fillStyle = '#7a5630'; g.fillRect(-13, Math.round(-3 + w), 2, 3); g.fillStyle = '#c8944a'; g.fillRect(-14, Math.round(-2 + w), 1, 2);
+    g.restore();
+    // Nila on his back, leaning into the speed.
+    g.save(); g.translate(cx, by - 7); g.scale(p.sx, p.sy); g.transform(1, 0, d * .22, 1, 0, 0); g.drawImage(spr, -8, -spr.height + 2); g.restore();
   },
   // Bigotes has a spine: the sprite is drawn in one-pixel slices from the hand outward, and each slice
   // follows a curve that bends toward whatever he is about to do. The tail lags, whips and wags.

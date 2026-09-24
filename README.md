@@ -31,7 +31,7 @@ Como en Rayman, las habilidades se van consiguiendo, y aquí todas las da el pez
 | Anzuelo viejo | **Mordisco** | Picar anzuelos: Bigotes muerde el anzuelo como un pez y el sedal iza a Nila |
 | Canto de río | **Panzazo** | ↓ y salto en el aire: caída de panza que rompe suelo agrietado |
 | Guindilla del pantano | **Escupitajo picante** | Mantener y soltar con la boca llena: disparo cargado, rompe piedra reforzada |
-| Alga resbaladiza | **Resbalón** | ↓ corriendo: Nila se desliza sobre Bigotes |
+| Alga resbaladiza | **Resbalón** | Agachada, SOPLO (o ↓ corriendo): Bigotes se hace trineo, con estelas, polvo y chispas, y Nila se desliza sobre él |
 
 Por orden: Ruca (la tortuga vieja) en el embarcadero da el soplido; Lumi (la luciérnaga del farolillo) en los juncos, el aleteo; Tía Lapa en el bosque de raíces, la ventosa; Olga la molinera en el molino anegado, el trago de agua; Don Anselmo en el muelle del pescador, el mordisco; Canto el topo en la turbera, el panzazo; Don Pinzas en la cueva de barro, la guindilla; y Alga la anguila en el río subterráneo, el resbalón. De serie Bigotes sólo sabe sorber y escupir, y Nila correr, saltar y agacharse. El menú de pausa lista lo aprendido y el mapa cuenta los trucos.
 

@@ -7,7 +7,7 @@ const Aprende = (() => {
   const KEYS = {
     aleteo: '{jump} otra vez en el aire', soplido: 'Pulsa {puff} para soplar', ventosa: '{jump} pegada al muro de raíces',
     chorro: 'Con agua, mantén {fish} en el aire', mordisco: 'Mantén {fish} hacia el anzuelo ({up} si está arriba)', panzazo: '{down} y {jump} en el aire',
-    guindilla: 'Mantén {fish} con la boca llena y suelta', resbalon: '{down} mientras corres' };
+    guindilla: 'Mantén {fish} con la boca llena y suelta', resbalon: 'Agachada, {down} y {puff}' };
   const hash = i => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
   const ease = k => k <= 0 ? 0 : k >= 1 ? 1 : 1 - (1 - k) * (1 - k);
   let shade = null;
