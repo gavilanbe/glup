@@ -33,7 +33,7 @@ const Charla = (() => {
   const text = () => Game.signText(null, S.lines[S.i]);
   function update() {
     if (!S) return;
-    S.t++; if (S.wait > 0) S.wait--;
+    S.t++; S.lineT = (S.lineT || 0) + 1; if (S.wait > 0) S.wait--;
     const full = text().length, before = Math.floor(S.shown);
     S.shown = Math.min(full, S.shown + SPEED);
     if (Math.floor(S.shown) > before && Math.floor(S.shown) % 3 === 0 && S.shown < full) Sound.play('talk', S.who.voz);
@@ -42,41 +42,56 @@ const Charla = (() => {
     if (!go || S.wait > 0) return;
     if (S.shown < full) { S.shown = full; return; }
     Sound.play('select');
-    if (++S.i < S.lines.length) { S.shown = 0; S.wait = 4; return; }
+    if (++S.i < S.lines.length) { S.shown = 0; S.wait = 4; S.lineT = 0; return; }
     const f = S.alFinal, ent = S.ent; S = null; if (ent) ent.talking = false; Input.release();
     if (f) f();
   }
-  // The box: a portrait on the left in its frame, the name on a tab, the words on the right.
+  // The speech bubble: it comes out of whoever speaks, with its tail pointing at them, above them if
+  // there's room (below if not). Cream paper, a little portrait, the name on a wooden tag, the Glup
+  // letters typed one by one with a pop, and a small fish bobbing when there's more to read.
   function draw(g) {
     if (!S) return;
-    // At the bottom of the screen, unless the speakers stand there: then at the top, so they stay in view.
-    const top = !!S.ent && S.ent.y + S.ent.h - Cam.y > H * .55;
-    const who = S.who, lines = ART.wrap(text(), W - 86), bh = Math.max(44, lines.length * 10 + 14), bx = 8, bw = W - 16, by = top ? 6 : H - bh - 6;
-    g.fillStyle = '#120c18'; g.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
-    g.fillStyle = 'rgba(27,36,48,.96)'; g.fillRect(bx, by, bw, bh);
-    g.fillStyle = who.edge; g.fillRect(bx, by, bw, 1); g.fillRect(bx, by + bh - 1, bw, 1);
-    // Portrait.
-    const pw = 38, ph = 38, px = bx + 5, py = by + Math.round((bh - ph) / 2);
-    g.fillStyle = '#120c18'; g.fillRect(px - 1, py - 1, pw + 2, ph + 2); g.fillStyle = who.edge; g.fillRect(px, py, pw, ph);
-    g.fillStyle = who.fondo; g.fillRect(px + 1, py + 1, pw - 2, ph - 2);
-    g.fillStyle = 'rgba(255,255,255,.08)'; for (let y = py + 1; y < py + ph - 1; y += 2) g.fillRect(px + 1, y, pw - 2, 1);
-    Maestros.portrait(g, who, px + 1, py + 1, pw - 2, ph - 2, S.shown < text().length, S.t);
-    // Name tab.
-    const nw = ART.textWidth(who.name) + 10, ny = top ? by + bh : by - 10;
-    g.fillStyle = '#120c18'; g.fillRect(px + pw + 5, ny, nw + 2, 11);
-    g.fillStyle = who.edge; g.fillRect(px + pw + 6, ny + 1, nw, 10); g.fillStyle = '#1b2430'; g.fillRect(px + pw + 7, ny + (top ? 1 : 2), nw - 2, 9);
-    ART.text(g, who.name, px + pw + 6 + nw / 2, ny + (top ? 2 : 3), who.tag, 'center');
-    // The words, typed.
-    let left = Math.floor(S.shown); const tx = px + pw + 8;
-    lines.forEach((l, i) => { const s = l.slice(0, Math.max(0, left)); left -= l.length + 1; if (s) ART.text(g, s, tx, by + 7 + i * 10, '#fff6d6', 'left'); });
-    // More to read: a bobbing arrow; the last line: a little dot.
-    if (S.shown >= text().length) {
-      const ax = bx + bw - 10, ay = by + bh - 8 + ((S.t >> 3) % 2);
-      g.fillStyle = '#120c18'; g.fillRect(ax - 3, ay - 1, 7, 4);
-      g.fillStyle = S.i < S.lines.length - 1 ? '#f2c46a' : who.edge;
-      if (S.i < S.lines.length - 1) { g.fillRect(ax - 2, ay, 5, 1); g.fillRect(ax - 1, ay + 1, 3, 1); g.fillRect(ax, ay + 2, 1, 1); }
-      else g.fillRect(ax - 1, ay, 3, 3);
+    const who = S.who, str = text(), maxW = 190, lines = Letra.wrap(str, maxW), tw = Math.max(60, ...lines.map(Letra.width));
+    const w = tw + 44, h = Math.max(34, lines.length * Letra.LINE + 16);
+    // Where the speaker is on screen (or a spot at the bottom when nobody is in the scene).
+    const e = S.ent, ax = e ? Math.round(e.x + e.w / 2 - Cam.x) : W / 2, ay = e ? Math.round(e.y - Cam.y + (e.fy || 0)) : H;
+    let bx = Math.max(6, Math.min(W - w - 6, ax - Math.round(w * .35))), by = ay - h - 16, below = false;
+    if (!e) by = H - h - 8; else if (by < 20) { by = ay + (e.h || 16) + 16; below = true; }
+    by = Math.max(4, Math.min(H - h - 4, by));
+    // Pop in from the speaker's mouth, with a little overshoot; a squash on each new line.
+    const k = Math.min(1, S.t / 9), sc = k < 1 ? .3 + .7 * (1 - Math.pow(1 - k, 3)) + Math.sin(k * Math.PI) * .12 : 1 + (S.lineT < 6 ? Math.sin(S.lineT / 6 * Math.PI) * .03 : 0);
+    const ox = e ? Math.max(bx + 10, Math.min(bx + w - 10, ax)) : bx + w / 2, oy = below ? by : by + h;
+    g.save(); g.translate(ox, oy); g.scale(sc, sc); g.translate(-ox, -oy);
+    const O = '#2a1e2e', P = '#fff4dc', Pd = '#ecd6ae';
+    // Tail toward the speaker.
+    if (e) { const tx = Math.max(bx + 12, Math.min(bx + w - 12, ax)), ty0 = below ? by : by + h - 1, ty1 = below ? by - 10 : by + h + 9, tip = Math.max(-6, Math.min(6, ax - tx));
+      for (let r = 0; r <= 10; r++) { const yy = below ? ty0 - r : ty0 + r, half = Math.round((10 - r) * .45), cx = Math.round(tx + tip * r / 10); g.fillStyle = O; g.fillRect(cx - half - 1, yy, half * 2 + 3, 1); if (half > 0 && r < 10) { g.fillStyle = P; g.fillRect(cx - half, yy, half * 2 + 1, 1); } } }
+    // Rounded paper with a dark rim, a lit top and a soft shadow at the bottom.
+    g.fillStyle = 'rgba(8,6,14,.35)'; g.fillRect(bx + 3, by + 3, w, h);
+    g.fillStyle = O; g.fillRect(bx + 2, by, w - 4, h); g.fillRect(bx, by + 2, w, h - 4); g.fillRect(bx + 1, by + 1, w - 2, h - 2);
+    g.fillStyle = P; g.fillRect(bx + 2, by + 1, w - 4, h - 2); g.fillRect(bx + 1, by + 2, w - 2, h - 4);
+    g.fillStyle = Pd; g.fillRect(bx + 2, by + h - 4, w - 4, 2); g.fillStyle = '#ffffff'; g.fillRect(bx + 3, by + 2, w - 10, 1);
+    // The little portrait in its round frame.
+    const pw = 26, px = bx + 6, py = by + Math.round((h - pw) / 2);
+    g.fillStyle = O; g.fillRect(px, py - 1, pw, pw + 2); g.fillRect(px - 1, py, pw + 2, pw);
+    g.fillStyle = who.fondo || '#2e4a3a'; g.fillRect(px, py, pw, pw);
+    g.save(); g.beginPath(); g.rect(px, py, pw, pw); g.clip(); Maestros.portrait(g, who, px, py, pw, pw, S.shown < str.length, S.t); g.restore();
+    g.fillStyle = who.edge; g.fillRect(px, py + pw - 2, pw, 2);
+    // The name on a wooden tag with two nails.
+    const nw = Letra.width(who.name) + 12, nx = bx + 8, ny = by - 9;
+    g.fillStyle = O; g.fillRect(nx - 1, ny - 1, nw + 2, 13); g.fillStyle = '#8a5a34'; g.fillRect(nx, ny, nw, 11); g.fillStyle = '#b07848'; g.fillRect(nx, ny, nw, 2); g.fillStyle = '#5a3a24'; g.fillRect(nx, ny + 9, nw, 2);
+    g.fillStyle = '#e8d8b0'; g.fillRect(nx + 2, ny + 4, 1, 1); g.fillRect(nx + nw - 3, ny + 4, 1, 1);
+    Letra.text(g, who.name, nx + 6, ny + 1, { color: '#fff4dc', light: '#ffffff', shadow: '#3a2418' });
+    // The words, typed with a pop.
+    let left = Math.floor(S.shown);
+    lines.forEach((l, i) => { if (left > 0) Letra.text(g, l, bx + 38, by + 7 + i * Letra.LINE, { color: O, shadow: '#e2c9a0', shown: left, t: S.t }); left -= l.length + 1; });
+    // More to read: a little fish nodding; the end: a small shell.
+    if (S.shown >= str.length) {
+      const ix = bx + w - 14, iy = by + h - 9 + ((S.t >> 3) % 2);
+      if (S.i < S.lines.length - 1) { const f = ART.criaFree[(S.t >> 3) % 2]; g.drawImage(f, ix - 2, iy); }
+      else { g.fillStyle = O; g.fillRect(ix, iy, 5, 4); g.fillStyle = '#f2c46a'; g.fillRect(ix + 1, iy + 1, 3, 2); }
     }
+    g.restore();
   }
   return { start, stop, active, update, draw };
 })();
@@ -382,7 +397,7 @@ const Maestros = (() => {
     g.fillStyle = '#120c18'; g.fillRect(cx - 2, y + 11, 5, 2); g.fillRect(cx - 1, y + 13, 3, 1); g.fillStyle = 'rgba(27,36,48,.95)'; g.fillRect(cx - 1, y + 11, 3, 1); g.fillRect(cx, y + 12, 1, 1);
     g.fillStyle = '#e8e0cc'; g.fillRect(x + 2, y + 2, cw, 8); g.fillStyle = '#a89a80'; g.fillRect(x + 2, y + 9, cw, 1);
     ART.text(g, cap, x + 2 + cw / 2, y + 2, '#1b2430', 'center');
-    ART.text(g, label, x + cw + 5, y + 2, '#fff6d6', 'left');
+    Letra.text(g, label, x + cw + 5, y + 1, { color: '#fff6d6', shadow: '#120c18' });
   }
 
   // ---- The talk: what they say depends on whether the trick is given and the quest done.

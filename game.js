@@ -1020,7 +1020,7 @@ const Item = {
       const cx = Math.round(e.x - Cam.x + 10), y = Math.round(e.y - Cam.y) - 26 + ((e.t >> 4) % 2), x = clamp(cx - Math.round(w / 2), 2, W - w - 2);
       g.fillStyle = '#120c18'; g.fillRect(x - 1, y - 1, w + 2, 13); g.fillStyle = 'rgba(27,36,48,.95)'; g.fillRect(x, y, w, 11); g.fillStyle = '#8aa84a'; g.fillRect(x, y, w, 1);
       g.fillStyle = '#e8e0cc'; g.fillRect(x + 2, y + 2, cw, 8); g.fillStyle = '#a89a80'; g.fillRect(x + 2, y + 9, cw, 1);
-      ART.text(g, cap, x + 2 + cw / 2, y + 2, '#1b2430', 'center'); ART.text(g, label, x + cw + 5, y + 2, '#fff6d6', 'left');
+      ART.text(g, cap, x + 2 + cw / 2, y + 2, '#1b2430', 'center'); Letra.text(g, label, x + cw + 5, y + 1, { color: '#fff6d6', shadow: '#120c18' });
     } else if (!heard && (e.t >> 5) % 2) g.drawImage(ART.bubble, Math.round(e.x - Cam.x) + 14, Math.round(e.y - Cam.y) - 14 + Math.round(Math.sin(e.t / 8)));
   },
   sign(x, y, idx) { return { kind: 'sign', x, y, w: 14, h: 12, idx, update() { }, draw(e, g) { g.drawImage(ART.sign, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y)); } }; },
@@ -1876,13 +1876,23 @@ const Game = {
     }
     if (Game.toastT > 0) { const a = Math.min(1, Game.toastT / 20); g.globalAlpha = a; ART.text(g, Game.toastText, W / 2, 30, '#fff6d6', 'center', '#1b2430'); g.globalAlpha = 1; }
     if (Player.nearSign && !Player.dead && !Maestros.busy() && !Game.learning) {
-      const lines = ART.wrap(Game.signText(null, Game.noteRaw(Player.nearSign)), W - 40); const h = lines.length * 10 + 10; const y = H - h - 6;
-      const ruca = Player.nearSign.kind === 'ruca', edge = ruca ? '#8aa84a' : '#c78d4e';
-      g.fillStyle = 'rgba(27,36,48,.9)'; g.fillRect(14, y, W - 28, h); g.fillStyle = edge; g.fillRect(14, y, W - 28, 1); g.fillRect(14, y + h - 1, W - 28, 1);
-      if (ruca) { g.fillStyle = '#1b2430'; g.fillRect(18, y - 9, 30, 10); g.fillStyle = edge; g.fillRect(18, y - 9, 30, 1); ART.text(g, 'Ruca', 33, y - 7, '#d8f0b8', 'center'); }
-      // Ruca's words come out a few letters at a time; signs are read at once.
-      let left = ruca ? Math.floor((Player.nearSign.talkT || 0) * 1.5) : 1e9;
-      lines.forEach((l, i) => { const shown = l.slice(0, Math.max(0, left)); left -= l.length; if (shown) ART.text(g, shown, W / 2 - ART.textWidth(l) / 2, y + 5 + i * 10, '#fff6d6', 'left'); });
+      // The sign's words on a wooden board above the sign, in the Glup letters; it pops up when you arrive.
+      const e = Player.nearSign; if (Game.signFor !== e) { Game.signFor = e; Game.signT = 0; } Game.signT++;
+      const str = Game.signText(null, Game.noteRaw(e)), lines = Letra.wrap(str, 210), tw = Math.max(...lines.map(Letra.width)), w = tw + 20, h = lines.length * Letra.LINE + 10;
+      const sx = Math.round(e.x + 7 - Cam.x), sy = Math.round(e.y - Cam.y);
+      let bx = Math.max(6, Math.min(W - w - 6, sx - Math.round(w / 2))), by = sy - h - 14; if (by < 22) by = sy + 22;
+      const k = Math.min(1, Game.signT / 8), sc = .4 + .6 * (1 - Math.pow(1 - k, 3)) + Math.sin(k * Math.PI) * .1;
+      g.save(); g.translate(sx, by + h); g.scale(sc, sc); g.translate(-sx, -(by + h));
+      const O = '#2a1a14';
+      if (by < sy) { g.fillStyle = O; g.fillRect(sx - 2, by + h, 4, sy - by - h); g.fillStyle = '#6b4a30'; g.fillRect(sx - 1, by + h, 2, sy - by - h); }
+      g.fillStyle = 'rgba(8,6,14,.35)'; g.fillRect(bx + 3, by + 3, w, h);
+      g.fillStyle = O; g.fillRect(bx - 1, by - 1, w + 2, h + 2);
+      g.fillStyle = '#8a5a34'; g.fillRect(bx, by, w, h);
+      for (let yy = by + 5; yy < by + h - 2; yy += 6) { g.fillStyle = '#6e4630'; g.fillRect(bx, yy, w, 1); }
+      g.fillStyle = '#b07848'; g.fillRect(bx, by, w, 2); g.fillStyle = '#5a3a24'; g.fillRect(bx, by + h - 2, w, 2);
+      g.fillStyle = '#e8d8b0'; for (const [nx, ny] of [[bx + 2, by + 3], [bx + w - 3, by + 3], [bx + 2, by + h - 4], [bx + w - 3, by + h - 4]]) g.fillRect(nx, ny, 1, 1);
+      lines.forEach((l, i) => Letra.text(g, l, bx + Math.round((w - Letra.width(l)) / 2), by + 5 + i * Letra.LINE, { color: '#fff4dc', light: '#ffffff', shadow: '#3a2418' }));
+      g.restore();
     }
   },
   pauseRows() { return [70, 88, 106]; },
