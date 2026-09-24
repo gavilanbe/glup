@@ -1377,6 +1377,7 @@ const Game = {
       if (c.x >= 0) { Game.sel = c.x; Mapa.place(c.x); }
       for (let i = 0; i < c.t; i++) { Input.pressed = {}; Game.update(); } Game.frozen = true; return; }
     if (c.scene === 'aprende') { Game.startLevel(0); Game.banner = 0; for (let i = 0; i < 40; i++) Game.updatePlay(); Aprende.start(POWER_ORDER[c.n]); for (let i = 0; i < c.t; i++) { Input.pressed = {}; Aprende.update(); } Game.frozen = true; return; }
+    if (c.scene === 'llegada') { Game.startLevel(c.n); Barca.start(); for (let i = 0; i < c.t; i++) { Input.pressed = {}; Game.updatePlay(); } Game.frozen = true; return; }
     if (c.scene === 'cine') { Cine.start(() => { }); Cine.state.t = c.t; Game.frozen = true; return; }
     if (c.scene === 'titulo') { Game.title(); for (let i = 0; i < c.t; i++) Game.updateTitle(); Game.frozen = true; return; }
     if (c.scene === 'icono') { Game.state = 'icon'; return; }
@@ -1453,7 +1454,7 @@ const Game = {
       const i = Game.sel;
       if (i > Save.reached()) Sound.play('hurt');
       else if (Save.locked(i)) { Sound.play('hurt'); Mapa.shake(i); Game.explainWall(i, true); }
-      else { Sound.play('confirm'); Game.transition(() => Game.startLevel(i)); }
+      else { Sound.play('confirm'); Game.transition(() => Game.startLevel(i, true)); }
     }
     if (Input.pressed.pause) { Sound.play('select'); Game.transition(() => Game.title()); }
   },
@@ -1467,7 +1468,7 @@ const Game = {
     Charla.start({ quien: 'ruca', lines });
   },
   // ---- play
-  startLevel(i) { Maestros.reset(); Game.level = i; Game.hitStop = 0; Game.heldPresses = {}; loadLevel(i); Game.state = 'play'; Game.paused = false; Game.banner = 190; Sound.playMusic(LEVELS[i].music); Game.toastT = 0; Game.weather = { bolt: 0, next: 200, x: 0, seed: 1, thunder: 0 }; },
+  startLevel(i, arrive) { Maestros.reset(); Game.level = i; Game.hitStop = 0; Game.heldPresses = {}; loadLevel(i); Game.state = 'play'; Game.paused = false; Game.banner = 190; Sound.playMusic(LEVELS[i].music); Game.toastT = 0; Game.weather = { bolt: 0, next: 200, x: 0, seed: 1, thunder: 0 };  if (arrive) { Barca.start(); Game.banner = 0; } },
   respawn() { Game.transition(() => { Player.reset(L.checkpoint.x, L.checkpoint.y, true); if (L.def.boss) { if (!Boss.restart()) { loadLevel(Game.level); Game.banner = 60; } } else { spawnEntities(); } Cam.snap(); Sound.playMusic(L.def.boss ? Boss.song() : L.def.music); }); },
   drown(fell) {
     const p = Player; if (p.dead) return;
@@ -1495,6 +1496,8 @@ const Game = {
   updatePlay() {
     if (Input.pressed.pause) { Game.pause(); return; }
     if (Game.learning) { Aprende.update(); return; }
+    // Arriving by boat: nothing moves but the boat, Nila and the camera.
+    if (Game.arrival) { Barca.update(); updateParts(); Hud.update(); return; }
     // A teacher talking, or the morsel on its way to Bigotes: the world waits.
     if (Maestros.busy()) { Maestros.updateModal(); return; }
     // A hit-stop freezes the world, not the hands: presses made during it are kept and land on the first live frame.
@@ -1669,6 +1672,7 @@ const Game = {
     else if (zoom > 1) { const f = Player.win && Cam.fx != null; g.save(); g.translate(W / 2, H / 2); g.scale(zoom, zoom); g.translate(-(f ? Cam.fx : W / 2), -(f ? Cam.fy : H / 2)); }
     Game.drawBackground(g, camX, camY, L.bg);
     Game.drawTiles(g, camX, camY, 'back');
+    if (Game.arrival) Barca.drawBack(g);
     // Depth: signs and lanterns behind, then items, enemies, player, projectiles.
     const order = e => e.kind === 'sign' || e.kind === 'lantern' ? 0 : e.kind === 'boat' ? 1 : e.enemy ? 3 : e.boss ? 4 : 2;
     const ents = L.ents.slice().sort((a, b) => order(a) - order(b));
@@ -1676,7 +1680,7 @@ const Game = {
     if (Player.sucking) Game.drawSuction(g);
     for (const e of ents) if (!e.dead && order(e) > 1) e.draw(e, g);
     for (const gh of L.ghosts) { const sx = 1 + (5 - gh.life) * gh.grow; g.save(); g.translate(Math.round(gh.x - Cam.x + gh.sprite.width / 2), Math.round(gh.y - Cam.y + gh.sprite.height / 2)); g.scale(sx, sx); g.globalAlpha = gh.life / 5; g.drawImage(ART.tint(gh.sprite, '#ffffff'), -gh.sprite.width / 2, -gh.sprite.height / 2); g.restore(); }
-    Player.draw(g);
+    if (Game.arrival) Barca.drawFront(g); else Player.draw(g);
     for (const p of L.projs) if (!p.dead) Proj.draw(p, g);
     Game.drawParts(g);
     Game.drawGusts(g);
@@ -1792,9 +1796,9 @@ const Game = {
       if (p.kind === 'rain') { g.fillStyle = p.color; g.fillRect(x, y, 1, 2); g.fillRect(x + 1, y - 2, 1, 2); continue; }
       if (p.kind === 'cria') { const sp = ART.criaFree[(p.life >> 2) % 2]; g.globalAlpha = Math.min(1, p.life / 14); g.drawImage(p.vx < 0 ? ART.flip(sp) : sp, x, y); g.globalAlpha = 1; continue; }
       if (p.kind === 'feather') { g.fillStyle = p.color; g.fillRect(x + Math.round(Math.sin(p.life / 5) * 2), y, 2, 1); continue; }
-      if (p.kind === 'ripple') { const r = (16 - p.life) * 1.1 + 2; g.strokeStyle = p.color; g.globalAlpha = p.life / 16; g.beginPath(); g.ellipse(x, y, r, r * .35, 0, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1; continue; }
+      if (p.kind === 'ripple') { const r = Math.max(.5, (16 - p.life) * 1.1 + 2); g.strokeStyle = p.color; g.globalAlpha = Math.min(1, p.life / 16); g.beginPath(); g.ellipse(x, y, r, r * .35, 0, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1; continue; }
       if (p.kind === 'puddle') { g.globalAlpha = Math.min(1, p.life / 40) * .6; g.fillStyle = '#2f7f88'; g.beginPath(); g.ellipse(x, y, p.size, 1.5, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#8fd9d0'; g.fillRect(x - p.size / 2, y - 1, Math.max(1, p.size / 2), 1); g.globalAlpha = 1; continue; }
-      if (p.kind === 'ring') { const r = (8 - p.life) * 1.6 + 2; g.strokeStyle = p.color; g.globalAlpha = p.life / 8; g.beginPath(); g.ellipse(x + 8, y, r, r * .45, 0, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1; continue; }
+      if (p.kind === 'ring') { const r = Math.max(.5, (8 - p.life) * 1.6 + 2); g.strokeStyle = p.color; g.globalAlpha = Math.min(1, p.life / 8); g.beginPath(); g.ellipse(x + 8, y, r, r * .45, 0, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1; continue; }
       if (p.kind === 'smoke') { g.globalAlpha = Math.min(1, p.life / 20) * .8; g.fillStyle = p.color; const sz = p.life > 30 ? 2 : 3; g.fillRect(x, y, sz, sz); g.globalAlpha = 1; continue; }
       if (p.kind === 'amb') { g.globalAlpha = .35 + Math.sin(p.life / 9 + p.ph) * .35; g.fillStyle = p.color; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; continue; }
       if (p.kind === 'fly') { const a = Math.max(0, Math.sin(p.life / 11 + p.ph)) * Math.min(1, p.life / 30); if (a > .05) { g.fillStyle = p.color; g.globalAlpha = a * .3; g.fillRect(x - 1, y - 1, 3, 3); g.globalAlpha = a * .5; g.fillRect(x - 2, y, 5, 1); g.fillRect(x, y - 2, 1, 5); g.globalAlpha = Math.min(1, a * 1.4); g.fillStyle = '#ffffe0'; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; } continue; }

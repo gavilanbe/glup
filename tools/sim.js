@@ -6,7 +6,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 // The levels: every file in niveles/, in name order (each one places itself by its id).
 const NIVELES = fs.readdirSync(path.join(ROOT, 'niveles')).filter(f => f.endsWith('.js')).sort().map(f => 'niveles/' + f);
-const FILES = ['art.js', 'mundo.js', 'audio.js', 'levels.js', ...NIVELES, 'cine.js', 'titulo.js', 'mapa.js', 'hud.js', 'aprende.js', 'maestros.js', 'fx.js', 'victoria.js', 'garza.js', 'game.js'].filter(f => fs.existsSync(path.join(ROOT, f)));
+const FILES = ['art.js', 'mundo.js', 'audio.js', 'levels.js', ...NIVELES, 'cine.js', 'titulo.js', 'mapa.js', 'hud.js', 'aprende.js', 'maestros.js', 'fx.js', 'barca.js', 'victoria.js', 'garza.js', 'game.js'].filter(f => fs.existsSync(path.join(ROOT, f)));
 
 function stubContext() {
   const noop = () => { };
@@ -16,6 +16,9 @@ function stubContext() {
       if (k === 'createImageData' || k === 'getImageData') return (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) });
       if (k === 'createRadialGradient' || k === 'createLinearGradient' || k === 'createPattern') return () => ({ addColorStop: noop });
       if (k === 'measureText') return () => ({ width: 0 });
+      // Like a real canvas: a negative radius throws (it froze the game once, unseen by these tests).
+      if (k === 'ellipse') return (x, y, rx, ry) => { if (rx < 0 || ry < 0) throw new Error('ellipse con radio negativo: ' + rx + ', ' + ry); };
+      if (k === 'arc') return (x, y, r) => { if (r < 0) throw new Error('arc con radio negativo: ' + r); };
       return noop;
     },
     set(t, k, v) { t[k] = v; return true; }

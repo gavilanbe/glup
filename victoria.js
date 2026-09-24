@@ -34,11 +34,10 @@ const Victoria = (() => {
   }
   function start(boat) {
     const p = Player, n = Math.min(L.pearls, 12);
-    const sail = 118 + n * 4;
+    const sail = LAND + 18;   // she takes the oar and goes; the crías jump around the moving boat
     V.run = { t: 0, boat, x0: p.x, y0: p.y, bx0: boat.x, by0: boat.y, surf: surfaceOf(boat), n, sail, end: sail + 105, crias: [], conf: [], sailV: 0, dip: 0, dipV: 0, pop: 0, popV: 0,
       camX: Cam.x, camY: Cam.y, zoom: 1, fx: null, fy: null, flash: 0, finished: false, nx: p.x, ny: p.y, time: L.time };
     Sound.stopMusic(); Sound.play('fanfare'); Sound.duck(false);
-    Game.word('¡A LA BARCA!', p.x + 5, p.y - 12, '#ffe36a', true);
     Input.rumble(160, .5, .5);
     return V.run;
   }
@@ -52,7 +51,6 @@ const Victoria = (() => {
     const c = { x, y: r.surf + 2, vx: -side * R(.5, 1.25), vy: -R(3.4, 4.6), air: true, wait: 0, hops: 0, i, ph: R(0, 6) };
     r.crias.push(c); splash(r, x, 1);
     Sound.play('bloop', i);
-    if (i === r.n - 1) Game.word(r.n > 1 ? '¡' + r.n + ' CRÍAS!' : '¡UNA CRÍA!', cx, r.surf - 36, '#e8fbff', true);
   }
   function splash(r, x, k) {
     spawnParts(Math.round(6 + k * 6), x, r.surf, { color: ['#8fd9d0', '#c8f2ea', '#e8fbff'], angle: -Math.PI / 2, spread: .9, speed: [.6, 1.6 + k * 1.4], life: [12, 26], g: .14, kind: 'spray' });
@@ -72,7 +70,6 @@ const Victoria = (() => {
       Sound.play('splash'); Sound.play('land', 1); Cam.shake(3, 10); r.dipV = 3.2; r.pop = -7; r.popV = 0; r.flash = 6; Input.rumble(200, .8, .6);
       splash(r, b.x + 2, 1.2); splash(r, b.x + 30, 1.2);
       confetti(r, b.x + 16, b.y - 16, 46, true);
-      Game.word('¡YUPI!', b.x + 16, b.y - 40, '#fff6d6', true);
     }
     if (t > LAND) { r.dipV += -r.dip * .22; r.dipV *= .8; r.dip += r.dipV; r.popV += -r.pop * .25; r.popV *= .78; r.pop += r.popV; }
     b.y = r.by0 + Math.round(r.dip);
@@ -105,16 +102,16 @@ const Victoria = (() => {
     if (t > LAND && t % 4 === 0) L.parts.push({ x: b.x + R(-30, 60), y: b.y - R(10, 50), vx: R(-.15, .15), vy: R(-.2, 0), life: 120, color: '#f2f5a0', size: 1, g: 0, kind: 'fly', ph: R(0, 6) });
     for (let i = r.conf.length - 1; i >= 0; i--) { const q = r.conf[i]; q.vy = Math.min(q.vy + .07, q.drop ? 2.4 : .9); q.vx *= .97; q.x += q.vx + Math.sin(q.rot) * .3; q.y += q.vy; q.rot += q.vr; if (--q.life <= 0 || q.y > r.surf + 2) { if (q.y > r.surf && q.drop && waterAt(q.x, r.surf + 4)) L.parts.push({ x: q.x, y: r.surf + 1, vx: 0, vy: 0, life: 10, color: '#c8f2ea', size: 1, g: 0, kind: 'ripple' }); r.conf.splice(i, 1); } }
     // ---- Sail away with a wake.
-    if (t === r.sail) { Sound.play('whoosh'); Game.word('¡HASTA LUEGO!', b.x + 16, b.y - 40, '#ffe36a', false); }
+    if (t === r.sail) Sound.play('whoosh');
     if (t > r.sail) {
-      r.sailV = Math.min(1.7, r.sailV + .03); b.x += r.sailV; p.x = r.nx = b.x + 10;
+      r.sailV = Math.min(2.4, r.sailV + .045); b.x += r.sailV; p.x = r.nx = b.x + 10;
       if (t % 3 === 0) { L.parts.push({ x: b.x + 4, y: r.surf + 1, vx: 0, vy: 0, life: 18, color: '#c8f2ea', size: 1, g: 0, kind: 'ripple' }); spawnParts(2, b.x + 1, r.surf, { color: ['#8fd9d0', '#e8fbff'], angle: -Math.PI / 2 - .7, spread: .4, speed: [.5, 1.6], life: [10, 18], g: .12, kind: 'spray' }); }
       if (t % 5 === 0) spawnParts(2, b.x + 31, r.surf, { color: ['#c8f2ea', '#ffffff'], angle: -Math.PI / 2 + .6, spread: .4, speed: [.5, 1.2], life: [8, 14], g: .12, kind: 'spray' });
     }
     // ---- Camera: close in on the boat, then hold still and let it sail out of frame.
     const zt = Game.still ? 1.2 : t < 40 ? 1 + .45 * ease(t / 40) : t < r.sail ? 1.45 : 1.45 - .3 * ease((t - r.sail) / 60);
     r.zoom = zt;
-    if (t <= r.sail) {
+    if (t <= r.sail + 28) {
       r.camX += (Math.max(0, Math.min(L.w * TS - W, b.x + 16 - W / 2)) - r.camX) * .12;
       r.camY += (Math.max(0, Math.min(L.h * TS - H, b.y - 24 - H / 2 + 20)) - r.camY) * .12;
       r.fwx = b.x + 16; r.fwy = b.y - 14;
@@ -125,7 +122,8 @@ const Victoria = (() => {
     if (r.flash > 0) r.flash--;
     // ---- Off to the tally. A press after the landing hurries it along.
     const press = Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Game.tapped;
-    if (!r.finished && (t >= r.end || (t > LAND + 10 && press))) { r.finished = true; Game.tapped = false; Game.finishLevel(); }
+    const gone = t > r.sail + 30 && b.x - Cam.x > W / r.zoom + 8;
+    if (!r.finished && (gone || t >= r.end || (t > LAND + 10 && press))) { r.finished = true; Game.tapped = false; Game.finishLevel(); }
   }
 
   // Nila with Bigotes at (x, y) (hitbox corner, screen); optional spin, squash, a waving arm.
@@ -155,9 +153,10 @@ const Victoria = (() => {
       const d = t - LAND, squash = d < 14 ? Math.exp(-d / 4) * Math.cos(d / 1.8) : 0, sail = t > r.sail;
       const hop = !sail && d > 30 && (d % 48) < 14 ? Math.sin((d % 48) / 14 * Math.PI) * 5 : 0;
       o = { spr: hop > 0 ? N.jump : (t >> 3) % 2 ? N.win : N.idle[0], sx: 1 + squash * .3, sy: 1 - squash * .3, mood: 'happy', fish: (d % 48) < 16 && d > 4 ? ART.fish.open : ART.fish.full, bob: Math.round(r.pop), hopY: hop };
-      if (sail || d > 20) o.wave = -Math.PI / 2 - .55 + Math.sin(t * .3) * .4;
+      if (sail) { o.hopY = 0; o.spr = N.idle[0]; o.oar = true; }
     }
     drawNila(g, Math.round(r.nx - Cam.x), Math.round(r.ny - Cam.y - (o.hopY || 0)), o);
+    if (o.oar) Barca.oar(g, Math.round(r.nx - Cam.x) + 10, Math.round(r.ny - Cam.y) + 12, t, 1, 1.6);
     // The front of the hull over her boots, so she stands inside the boat.
     const bob = Math.round(Math.sin(b.t / 22) * 1.5), bx = Math.round(b.x - Cam.x), by = Math.round(b.y - Cam.y - 7 + bob);
     if (t >= LAND - 2) g.drawImage(ART.boat, 0, 6, 32, 6, bx, by + 6, 32, 6);
