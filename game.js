@@ -416,7 +416,7 @@ const POWERS = {
   aleteo: { name: 'Aleteo', food: 'una luciérnaga dorada', text: 'Pulsa {jump} otra vez en el aire y Bigotes aletea: salto doble.' },
   ventosa: { name: 'Ventosa', food: 'una lapa del pantano', text: 'Bigotes se pega a los muros de raíces: empuja contra ellos, resbala y salta de pared en pared.' },
   chorro: { name: 'Trago de agua', food: 'un nenúfar azul', text: 'Bigotes traga agua: sórbela de una charca, escúpela sobre el fuego, o mantén {fish} en el aire para flotar con el chorro.' },
-  mordisco: { name: 'Mordisco', food: 'un anzuelo viejo', text: 'Bigotes pica los anzuelos como un pez: sorbe hacia uno (con {up} si está arriba) y el sedal os izará. Salta para soltarte.' },
+  mordisco: { name: 'Mordisco', food: 'un anzuelo viejo', text: 'Bigotes pica los anzuelos como un pez: sorbe hacia uno (con {up} si está arriba) y os columpiáis del sedal. Suelta {fish} para salir lanzados, o salta; en el aire, {fish} otra vez muerde el anzuelo marcado.' },
   panzazo: { name: 'Panzazo', food: 'un canto de río', text: 'En el aire, {down} y {jump}: Bigotes cae de panza. Rompe suelo agrietado, aturde y rebota en las setas.' },
   guindilla: { name: 'Escupitajo picante', food: 'una guindilla del pantano', text: 'Mantén {fish} con la boca llena y suelta: el escupitajo cargado sale recto, atraviesa bichos y rompe piedra reforzada.' },
   resbalon: { name: 'Resbalón', food: 'un alga resbaladiza', text: 'Agachada con {down}, pulsa {puff}: Bigotes se hace trineo y salís disparados. También corriendo y {down}. Pasa huecos bajos a toda velocidad.' } };
