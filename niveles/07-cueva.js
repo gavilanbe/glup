@@ -250,7 +250,7 @@
       '######~~~~~~~~~~~~~~',
       '######~~~~~~~~~~~~~~',
       '####################'));
-  NIVEL.registrar({ id: 'cueva', name: 'La cueva de barro', theme: 'cave', music: 'cave', par: 360, rows: cueva,
+  NIVEL.registrar({ id: 'cueva', name: 'La cueva de barro', theme: 'cave', music: 'cueva', par: 360, rows: cueva,
     intro: 'Bajo el cerro, un río oscuro lleva hasta el nido.',
     ruca: ['La Garza cruzó la cueva a oscuras. Al fondo cocina Don Pinzas: si le caes bien, te dará algo que pica.',
       'El río de la cueva sigue bajo tierra, hasta el mismo ciprés. Ve con cuidado, Nila.'],
