@@ -103,8 +103,10 @@ const Hud = (() => {
     ring(g, mx, my, MED.r + 1, '#f2c46a', 0, 1, 1); ring(g, mx, my, MED.r, '#8a6a3a', 0, 1, 1);
     if (p.sucking && !held) {
       const lv = p.suckLv || 1;
-      // The steps of the inhale: three little pips that light up one by one.
-      for (let i = 0; i < 3; i++) { const on = i < lv, px = Math.round(mx - 7 + i * 6), py = Math.round(my + MED.r + 3), pop = on && i === lv - 1 && p.suckPulse > 8 ? 1 : 0;
+      // The steps of the inhale: little pips that light up one by one, only as many as Bigotes has grown into
+      // (one, then two after the 3rd trick, three after the 6th).
+      const cap = p.suckCap || 1;
+      for (let i = 0; i < cap; i++) { const on = i < lv, px = Math.round(mx - 1 - (cap - 1) * 3 + i * 6), py = Math.round(my + MED.r + 3), pop = on && i === lv - 1 && p.suckPulse > 8 ? 1 : 0;
         g.fillStyle = '#120c18'; g.fillRect(px - 1 - pop, py - 1 - pop, 5 + pop * 2, 5 + pop * 2); g.fillStyle = on ? (lv === 3 ? '#f2c46a' : '#8fe0f0') : '#3a4658'; g.fillRect(px - pop, py - pop, 3 + pop * 2, 3 + pop * 2); if (on) { g.fillStyle = '#ffffff'; g.fillRect(px - pop, py - pop, 1, 1); } }
     }
     // The bubble with what's inside.

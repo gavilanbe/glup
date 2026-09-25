@@ -240,7 +240,8 @@ const Touch = {
     const jit = p.sucking ? ((t >> 1) & 1) * (p.suckLv || 1) * .5 : full ? ((t >> 1) & 1) : 0, fx = Math.round(9 + jit + (held && held.kind !== 'agua' ? -4 : 0)), fy = 9 + (held ? 0 : Math.round(Math.sin(t / 20)));
     g.drawImage(face, fx, fy); Player.fishOverlay(g, face, fx, fy, t, { noWhiskers: true, mood: p.sucking || p.charge > 8 ? 'mad' : held ? null : 'happy', lx: 1 });
     if (held && held.kind !== 'agua' && held.sprite) { const sp = held.sprite, sc = Math.min(1, 11 / Math.max(sp.width, sp.height)), w = Math.round(sp.width * sc), h = Math.round(sp.height * sc), bx = 27, by = 12; g.fillStyle = 'rgba(232,251,255,.35)'; g.beginPath(); g.arc(bx + 1, by + 5, 8, 0, 7); g.fill(); g.drawImage(sp, bx + 1 - w / 2, by + 5 - h / 2, w, h); g.fillStyle = '#ffffff'; g.fillRect(bx - 4, by, 2, 1); }
-    if (p.sucking) { const lv = p.suckLv || 1; g.fillStyle = lv === 3 ? '#fff6d6' : '#cfe8f0'; for (let i = 0; i < 2 + lv; i++) { const k = (t * (.1 + lv * .04) + i / (2 + lv)) % 1; g.fillRect(Math.round(38 - k * 8), 10 + i * 2, 2, 1); } for (let i = 0; i < 3; i++) { g.fillStyle = i < lv ? (lv === 3 ? '#ffe36a' : '#8fe0f0') : 'rgba(255,255,255,.2)'; g.fillRect(16 + i * 4, 6, 2, 2); } }
+    if (p.sucking) { const lv = p.suckLv || 1; g.fillStyle = lv === 3 ? '#fff6d6' : '#cfe8f0'; for (let i = 0; i < 2 + lv; i++) { const k = (t * (.1 + lv * .04) + i / (2 + lv)) % 1; g.fillRect(Math.round(38 - k * 8), 10 + i * 2, 2, 1); } // One pip per step Bigotes has grown into (the locked ones are not there yet); straining, the next one flickers faintly.
+      const cap = p.suckCap || 1, x0 = 20 - cap * 2; for (let i = 0; i < cap; i++) { g.fillStyle = i < lv ? (lv === 3 ? '#ffe36a' : '#8fe0f0') : 'rgba(255,255,255,.2)'; g.fillRect(x0 + i * 4, 6, 2, 2); } if (p.strainT > 0 && cap < 3 && (t >> 2) & 1) { g.fillStyle = 'rgba(240,112,128,.55)'; g.fillRect(x0 + cap * 4, 6, 2, 2); } }
     if (hot > 0) Touch.rimArc(g, S, hot, hot >= 1 ? ((t >> 2) & 1 ? '#ffffff' : '#ffe36a') : '#f2c46a');
     Touch.label(g, lab, 21, 27, full ? '#ffe36a' : p.sucking ? '#fff6d6' : held ? '#d0f09a' : '#e8fbff');
   },
@@ -447,9 +448,9 @@ const Touch = {
     Touch.talkWho = talk ? (L.maestro && L.maestro.near ? L.maestro.who : Maestros.QUIEN.ruca) : null;
     if (talk && !B.talk.classList.contains('show')) { const c = Touch.center(B.talk); for (let i = 0; i < 14; i++) { const a = i / 14 * 6.28; Touch.spark(c.x, c.y, Math.cos(a) * 1.6, Math.sin(a) * 1.1, i % 2 ? '#fff6d6' : '#f2c46a', 18, { g: .02, star: i % 3 === 0 }); } }
     B.talk.classList.toggle('show', talk); if (talk && K.talk !== (t >> 4)) { K.talk = t >> 4; Touch.drawTalk(Touch.ctx.talk, t); }
-    const fk = [p.held && p.held.kind === 'agua' ? Math.round(p.held.amount * 20) : 0, Math.round((p.charge || 0) / 4), !!p.grapple, !!p.target, p.held ? p.held.kind : '', p.sucking ? p.suckLv : 0, p.charge >= CHARGE_FULL, p.spitT > 6, p.onGround, !!Input.held.down || p.downT === 8, p.sucking || p.charge >= CHARGE_FULL ? t >> 1 : t >> 3].join();
+    const fk = [p.held && p.held.kind === 'agua' ? Math.round(p.held.amount * 20) : 0, Math.round((p.charge || 0) / 4), !!p.grapple, !!p.target, p.held ? p.held.kind : '', p.sucking ? p.suckLv + ':' + (p.suckCap || 1) + (p.strainT > 0 ? 's' : '') : 0, p.charge >= CHARGE_FULL, p.spitT > 6, p.onGround, !!Input.held.down || p.downT === 8, p.sucking || p.charge >= CHARGE_FULL ? t >> 1 : t >> 3].join();
     if (K.fish !== fk) { K.fish = fk; Touch.drawFish(Touch.ctx.fish, t); }
-    const ring = p.sucking ? (p.suckLv || 1) / 3 : p.charge > 8 ? Math.min(1, p.charge / CHARGE_FULL) : 0;
+    const ring = p.sucking ? (p.suckLv || 1) / (p.suckCap || 1) : p.charge > 8 ? Math.min(1, p.charge / CHARGE_FULL) : 0;
     B.fish.style.setProperty('--charge', ring.toFixed(3)); B.fish.style.setProperty('--charge-col', p.sucking ? (p.suckLv === 3 ? '#fff6d6' : '#8fe0f0') : '#f2c46a');
     B.fish.classList.toggle('full', p.charge >= CHARGE_FULL || (p.sucking && p.suckLv === 3));
     const jk = [p.onGround, p.airJumps, !!Input.held.down, !!p.grapple, t >> 2].join(); if (K.jump !== jk) { K.jump = jk; Touch.drawJump(Touch.ctx.jump, t); }
@@ -681,13 +682,15 @@ const WEIGHT = { mosquito: .35, snail: .6, frog: .7, agua: .6, rock: 1, crab: 1.
 // How hard each thing resists the suction (the crate is the heaviest thing Bigotes can swallow).
 const SUCK_MASS = { mosquito: .7, snail: .9, frog: .9, rock: 1, crab: 1.1, crate: 1.35 };
 // The inhale builds up in steps, Kirby-style: held longer, it reaches further, opens wider and pulls harder.
-const SUCK_STAGES = [{ at: 0, reach: 64, cone: .45, pull: 1 }, { at: 40, reach: 82, cone: .55, pull: 1.35 }, { at: 95, reach: 104, cone: .7, pull: 1.8 }];
+// Bigotes grows with the teachers' morsels: at first only the first step; the 3rd trick learnt opens the second,
+// the 6th the third (see Player.suckMax). `pre` is how many frames before a step his cheeks start to fill.
+const SUCK_STAGES = [{ at: 0, reach: 64, cone: .45, pull: 1, pre: 0 }, { at: 36, reach: 82, cone: .55, pull: 1.35, pre: 16 }, { at: 84, reach: 104, cone: .7, pull: 1.8, pre: 22 }];
 const CHARGE_FULL = 40, AMMO_NAMES = { rock: 'Piedra', crate: 'Caja', snail: 'Caracol', frog: 'Rana', mosquito: 'Mosquito', crab: 'Cangrejo', agua: 'Agua' };
 const Player = {
   x: 0, y: 0, w: 10, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, coyote: 0, jumpBuf: 0, held: null, sucking: false, suckT: 0, hp: 3, inv: 0, animT: 0, sx: 1, sy: 1,
   dead: false, deadT: 0, spitT: 0, swallowT: 0, blink: 0, hurtT: 0, stepT: 0, dropping: false, win: false, nearSign: null, airT: 0, puffCd: 0, jumpCut: false,
   charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, prevVx: 0, prevVy: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0,
-  reset(x, y, full) { Object.assign(Player, { x, y, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, held: null, sucking: false, inv: 0, dead: false, deadT: 0, spitT: 0, swallowT: 0, sx: 1, sy: 1, win: false, airT: 0, charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0, lastSafe: null, rope: null, castTo: null, target: null, flingT: 0, gait: 0, moveT: 0, stopT: 0, landT: 0, fidget: null, pose: null }); if (full) Player.hp = 3; Sound.suck(false); Sound.jet(false); },
+  reset(x, y, full) { Object.assign(Player, { x, y, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, held: null, sucking: false, inv: 0, dead: false, deadT: 0, spitT: 0, swallowT: 0, sx: 1, sy: 1, win: false, airT: 0, charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0, lastSafe: null, rope: null, castTo: null, target: null, flingT: 0, gait: 0, moveT: 0, stopT: 0, landT: 0, fidget: null, pose: null, fj: null, strainT: 0 }); if (full) Player.hp = 3; Sound.suck(false); Sound.jet(false); },
   // Is there firm ground a knock-back could land on, that way? Water or a drop within reach says no.
   safeSide(dir) {
     const p = Player, fy = p.y + p.h;
@@ -810,6 +813,7 @@ const Player = {
     p.fishLagV += -dvy * .9; p.fishLagHV += dvx * p.dir * 1.3;
     p.fishLagV -= p.fishLag * .22; p.fishLagV *= .8; p.fishLag = clamp(p.fishLag + p.fishLagV, -5, 5);
     p.fishLagHV -= p.fishLagH * .22; p.fishLagHV *= .8; p.fishLagH = clamp(p.fishLagH + p.fishLagHV, -3, 3);
+    Player.fishJuice();
     if (p.spitT > 0) p.spitT--; if (p.swallowT > 0) p.swallowT--; if (p.inv > 0) p.inv--; if (p.hurtT > 0) p.hurtT--; if (p.puffCd > 0) p.puffCd--; if (p.puffT > 0) p.puffT--; if (p.puffWind > 0 && --p.puffWind === 0) Player.puff(); if (p.dropT > 0) p.dropT--; if (p.reliefT > 0) p.reliefT--;
     p.sx += (1 - p.sx) * .18; p.sy += (1 - p.sy) * .18;
     p.animT++;
@@ -833,6 +837,32 @@ const Player = {
     const fk = (p.idleT || 0) - 240; p.fidget = fk > 0 && fk % 480 < 80 ? { kind: Math.floor(fk / 480) % 3, f: fk % 480 } : null;
     if (p.fidget && p.fidget.kind === 2 && p.fidget.f === 20) p.happyT = 60;
     p.nearSign = null; for (const e of L.ents) if (e.kind === 'sign' && Math.abs(e.x + 7 - (p.x + 5)) < 22 && Math.abs(e.y - p.y) < 30) p.nearSign = e;
+  },
+  // Bigotes' body is a jelly on springs (only for the eye, never the physics): `jel` stretches him long (+) or
+  // squashes him (−), `flick` whips the tail, `rip` runs a wave from the mouth to the tail (a spit's recoil),
+  // `shud` shivers him after a hit, `shimmy` is the happy wiggle after a swallow and `flop` a bored wriggle.
+  // He lives out of the water: every so often he gulps air (`gasp`), more often and bigger near water.
+  fishJuice() {
+    const p = Player, J = p.fj || (p.fj = { jel: 0, jelV: 0, flick: 0, flickV: 0, rip: 0, shud: 0, shimmy: 0, flop: 0, gasp: 0, gaspIn: 120, near: 0, sw: 0, dir: p.dir, ground: p.onGround, vy: 0 });
+    if (p.onGround && !J.ground) J.jelV -= .1 + Math.min(.28, Math.max(0, J.vy) * .05);   // a landing squashes him
+    if (!p.onGround && J.ground && p.vy < -2) J.jelV += .22;                               // a jump stretches him
+    if (p.dir !== J.dir) { J.flickV += 1.6; J.jelV -= .08; }                                // a turn whips the tail
+    if (p.swallowT === 10) J.jelV += .16; if (p.swallowT === 1) J.shimmy = 34;
+    if (p.spitT === 12 || p.spitT === 6 && p.puffT === 8) { J.rip = 1; J.jelV -= .26; }
+    if (p.hurtT === 20) J.shud = 26;
+    if (p.flap === 13) J.jelV += .15;
+    J.dir = p.dir; J.ground = p.onGround; J.vy = p.vy;
+    J.jelV -= J.jel * .24; J.jelV *= .8; J.jel = clamp(J.jel + J.jelV, -.45, .45);
+    J.flickV -= J.flick * .2; J.flickV *= .83; J.flick = clamp(J.flick + J.flickV, -2.2, 2.2);
+    if (J.rip > 0) J.rip = Math.max(0, J.rip - .07); if (J.shud > 0) J.shud--; if (J.shimmy > 0) J.shimmy--; if (J.flop > 0) J.flop--;
+    J.sw += (Math.min(1, Math.abs(p.vx) / 1.7) - J.sw) * .1;
+    // Water close by (checked now and then): he can smell it, wriggles and gasps harder.
+    if (p.animT % 15 === 0) { let w = 0; for (const [dx, dy] of [[0, 24], [p.dir * 26, 20], [p.dir * 44, 28], [-p.dir * 18, 26], [p.dir * 30, 44]]) if (waterAt(p.x + 5 + dx, p.y + dy)) { w = 1; break; } J.near = w; }
+    // Gulps of air: mouth wide, gills flared, a bubble or two. Not while his mouth is busy.
+    const busy = p.sucking || p.held || p.spitT > 0 || p.swallowT > 0 || p.hover || p.grapple || p.dead || p.slide > 0 || p.charge > 0;
+    if (J.gasp > 0) J.gasp--; else if (!busy && --J.gaspIn <= 0) { J.gasp = J.near ? 18 : 14; J.gaspIn = (J.near ? 55 : 150) + (p.animT * 37) % (J.near ? 40 : 110); }
+    // Bored on the ground, every so often he flops and wriggles in her arm.
+    if (p.idleT > 90 && p.idleT % 250 === 170 && !p.fidget) J.flop = 30;
   },
   wallAt(d) { const p = Player; const x = d > 0 ? p.x + p.w + 1 : p.x - 2; return tileAt(x >> 4, (p.y + 3) >> 4) === 'M' || tileAt(x >> 4, (p.y + p.h - 3) >> 4) === 'M'; },
   // Reaching a ledge with the hands: Nila hauls herself up.
@@ -893,17 +923,22 @@ const Player = {
       if (!down) p.charge = 0;
     } else {
       p.charge = 0;
-      if (down && p.fishDown && !p.sucking && !p.grapple && !p.castTo && p.fishT > 4) { p.sucking = true; p.suckT = 0; p.waterT = 0; p.suckLv = 1; p.suckLen = 36; p.suckPulse = 0; Sound.suck(true); }
+      if (down && p.fishDown && !p.sucking && !p.grapple && !p.castTo && p.fishT > 4) { p.sucking = true; p.suckT = 0; p.waterT = 0; p.suckLv = 1; p.suckCap = Player.suckMax(); p.strainT = 0; p.suckLen = 36; p.suckPulse = 0; Sound.suck(true); }
       if (!down && p.fishDown) { p.fishDown = false; if (p.grapple) Player.release(false); else if (p.castTo) p.castTo = null; else if (p.sucking) { p.sucking = false; Sound.suck(false); Player.letGo(); } }
       if (p.sucking) Player.suck();
     }
     if (wasHover && !p.hover) Sound.jet(false);
     if (p.held && p.held.kind === 'agua' && p.held.amount <= 0) { const m = p.mouth(); p.held = null; Sound.play('puff'); Game.word('pff', m.x, m.y - 8, '#9fc0cc', false); spawnParts(6, m.x, m.y, { color: ['#8fd9d0', '#cfe0e8'], speed: [.5, 1.5], life: [8, 14], g: .05 }); }
   },
+  // How many steps of the inhale Bigotes has grown into: one more at the 3rd and at the 6th trick learnt.
+  suckMax() { let n = 0; for (const q of POWER_ORDER) if (Game.has(q)) n++; return 1 + (n >= 3 ? 1 : 0) + (n >= 6 ? 1 : 0); },
   suck() {
     const p = Player, m = p.mouth(), a = p.aim(); p.suckT++;
-    const lv = p.suckT >= SUCK_STAGES[2].at ? 3 : p.suckT >= SUCK_STAGES[1].at ? 2 : 1, S = SUCK_STAGES[lv - 1];
+    const cap = p.suckCap || 1, want = p.suckT >= SUCK_STAGES[2].at ? 3 : p.suckT >= SUCK_STAGES[1].at ? 2 : 1, lv = Math.min(cap, want), S = SUCK_STAGES[lv - 1];
     if (lv !== p.suckLv) { p.suckLv = lv; Player.suckUp(lv); }
+    // He is not big enough for the next step yet: he strains, wobbles and lets out a little puff instead.
+    if (want > cap && p.suckT === SUCK_STAGES[want - 1].at) Player.suckStrain();
+    if (p.strainT > 0) p.strainT--;
     p.suckLen = lerp(p.suckLen || 36, S.reach, .18); if (p.suckPulse > 0) p.suckPulse--;
     // At full blast Nila digs her heels in: dust kicks up behind her and the air hums.
     if (lv === 3 && p.onGround && p.suckT % 5 === 0) spawnParts(1, p.x + 5 - p.dir * 5, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2 - p.dir * .9, spread: .5, speed: [.4, 1.2], life: [8, 14], g: .04 });
@@ -970,6 +1005,10 @@ const Player = {
     spawnParts(4 + lv * 4, m.x, m.y, { color: lv === 3 ? ['#ffffff', '#fff6d6', '#f2c46a'] : ['#e8fbff', '#cfe0e8', '#ffffff'], speed: [1, 2 + lv * .6], life: [8, 16], g: 0 });
     if (p.onGround) spawnParts(3 + lv * 2, p.x + 5 - p.dir * 4, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2 - p.dir * .8, spread: .6, speed: [.5, 1.6], life: [10, 18], g: .04 });
     if (lv === 3) { Cam.punch(1.04); Game.stop(2); Game.word('¡SÚPER!', m.x + a.x * 16, m.y - 14 + a.y * 10, '#e8fbff', true); }
+  },
+  suckStrain() {
+    const p = Player, m = p.mouth(); p.strainT = 26; p.sx = 1.05; p.sy = .96; Sound.play('blub'); Input.rumble(40, .15, .1);
+    spawnParts(4, m.x - p.dir * 3, m.y - 3, { color: ['#e8f2f6', '#cfe0e8'], angle: -Math.PI / 2 - p.dir * .4, spread: .7, speed: [.3, .8], life: [14, 22], g: -.02 });
   },
   // ---- The hooks: a liana made of fishing line.
   // Bigotes bites, the line hangs from where it is tied and Nila swings under it like a pendulum: she keeps
@@ -1320,8 +1359,28 @@ const Player = {
     if (p.onWall) { bend += .35; hx = fx + 5 + p.dir * 6; }
     if (p.slide > 0) { bend -= .25; hy += 2; wave = 1.2; waveSpeed = .5; }
     bend += p.fishLag * .05; tailBend += p.fishLagH * .45;
-    const breath = 1 + Math.sin(t / 22) * .035;
+    // The jelly (see fishJuice): stretch, tail flicks, flops, a cuddle while she pets him, a head tilt toward what he watches.
+    const J = p.fj || { jel: 0, flick: 0, rip: 0, shud: 0, shimmy: 0, flop: 0, gasp: 0, near: 0, sw: 0 }, calm = !p.sucking && !p.held && p.charge === 0 && p.spitT === 0 && !p.grapple && !p.hover;
+    tailBend += J.flick * .5; spacing *= 1 + J.jel * .2;
+    if (J.flop > 0) { const k = (30 - J.flop) / 30; bend -= Math.sin(k * Math.PI) * .4; tailBend += Math.sin(k * Math.PI * 3) * 1.2 * (1 - k); }
+    if (p.fidget && p.fidget.kind === 2) { const k = Math.min(1, p.fidget.f / 12); tailBend -= .7 * k; bend += .18 * k; }
+    if (calm && p.onGround) bend += (p.lookY || 0) * .14;
+    if (J.near && calm) { wave = Math.max(wave, 1.3); waveSpeed = Math.max(waveSpeed, .5); }
+    if (!p.onGround && !p.hover && !p.grapple && p.vy > 4 && calm) { wave = Math.max(wave, 1.4); waveSpeed = .7; }
+    // The inhale fills his throat and cheeks step by step (and a bit ahead of each step); he leans back into it
+    // and trembles. Not grown enough for the next step, he strains at the brim and it wobbles back.
+    let throat = 0, strain = 0;
+    if (p.sucking && !p.grapple) {
+      const lv = p.suckLv || 1, cap = p.suckCap || 1, nx = SUCK_STAGES[lv], k = nx ? clamp(1 - (nx.at - p.suckT) / nx.pre, 0, 1) : 0;
+      throat = (lv - 1) * .5 + (lv < 3 ? k * .4 : .15 + Math.sin(t * .5) * .08) + (p.suckPulse || 0) / 16 * .25;
+      if (lv === cap && lv < 3 && k >= 1) { strain = p.strainT > 0 ? p.strainT / 26 : .35; throat = (lv - 1) * .5 + .3 + Math.sin(t * .7) * .12 * (1 + strain); }
+      lunge -= .5 + lv * .6; bend -= .05 * lv; jitter += strain * .8;
+    }
+    if (J.gasp > 2 && calm) headStretch *= 1.04;
+    const breath = 1 + Math.sin(t / 22) * .035 + (p.charge > 8 ? Math.min(1, p.charge / CHARGE_FULL) * .1 : 0) - J.jel * .3;
     if (!p.sucking && !p.held && p.spitT === 0 && p.swallowT === 0 && t % 230 < 5) fs = ART.fish.blink;
+    // Gulping air, or dropping like a stone: the mouth goes wide.
+    else if (fs === ART.fish.closed && calm && ((J.gasp > 3 && J.gasp < 13) || (!p.onGround && p.vy > 4.2))) fs = ART.fish.open;
     const bulgeU = p.swallowT > 0 ? 1 - ((10 - p.swallowT) / 10) * .65 : -9;
     const water = p.held && p.held.kind === 'agua';
     const img = p.charge >= CHARGE_FULL && (t >> 1) % 3 === 0 ? ART.tint(fs, '#fff6d6') : fs;
@@ -1333,7 +1392,16 @@ const Player = {
     for (let c = 0; c < n; c++) {
       const sl = cols[c], u = c / (n - 1);
       sl.off = Math.sin(t * waveSpeed + c * .45) * wave * (1 - u) * (1 - u) + (jitter ? (Math.random() - .5) * jitter : 0) + p.fishLag * (.15 + u * .5);
+      // Running he swims: a wave down the whole body; spits send a ripple to the tail; hits shiver; a swallow ends in a shimmy.
+      if (J.sw > .05 && p.onGround && calm) sl.off += Math.sin(t * .34 + c * .5) * .5 * J.sw * (.35 + .65 * (1 - u));
+      if (J.rip > 0) { const d = (u - J.rip) * 5; sl.off += Math.exp(-d * d) * 1.6 * Math.sin(J.rip * 9); }
+      if (J.shud > 0) sl.off += Math.sin(t * 2.7 + c * 1.3) * J.shud / 26 * 1.1;
+      if (J.shimmy > 0) sl.off += Math.sin(t * 1.15 + c * .8) * .8 * J.shimmy / 34;
+      if (strain) sl.off += Math.sin(t * 1.3 + c * .6) * .35 * strain;
       sl.sy = breath; sl.dy = -(breath - 1) * MID; if (bulgeU > -1) { const b = Math.max(0, 1 - Math.abs(u - bulgeU) * 4); sl.sy = 1 + b * .55; sl.dy = -b * 2.6; }
+      if (throat > 0) { const b = Math.max(0, 1 - Math.abs(u - .8) * 4.5); sl.sy += b * throat * .45; sl.dy -= b * throat * .45 * MID * .4; }
+      // The tail fin swishes side to side: seen from the side it narrows and widens, faster with speed.
+      if (c < 5) { const sw = (.1 + .22 * J.sw + (J.near ? .1 : 0)) * (.5 + .5 * Math.sin(t * (.16 + J.sw * .22) + (J.flick || 0))); sl.sy *= 1 - sw * (1 - c / 5); sl.dy += sw * (1 - c / 5) * MID * .9; }
     }
     // A point of the sprite (column c, row r) on screen, following the bent spine.
     const HX = Math.round(hx), HY = Math.round(hy);
@@ -1398,7 +1466,7 @@ const Player = {
     if (!o.noWhiskers) for (const [c, r, n, base, col, tip] of [[20, 7.5, 7, .7, '#e0a45a', '#8a5a34'], [18, 8, 5, 1.1, '#9a6a3a', '#5a3e2a']]) {
       let x = c, y = r, a = base; for (let i = 0; i < n; i++) { a += .22 + Math.sin(t / 18 + i * .5 + c) * .07; x += Math.cos(a) * 1.2; y += Math.sin(a) * 1.2; P(x, y, i > n - 3 ? tip : col); }
     }
-    P(12, 5.5, '#3e3a24'); P(12, 7.5, '#3e3a24'); P(11.5, 8.5, '#3e3a24'); if (Math.sin(t / 22) > .3) P(13, 7, '#d0604e');
+    P(12, 5.5, '#3e3a24'); P(12, 7.5, '#3e3a24'); P(11.5, 8.5, '#3e3a24'); if (Math.sin(t / 22) > .3) P(13, 7, '#d0604e'); if (t % 160 < 12) { P(13, 6, '#e0707f'); P(13, 8, '#d0604e'); }
     const fa = Math.sin(t * .22) * .6; for (let i = 0; i < 4; i++) P(13 - i * .9 + Math.cos(Math.PI / 2 + fa) * i * .3, 9.5 + Math.sin(Math.PI / 2 + fa) * i * .8, i < 2 ? '#c8944a' : '#7a5630');
     const sk = (t % 170) / 22; if (sk < 1) P(6 + sk * 13, 4.2, '#fffbe0', 2, 1);
     const baked = spr === F.blink || spr === F.squint || spr === F.spit || spr === F.swallow, eye = Player.eyeOf(spr);
@@ -1419,28 +1487,44 @@ const Player = {
   drawFishLife(g, at0, fs, t) {
     const at = (c, r) => at0(Math.max(0, Math.min(fs.width - 1, Math.round(c))), r);
     const p = Player, F = ART.fish, px = (x, y, c, w = 1, h = 1) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
-    // Gills: a dark slit that opens with each breath and flashes red.
-    const br = Math.sin(t / 22), g1 = at(12, 5.5), g2 = at(12, 7.5), g3 = at(11.5, 8.5);
-    px(g1.x, g1.y, '#3e3a24'); px(g2.x, g2.y, '#3e3a24'); px(g3.x, g3.y, '#3e3a24'); if (br > .3 || p.charge > 8) { const gr = at(13, 7); px(gr.x, gr.y, '#d0604e'); }
-    // Pectoral fin paddling under the belly.
-    const act = p.hover ? 1 : p.onGround && Math.abs(p.vx) > .5 ? .8 : p.sucking ? .6 : .25, fa = Math.sin(t * (.15 + act * .35)) * (.5 + act * .6), fb = at(13, 9.5);
-    for (let i = 0; i < 4; i++) { const ang = Math.PI / 2 + fa - p.dir * .6, fxp = fb.x + Math.cos(ang) * i * -p.dir * .8 - p.dir * i * .7, fyp = fb.y + Math.sin(ang) * i * .8; px(fxp, fyp, i < 2 ? '#c8944a' : '#7a5630'); }
+    // Gills: a dark slit that opens with each breath and flashes red; out of the water he pants, and a gulp of
+    // air (or the effort of an inhale) flares the gill cover wide open.
+    const J = p.fj || { gasp: 0, near: 0, flick: 0, sw: 0 }, br = Math.sin(t / (J.near ? 11 : 22)), g1 = at(12, 5.5), g2 = at(12, 7.5), g3 = at(11.5, 8.5);
+    const flare = J.gasp > 0 ? Math.sin((J.gasp / (J.near ? 18 : 14)) * Math.PI) * (J.near ? 1.3 : 1) : p.sucking ? .3 + (p.suckLv || 1) * .2 + (p.strainT > 0 ? .4 : 0) : p.charge > 8 ? .8 : br > .3 ? .35 : 0;
+    px(g1.x, g1.y, '#3e3a24'); px(g2.x, g2.y, '#3e3a24'); px(g3.x, g3.y, '#3e3a24');
+    if (flare > .2) { const a1 = at(13, 7); px(a1.x, a1.y, '#d0604e'); if (flare > .6) { const a2 = at(13, 6), a3 = at(13, 8); px(a2.x, a2.y, '#e0707f'); px(a3.x, a3.y, '#d0604e'); } if (flare > .95) { const c1 = at(14, 5.5), c2 = at(14, 7), c3 = at(14, 8.5); px(c1.x, c1.y, '#3e3a24'); px(c2.x, c2.y, '#3e3a24'); px(c3.x, c3.y, '#3e3a24'); } }
+    // A gulp's end: a bubble or two escapes from his lips and floats up.
+    if ((J.gasp === 5 || (J.near && J.gasp === 9)) && Game.state === 'play') { const m = at(21.5, 7.5); L.parts.push({ x: m.x + Cam.x + p.dir * 2, y: m.y + Cam.y, vx: p.dir * .25, vy: -.35, life: 30 + (t % 12), color: '#cfeef8', size: J.near ? 3 : 2, g: -.004, kind: 'bub', ph: t }); }
+    // Dorsal fin: raised and fluttering when he is excited (in the air, inhaling, charging, near water), folded when calm.
+    const up = p.sucking || p.charge > 8 ? 1 : !p.onGround ? .8 : J.near || J.gasp > 0 ? .6 : p.onGround && Math.abs(p.vx) > .5 ? .35 : 0;
+    if (up > 0) for (let i = 0; i < 3; i++) { const hgt = Math.max(0, Math.round(up * (1.7 - i * .45) + Math.sin(t * (p.sucking ? .9 : .3) + i * 1.1) * .5 * up)); for (let k = 1; k <= hgt; k++) { const q = at(10 + i - k * .7, 2 - k); px(q.x, q.y, k === hgt ? '#e4d86c' : '#c8944a'); } }
+    // Pectoral fin under the belly: paddles when calm, rows when running, spreads wide in the air, trembles during an
+    // inhale and flutters madly falling fast.
+    const air = !p.onGround && !p.hover && !p.grapple, fall = air && p.vy > 4;
+    const act = p.hover || fall ? 1 : p.onGround && Math.abs(p.vx) > .5 ? .8 : p.sucking ? .6 : J.near ? .7 : .25;
+    let fa = Math.sin(t * (.15 + act * .35 + (fall ? .5 : 0))) * (.5 + act * .6) + (J.flick || 0) * .35;
+    if (p.sucking || p.strainT > 0) fa = .9 + Math.sin(t * 1.9) * .25 * (p.suckLv || 1);
+    const spread = air ? -.7 : 0, flen = air || p.sucking ? 5 : 4, fb = at(13, 9.5);
+    for (let i = 0; i < flen; i++) { const ang = Math.PI / 2 + fa + spread - p.dir * .6, fxp = fb.x + Math.cos(ang) * i * -p.dir * .8 - p.dir * i * .7, fyp = fb.y + Math.sin(ang) * i * .8; px(fxp, fyp, i < 2 ? '#c8944a' : '#7a5630'); }
     // Wet shine sliding along his back; more of it (and drips) after water.
     const wet = p.wetT > 0, per = wet ? 60 : 170, sk = (t % per) / 22; if (sk < 1) { const sh = at(6 + sk * 13, 4.2); px(sh.x, sh.y, '#fffbe0', 2, 1); }
     if (wet && t % 7 === 0) { const d = at(8 + Math.random() * 10, 10.5); L.parts.push({ x: d.x + Cam.x, y: d.y + Cam.y, vx: 0, vy: .3, life: 24, color: '#8fd9d0', size: 1, g: .15, kind: 'drip' }); }
     // Charging: cheeks flush and pulse.
     if (p.charge > 8) { const k = Math.min(1, p.charge / CHARGE_FULL); g.globalAlpha = .35 + k * .45 * (.6 + .4 * Math.sin(t * .8)); const ck = at(16, 8.2); px(ck.x - 1, ck.y, '#f05060', 3, 1); g.globalAlpha = 1; }
+    // Straining at the top of what he can inhale: red in the face, a bead of sweat.
+    if (p.sucking && p.strainT > 0) { g.globalAlpha = .4 + .4 * (p.strainT / 26); const ck = at(16, 8.4); px(ck.x - 1, ck.y, '#f05060', 3, 1); g.globalAlpha = 1; const sw = at(15, 1 - (26 - p.strainT) * .15); px(sw.x + p.dir * 2, sw.y, '#cfeef8'); }
     // The eye: bigger than the sprite's, looking at whatever matters right now.
     const baked = fs === F.blink || fs === F.squint || fs === F.spit || fs === F.swallow, eye = Player.eyeOf(fs);
     if (eye && !baked) {
       const e = at(eye.c, eye.r), ex = Math.round(e.x), ey = Math.round(e.y);
       let lx = p.dir, ly = 0;
       if (p.aimUp || p.grapple) { lx = p.dir * .3; ly = -1; } else if (!p.onGround && p.vy > 4) { lx = 0; ly = 1; } else if (!p.sucking) {
-        let best = null, bd = 110; for (const o of L.ents) if (!o.dead && (o.enemy || o.kind === 'pearl' || o.kind === 'maestro')) { const d = Math.hypot(o.x + o.w / 2 - (e.x + Cam.x), o.y + o.h / 2 - (e.y + Cam.y)); if (d < bd) { bd = d; best = o; } }
+        let best = null, bd = 110; for (const o of L.ents) if (!o.dead && !o.held && (o.enemy || o.suckable || o.kind === 'pearl' || o.kind === 'maestro' || o.kind === 'ruca')) { const d = Math.hypot(o.x + o.w / 2 - (e.x + Cam.x), o.y + o.h / 2 - (e.y + Cam.y)); if (d < bd) { bd = d; best = o; } }
         if (best) { const dx = best.x + best.w / 2 - (e.x + Cam.x), dy = best.y + best.h / 2 - (e.y + Cam.y), dd = Math.hypot(dx, dy) || 1; lx = dx / dd; ly = dy / dd; }
         else if (p.idleT > 60) { const ph = Math.floor(t / 90) % 4; lx = [p.dir, -p.dir, 0, p.dir][ph]; ly = [0, -1, -1, 0][ph]; }
       }
-      Player.drawEye(g, ex, ey, lx, ly, { happy: p.happyT > 0, happyK: (70 - p.happyT) / 50, sleep: p.idleT > 900, shock: !p.onGround && p.vy > 4.5 || p.hurtT > 10, blink: (t % 230) < 5 || (p.reliefT > 6 && !p.held), mad: p.sucking || p.charge > 8, sad: p.hurtT > 0 || p.dizzyT > 40 || p.dead, dizzy: p.dizzyT > 0, dir: p.dir }, t);
+      p.lookY = ly;
+      Player.drawEye(g, ex, ey, lx, ly, { happy: p.happyT > 0 || (p.fj && p.fj.shimmy > 12), happyK: (70 - p.happyT) / 50, sleep: p.idleT > 900, shock: !p.onGround && p.vy > 4.5 || p.hurtT > 10, blink: (t % 230) < 5 || (p.reliefT > 6 && !p.held), mad: p.sucking || p.charge > 8, sad: p.hurtT > 0 || p.dizzyT > 40 || p.dead, dizzy: p.dizzyT > 0, dir: p.dir }, t);
     }
     // Bored: he blows a bubble that grows at his lips and pops.
     if (p.idleT > 150 && p.idleT < 900) { const k = (p.idleT - 150) % 160; if (k < 60) { const m = at(21.5, 7), r = k / 60 * 3.5; g.globalAlpha = .85; g.strokeStyle = '#cfeef8'; g.beginPath(); g.arc(m.x + p.dir * (r + 1), m.y - r * .3, Math.max(.8, r), 0, 7); g.stroke(); g.fillStyle = '#ffffff'; g.fillRect(Math.round(m.x + p.dir * (r + 1) - r * .4), Math.round(m.y - r * .3 - r * .5), 1, 1); g.globalAlpha = 1; } if (k === 60) { const m = at(21.5, 7); Sound.play('pop'); for (let i = 0; i < 6; i++) L.parts.push({ x: m.x + Cam.x + p.dir * 4, y: m.y + Cam.y - 1, vx: Math.cos(i) * .8, vy: Math.sin(i) * .8, life: 10, color: '#cfeef8', size: 1, g: 0 }); } }
@@ -1489,8 +1573,9 @@ const Player = {
   // Nila with Bigotes under her arm for the still scenes (title, story, clear, ending); x, y is where her
   // hitbox corner would be. His tail tucks behind her like in play, and his whiskers hang in a hook.
   drawCarry(g, x, y, spr, fish, bob = 0) {
-    const F = fish; bob += spr.bob || 0; const fy = y + 6 + bob;
-    g.drawImage(F, 0, 0, 7, F.height, x + 5, fy, 7, F.height);
+    const F = fish, T = Game.t; bob += spr.bob || 0; const fy = y + 6 + bob;
+    // The tail is never still: a slow wag behind her, a column at a time (bigger toward the fin).
+    for (let c = 0; c < 7; c++) { const k = (7 - c) / 7; g.drawImage(F, c, 0, 1, F.height, x + 5 + c, fy + Math.round(Math.sin(T / 11 + c * .5) * 1.3 * k * k), 1, F.height); }
     g.drawImage(spr, x - 3, y + 18 - spr.height);
     g.drawImage(F, 7, 0, F.width - 7, F.height, x + 12, fy, F.width - 7, F.height);
     Player.fishOverlay(g, F, x + 5, fy, Game.t, Player.carryLook || {});
@@ -2282,7 +2367,9 @@ const Game = {
   has(p) { return Save.has(p); },
   // Bigotes eats the morsel a teacher gave him and learns a trick: a beat of celebration, then a card that waits for a press.
   learn(power, giver) {
-    const p = Player; Aprende.start(power, giver); Save.data.powers[power] = true; Save.write();
+    const p = Player, was = Player.suckMax(); Aprende.start(power, giver); Save.data.powers[power] = true; Save.write();
+    // A morsel that makes him bigger: the learning card also celebrates the stronger inhale.
+    const now = Player.suckMax(); if (now > was && Game.learning) Game.learning.sorbo = now;
     p.vx = 0; p.sucking = false; Sound.suck(false); Sound.jet(false); p.hover = false; p.charge = 0; p.swallowT = 10; Player.letGo();
     Sound.duck(true); Cam.punch(1.05); Input.rumble(200, .6, .6);
     const m = p.mouth(); Game.word('¡ÑAM!', m.x, m.y - 14, '#ffe36a', true);
@@ -2515,6 +2602,7 @@ const Game = {
       if (p.kind === 'amb') { g.globalAlpha = .35 + Math.sin(p.life / 9 + p.ph) * .35; g.fillStyle = p.color; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; continue; }
       if (p.kind === 'fly') { const a = Math.max(0, Math.sin(p.life / 11 + p.ph)) * Math.min(1, p.life / 30); if (a > .05) { g.fillStyle = p.color; g.globalAlpha = a * .3; g.fillRect(x - 1, y - 1, 3, 3); g.globalAlpha = a * .5; g.fillRect(x - 2, y, 5, 1); g.fillRect(x, y - 2, 1, 5); g.globalAlpha = Math.min(1, a * 1.4); g.fillStyle = '#ffffe0'; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; } continue; }
       if (p.kind === 'drip') { g.fillStyle = p.color; g.fillRect(x, y, 1, 2); continue; }
+      if (p.kind === 'bub') { const bx = x + Math.round(Math.sin((p.life + p.ph) / 4) * .8), s = p.size; g.fillStyle = p.color; if (p.life < 4) { g.fillRect(bx - 1, y, 1, 1); g.fillRect(bx + 2, y, 1, 1); g.fillRect(bx, y - 1, 1, 1); g.fillRect(bx + 1, y + 2, 1, 1); } else if (s > 2) { g.fillRect(bx, y - 1, 2, 1); g.fillRect(bx - 1, y, 1, 2); g.fillRect(bx + 2, y, 1, 2); g.fillRect(bx, y + 2, 2, 1); g.fillStyle = '#ffffff'; g.fillRect(bx, y, 1, 1); } else { g.fillRect(bx, y, 2, 2); g.fillStyle = '#ffffff'; g.fillRect(bx, y, 1, 1); } continue; }
       if (p.kind === 'spray') { g.fillStyle = p.color; g.fillRect(x, y, 1, 1); const sp = Math.hypot(p.vx, p.vy); if (sp > 1.2) g.fillRect(Math.round(x - p.vx / sp * 1.5), Math.round(y - p.vy / sp * 1.5), 1, 1); continue; }
       if (p.kind === 'mist') { const k = p.life / (p.max || 20), sz = k > .6 ? 1 : k > .3 ? 2 : 3; g.globalAlpha = k * .55; g.fillStyle = p.color; g.fillRect(x - (sz >> 1), y - (sz >> 1), sz, sz); g.globalAlpha = 1; continue; }
       if (p.kind === 'wring') { const k = 1 - p.life / p.max, r = (2 + k * 9) * (p.big || 1); g.globalAlpha = (1 - k) * .9; g.fillStyle = p.color; const ca = Math.cos(p.flat ? Math.atan2(p.ny, p.nx) : p.ang), sa = Math.sin(p.flat ? Math.atan2(p.ny, p.nx) : p.ang); for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2, ex = Math.cos(a) * r * .35, ey = Math.sin(a) * r; g.fillRect(Math.round(x + ex * ca - ey * sa), Math.round(y + ex * sa + ey * ca), 1, 1); } g.globalAlpha = 1; continue; }
