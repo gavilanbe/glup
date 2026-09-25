@@ -123,7 +123,8 @@ const repaso = [
   R(56, 11), R(64, 11), ...FLAP_UP, CRIA(64, 6), R(68, 11), R(72, 11),
   // Hang from the middle hook looking up, let go onto the cría and bite it again.
   D('face', 1), HANG(74, { up: 1 }), BITE(79), HANG(79, { up: 1 }), { wait: 16 }, HANG(79, { up: 1 }), CRIA(79, 8), HANG(84), ...HOP(1), R(88, 6),
-  ...S.repisa, ...S.rio, CRIA(115, 6),
+  // Over the river the jet holds her above the cría: sink onto it with {down}, then hold on to the far bank.
+  ...S.repisa, R(105, 6), R(108, 11), WATER(1), ...HOVER(1, 120, 0, [15, 35]), CRIA(115, 6), R(123, 11),
   // The fire at the top of the chimney: water from the river, up the roots with it, spit it at the fire.
   D('face', -1), WATER(-1), ...S.chimenea, CRIA(126, 5), R(124, 3), D('spit', -1), { wait: 20 }, gone(123, 2), R(120, 3), CRIA(120, 2), CRIA(121, 2),
   R(130, 3), ...S.alga,

@@ -268,7 +268,7 @@
       'La compuerta sólo se abre mientras algo pese en la placa. Sube con la caja en la boca y déjala encima con {down} y {fish}.',
       'Bigotes también escupe en pleno salto: lo que escupe sale a la altura de su boca.',
       'Bigotes ya sorbe agua: mantén {fish} de cara a la charca. Luego escúpela a la hoguera.',
-      'El río es ancho. Con agua en la boca, salta y mantén {fish} en el aire: el chorro te sostiene.',
+      'El río es ancho. Con agua en la boca, salta y mantén {fish} en el aire: el chorro te sostiene. Con {down} bajas; con {up} remontas un poco.',
       'Con la boca llena no se sopla. Desde el nenúfar: agua al fuego, soplido al molinillo... y a beber otra vez.'],
     maestro: { quien: 'olga', poder: 'chorro',
       dialogo: ['¡Una visita con esta tormenta! Pasa, pasa, que te calas. Soy Olga, la molinera.',

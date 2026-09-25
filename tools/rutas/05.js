@@ -75,12 +75,13 @@ const TIMED = (label, steps, max = 400, still = {}) => DO('a tiempo: ' + label, 
   g.restore(s0); return 'nunca sale bien: ' + why;
 });
 // Water in the mouth: jump, flap and hover right holding {fish}; when the jet runs dry Bigotes goes on sucking
-// and bites the hook ahead (column `col`).
-const FLOAT_BITE = (col, flapAt = 16) => DO('flota y muerde ' + col, g => {
+// and bites the hook ahead (column `col`). The jet holds her height: `dip` = [y, until] sinks her with {down} to
+// feet at y (pixels) until she is past column `until` (for a cría below the line of flight).
+const FLOAT_BITE = (col, flapAt = 16, dip) => DO('flota y muerde ' + col, g => {
   const hp0 = g.P.hp;
   g.frame({ right: 1 }); g.run({ right: 1, jump: 1 }, flapAt); g.run({ right: 1 }, 1); g.run({ right: 1, jump: 1 }, 12);
   for (let n = 0; n < 400; n++) {
-    g.frame({ right: 1, fish: 1 });
+    g.frame(Object.assign({ right: 1, fish: 1 }, dip && g.P.hover && g.P.y + g.P.h < dip[0] && g.P.x < dip[1] * 16 ? { down: 1 } : {}));
     if (g.P.dead || g.P.hp < hp0) return 'daño flotando';
     if (g.P.grapple && Math.floor(g.P.grapple.x / 16) === col) return true;
     if (g.P.onGround) return 'aterrizó';
@@ -122,7 +123,7 @@ const cadena2 = [
   TIMED('mosquito del caladero', [BITE(136, { fishAt: 6 }), HANG(146, { right: 1 })]), LOG('E'), R(150, 6), R(152, 6), LOG('tablones'),
   R(148, 11), near('rock', -1), D('face', 1), D('suck', 40),
   TIMED('cangrejo', [DO('pedrada', g => { g.run({}, 1); g.run({ fish: 1 }, 2); g.run({}, 30); return !g.L.ents.some(e => e.kind === 'crab' && !e.flipped) || 'el cangrejo sigue'; })]),
-  R(162, 11), LOG('orilla'), WATER(1), FLOAT_BITE(179), HANG(184, { right: 1 }), LOG('G'), R(188, 11), LOG('cobertizo')];
+  R(162, 11), LOG('orilla'), WATER(1), FLOAT_BITE(179, 16, [6 * 16 + 6, 172]), HANG(184, { right: 1 }), LOG('G'), R(188, 11), LOG('cobertizo')];
 // ---- The shed, the hook well, the last chain and the frogs.
 const pozo = [
   TIMED('caracol', [GO(197, 7)]), R(203, 11), LOG('pozo'),

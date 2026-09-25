@@ -37,12 +37,13 @@ const STOMP = (kind, until) => DO('panzazo al ' + kind, g => {
   const ahead = () => g.L.ents.filter(e => !e.dead && e.kind === kind && !e.flipped && !(e.stun > 0) && e.x + e.w / 2 > g.P.x - 4).sort((a, b) => a.x - b.x)[0];
   for (let n = 0; n < 600; n++) { const e = ahead(); if (!e) return 'no hay ' + kind; if (e.x + e.w / 2 - (g.P.x + 5) < (e.dir < 0 ? 26 : 16)) break; g.frame({ right: 1 }); }
   g.run({ jump: 1 }, 5); g.frame({}); g.run({ down: 1, jump: 1 }, 2); for (let n = 0; n < 60 && g.P.pound; n++) g.frame({ down: 1 });
-  for (let n = 0; n < 60 && g.P.x < until * TS; n++) g.frame({ right: 1 });
+  // On past it, but not into the next one coming (the next STOMP deals with that).
+  for (let n = 0; n < 60 && g.P.x < until * TS; n++) { const e = ahead(); if (e && e.x - (g.P.x + g.P.w) < 18) break; g.frame({ right: 1 }); }
   return g.P.hp === 3 || 'le hizo daño';
 });
 const MAIN = [
   SETA(12, 3), R(20, 11), R(27, 9), R(29, 9), ...FLAP(0), R(36, 11), R(44, 11), HOOKS(60), R(66, 11), R(75, 4),
-  R(76, 4), WATER(1), R(82, 4), R(83, 4), ...HOVER(1, 150, 0), R(99, 7),
+  R(76, 4), WATER(1), R(82, 4), R(83, 4), ...HOVER(1, 150, 0, [25, 40]), R(99, 7),   // {down} over the cría at 91,0: the jet holds her above it
   R(110, 7), R(114, 7), SETA(115, 2), R(117, 2), R(122, 7), TALK(),
   R(129, 7), ...POUND, R(133, 10), R(129, 10, { tol: 0 }), ...POUND, R(130, 13),
   R(135, 12), STOMP('crab', 144), STOMP('crab', 149), SETA(151, 6), R(155, 7), R(160, 7), HOOKS(175), R(182, 7),

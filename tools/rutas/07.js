@@ -28,15 +28,16 @@ const BOUNCE = (col, dir, row) => DO('seta hasta la fila ' + row, g => {
   const d = dir < 0 ? { left: 1 } : { right: 1 }, cx = col * TS + 8;
   const steer = mid => mid < cx - 2 ? { right: 1 } : mid > cx + 2 ? { left: 1 } : {};
   let bounced = false;
-  for (let n = 0; n < 300; n++) {
+  for (let n = 0; n < 600; n++) {
     const P = g.P, mid = P.x + 5;
-    if (bounced && P.onGround) return Math.floor((P.y + P.h + 1) / TS) === row || 'aterrizó en la fila ' + Math.floor((P.y + P.h + 1) / TS);
+    // Off the cap on the way down (a few pixels decide it): back to the mushroom and try again.
+    if (bounced && P.onGround) { if (Math.floor((P.y + P.h + 1) / TS) === row) return true; bounced = false; }
     if (P.vy < -6) bounced = true;
     // First a full jump, steering over the cap so the fall lands on it; then up through the hole.
     if (!bounced) g.frame(Object.assign(P.onGround && n % 2 ? {} : { jump: 1 }, steer(mid)));
     else g.frame(P.y + P.h > row * TS ? steer(mid) : d);
   }
-  return 'no llegó a la fila ' + row;
+  return 'no llegó a la fila ' + row + ' (aterrizó en la fila ' + Math.floor((g.P.y + g.P.h + 1) / TS) + ')';
 });
 // Run `dir` until past column `col` with both feet down, slide, and keep going for `n` frames.
 const SLIDE = (col, dir, n = 200) => DO('resbalón desde ' + col, g => {
@@ -93,7 +94,7 @@ const repaso = [
   // Hooks: bite the second while hanging from the first, arrive looking up (so the third is not bitten),
   // let go onto the cría and bite the same hook again from below.
   R(63, 4), D('face', 1), BITE(71), HANG(71, { up: 1 }), { wait: 14 }, HANG(71, { up: 1 }), CRIA(71, 5), HANG(75), ...HOP(1), R(79, 4),
-  ...S.chorro, CRIA(91, 6), ...S.cocina,
+  R(84, 11), WATER(1), ...HOVER(1, 120, 0, [15, 35]), CRIA(91, 6), R(98, 8), ...S.cocina,   // the jet holds her over the cría: {down} to sink onto it
   // The pot's cría: onto the shelf, a flap straight up.
   R(110, 7), { hold: { jump: 1 }, n: 16 }, { hold: {}, n: 1 }, { hold: { jump: 1 }, n: 14 }, { wait: 30 }, CRIA(110, 4),
   // Secret 1: blow the pinwheel, drop into the hole and slide under the kitchen to the chamber; up through the plank.
