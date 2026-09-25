@@ -553,35 +553,60 @@ const MUNDO = (() => {
       }
     });
     const caps = [cap(0), cap(1), cap(2)];
-    // Gate: three poles and iron bands; the top tile has a beam, the bottom one stakes.
-    const gate = (top, bottom) => paint(16, 16, b => {
-      for (const x0 of [1, 6, 11]) for (let y = 0; y < 16; y++) {
-        const pt = bottom && y > 12 ? y - 12 : 0;
-        for (let i = 0; i < 4; i++) {
-          if (pt && (i < pt - 1 || i > 4 - pt) && !(pt === 3 && (i === 1 || i === 2))) continue;
-          if (pt === 3 && i !== 1 && i !== 2) continue;
-          let c = WOOD[[5, 4, 3, 2][i]]; if (noise(x0 * 3 + i, y / 3, 50) > .7) c = WOOD[[4, 3, 2, 1][i]];
-          put(b, x0 + i, y, c);
-        }
-        if (!pt) { put(b, x0 - 1, y, OUT); put(b, x0 + 4, y, OUT); }
-      }
-      for (const by of [3, 11]) { for (let x = 0; x < 16; x++) { put(b, x, by - 1, OUT); put(b, x, by, IRON[4]); put(b, x, by + 1, IRON[2]); put(b, x, by + 2, OUT); } for (const rx of [2, 7, 12]) put(b, rx, by, IRON[5]); }
-      if (top) for (let x = 0; x < 16; x++) { put(b, x, 0, WOOD[6]); put(b, x, 1, WOOD[4]); put(b, x, 2, WOOD[2]); put(b, x, 3, OUT); }
-    });
-    const gates = { mid: gate(), top: gate(true), bottom: gate(false, true), one: gate(true, true) };
-    // Target: a painted drum on a stake.
-    const target = on => paint(16, 16, b => {
-      for (let y = 12; y < 16; y++) { put(b, 6, y, OUT); put(b, 7, y, WOOD[5]); put(b, 8, y, WOOD[3]); put(b, 9, y, OUT); }
-      const ring = on ? ['#e8f8d0', '#5ab04a', '#e8f8d0', '#b8ff9a'] : ['#eadcc0', '#c83a32', '#eadcc0', '#e8584a'];
-      for (let y = 0; y < 14; y++) for (let x = 0; x < 16; x++) {
-        const dx = x - 7.5, dy = y - 6.5, d = Math.hypot(dx, dy); if (d > 7.2) continue;
-        let c = d > 6.3 ? OUT : d > 5.1 ? WOOD[dx + dy < -3 ? 6 : dx + dy > 3 ? 2 : 4] : d > 3.9 ? ring[0] : d > 2.7 ? ring[1] : d > 1.5 ? ring[2] : ring[3];
-        if (d <= 5.1 && dx + dy > 3.2 && d > 1.5) c = mix(c, '#3a2030', .3);
+    // Sluice gate: a door of stacked planks with two iron straps and rivets that slides in iron rails; the top
+    // piece carries the lifting band, the bottom one the iron shoe, slime and the damp of the swamp.
+    const door = (top, bottom, v) => paint(12, 16, b => {
+      // Three upright boards (lit left edge, grain, a dark seam between them)...
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 12; x++) {
+        const board = x < 4 ? 0 : x < 8 ? 1 : 2, bx = x - [1, 5, 8][board]; let c;
+        if (x === 0 || x === 11) c = OUT;
+        else if (x === 4 || x === 7) c = WOOD[1];
+        else { let k = bx === 0 ? 5 : bx === 1 ? 4 : 3; const n = noise(x * .7 + board * 3, y / 3.5 + v * 7 + board * 5, 51); if (n > .72) k--; else if (n < .22) k++; c = WOOD[Math.max(1, Math.min(6, k))]; }
         put(b, x, y, c);
       }
-      put(b, 5, 3, '#ffffff');
+      for (let k = 0; k < 3; k++) { const x = [2, 6, 9][k], y = (hash(k, v, 53) * 12 | 0) + 2; put(b, x, y, WOOD[2]); put(b, x, y + 1, WOOD[2]); }
+      // ...held by an iron band with a rivet on every board, rust weeping under it.
+      for (const by of [7]) for (let x = 0; x < 12; x++) { const e = x === 0 || x === 11; put(b, x, by - 1, OUT); put(b, x, by, e ? OUT : IRON[4]); put(b, x, by + 1, e ? OUT : IRON[2]); put(b, x, by + 2, e ? OUT : WOOD[1]); if (x === 2 || x === 5 || x === 9) { put(b, x, by, IRON[5]); put(b, x + 1, by + 1, IRON[1]); } if (!e && hash(x, by + v, 57) < .2) { put(b, x, by + 2, RUST[1]); if (hash(x, v, 58) < .5) put(b, x, by + 3, RUST[0]); } }
+      if (top) for (let x = 0; x < 12; x++) { const e = x === 0 || x === 11; put(b, x, 0, OUT); put(b, x, 1, e ? OUT : x === 4 || x === 7 ? WOOD[3] : WOOD[6]); }
+      if (bottom) {
+        for (let x = 1; x < 11; x++) for (let y = 10; y < 13; y++) put(b, x, y, '#16262a', (y - 8) / 12);
+        for (let x = 1; x < 11; x++) if (hash(x, v, 54) < .55) { put(b, x, 12, pick(MOSS, .35 + hash(x, v, 55) * .4, x, 12)); if (hash(x, v, 56) < .4) put(b, x, 11, pick(MOSS, .6, x, 11)); }
+        for (let x = 0; x < 12; x++) { const e = x === 0 || x === 11; put(b, x, 13, e ? OUT : IRON[3]); put(b, x, 14, e ? OUT : IRON[1]); put(b, x, 15, OUT); }
+      }
     });
-    const targets = { off: target(false), on: target(true) };
+    // A gate lying flat is a trapdoor: thick planks across, strapped with iron hinges.
+    const hatch = v => paint(16, 16, b => {
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const ly = y % 5; let c;
+        if (y === 0 || y === 15 || x === 0 || x === 15) c = OUT; else if (ly === 0) c = WOOD[1];
+        else { let k = ly === 1 ? 6 : ly === 2 ? 5 : ly === 3 ? 4 : 3; const n = noise(x / 3.5 + v * 9, y * .9, 59); if (n > .72) k--; else if (n < .2) k++; c = WOOD[Math.max(1, Math.min(6, k))]; }
+        put(b, x, y, c);
+      }
+      for (const sx of v ? [10] : [3]) for (let y = 1; y < 15; y++) { put(b, sx, y, IRON[4]); put(b, sx + 1, y, IRON[3]); put(b, sx + 2, y, IRON[1]); if (y % 5 === 2) put(b, sx + 1, y, IRON[5]); }
+      for (let x = 1; x < 15; x++) if (hash(x, v, 60) < .4) put(b, x, 1, pick(MOSS, .5 + hash(x, v, 61) * .4, x, 1));
+    });
+    const gates = { top: door(true, false, 0), mid: [door(false, false, 1), door(false, false, 2)], bottom: door(false, true, 3), one: door(true, true, 4), hatch: [hatch(0), hatch(1)] };
+    // Target: a painted wooden bullseye with a rim nailed on, chipped paint and a tuft of moss. Its back is
+    // painted green with a tick, and that is the face it ends on once it has been hit.
+    const face = on => paint(13, 13, b => {
+      const pc = on ? ['#dff6c0', '#6cbf4e', '#3f8a3a'] : ['#efe0c0', '#d0443a', '#9a2c30'];
+      for (let y = 0; y < 13; y++) for (let x = 0; x < 13; x++) {
+        const dx = x - 6, dy = y - 6, d = Math.hypot(dx, dy); if (d > 6.6) continue;
+        const lit = dx + dy < -2.5, dark = dx + dy > 2.5; let c;
+        if (d > 5.7) c = OUT;
+        else if (d > 4.6) c = WOOD[lit ? 6 : dark ? 3 : 5];
+        else if (on) c = d > 3.6 ? pc[1] : d > 2.6 ? pc[2] : pc[1];
+        else c = d > 3.6 ? pc[0] : d > 2.4 ? pc[1] : d > 1.3 ? pc[0] : '#e8584a';
+        if (d <= 4.6 && dark) c = mix(c, '#3a2030', .28);
+        if (d <= 4.6 && d > 1.3 && hash(x, y, on ? 61 : 60) < .07) c = mix(c, WOOD[3], .6);
+        put(b, x, y, c);
+      }
+      for (const [x, y] of [[2, 2], [10, 2], [2, 10], [10, 10]]) put(b, x, y, IRON[5]);
+      for (const [x, y] of [[1, 5], [1, 4], [2, 3], [3, 1], [4, 1]]) put(b, x, y, pick(MOSS, .55 + hash(x, y, 62) * .3, x, y));
+      if (on) for (const [x, y] of [[3, 6], [4, 7], [5, 8], [6, 7], [7, 6], [8, 5], [9, 4]]) { put(b, x, y, pc[0]); put(b, x, y + 1, '#2a5a2e'); }
+      else { put(b, 5, 5, '#ffb0a0'); put(b, 4, 3, '#ffffff'); }
+    });
+    const targets = { off: face(false), on: face(true) };
     // Bouncy toadstool.
     const toad = squash => paint(16, squash ? 6 : 10, b => {
       const capH = squash ? 3 : 6, h = squash ? 6 : 10;
@@ -666,6 +691,108 @@ const MUNDO = (() => {
     return tileCache[theme] = { planks, post, thorns, cracked: [cracked(0), cracked(1)], hard: [hard(0), hard(1)], rootWall, caps, gates, targets, mushroom, mushroomSquash, fire, lilies, lotus, tuft, reed, shroom };
   }
 
+  const WC = WOOD.map(css), IC = IRON.map(css);
+  // A pixel line (ropes, chains) from (x0, y0) to (x1, y1), alternating two colours.
+  function pline(g, x0, y0, x1, y1, c0, c1) { const n = Math.max(1, Math.round(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); for (let i = 0; i <= n; i++) { g.fillStyle = i & 1 ? c1 : c0; g.fillRect(Math.round(x0 + (x1 - x0) * i / n), Math.round(y0 + (y1 - y0) * i / n), 1, 1); } }
+  // The bullseye hangs on a rope from whatever is above it, from an arm out of a wall, or stands on a stake.
+  // Idle it sways; hit, it wobbles, flashes a ring and spins round to its green back, which it keeps showing.
+  function drawTarget(g, L, S, tx, ty, px, py, t, at, solidC) {
+    const k = tx + ',' + ty, hit = L.hitTargets.has(k), h0 = L.hitAt && L.hitAt.get(k), f = hit ? (h0 === undefined ? 999 : (L.time || 0) - h0) : -1;
+    const up = solidC(at(tx, ty - 1)), wl = solidC(at(tx - 1, ty)), wr = solidC(at(tx + 1, ty)), dn = solidC(at(tx, ty + 1));
+    const mount = up ? 'rope' : dn ? 'post' : wl || wr ? 'arm' : 'rope', hang = mount !== 'post';
+    let sway = hang ? Math.sin(t / 34 + tx * 1.7 + ty) * .8 : 0;
+    if (f >= 0 && f < 60) sway += Math.sin(f * .45) * 3.2 * Math.exp(-f / 16);
+    const cx = px + 8, cy = py + (hang ? 9 : 6), ox = cx + Math.round(sway);
+    if (mount === 'post') { g.fillStyle = OUT; g.fillRect(px + 6, py + 11, 4, 5); g.fillStyle = WC[5]; g.fillRect(px + 7, py + 11, 1, 5); g.fillStyle = WC[3]; g.fillRect(px + 8, py + 11, 1, 5); g.fillStyle = IC[4]; g.fillRect(px + 6, py + 13, 4, 1); }
+    else {
+      let ay = py;
+      if (mount === 'arm') { const x0 = wr ? cx - 2 : px, x1 = wr ? px + 16 : cx + 3; g.fillStyle = OUT; g.fillRect(x0, py, x1 - x0, 4); g.fillStyle = WC[5]; g.fillRect(x0 + (wr ? 1 : 0), py + 1, x1 - x0 - 1, 1); g.fillStyle = WC[3]; g.fillRect(x0 + (wr ? 1 : 0), py + 2, x1 - x0 - 1, 1); ay = py + 4; }
+      else { g.fillStyle = IC[4]; g.fillRect(cx - 1, py, 3, 1); g.fillStyle = OUT; g.fillRect(cx - 1, py + 1, 3, 1); ay = py + 1; }
+      pline(g, cx, ay, ox, cy - 7, '#c8b08a', '#7a6048');
+    }
+    // Spinning on its rope (or its stake): the face narrows to its edge and comes round the other side.
+    let img = S.targets.off, w = 13;
+    if (hit) { const a = f < 44 ? (1 - Math.pow(1 - f / 44, 3)) * Math.PI * 3 : Math.PI, cs = Math.cos(a); img = cs >= 0 ? S.targets.off : S.targets.on; w = Math.max(1, Math.round(13 * Math.abs(cs))); }
+    if (f >= 0 && f < 3) img = ART.tint(img, '#ffffff');
+    if (w <= 3) { g.fillStyle = OUT; g.fillRect(ox - 2, cy - 6, 4, 13); g.fillStyle = WC[5]; g.fillRect(ox - 1, cy - 5, 1, 11); g.fillStyle = WC[3]; g.fillRect(ox, cy - 5, 1, 11); }
+    else g.drawImage(img, Math.round(ox - w / 2), cy - 6, w, 13);
+    g.fillStyle = IC[5]; g.fillRect(ox, cy - 7, 1, 1);
+    if (!hit && t % 150 < 8) { g.fillStyle = '#ffffff'; g.fillRect(ox - 4 + (t % 150), cy - 4 + (t % 150), 1, 1); }
+    if (f >= 0 && f < 14) { g.globalAlpha = 1 - f / 14; g.strokeStyle = f < 5 ? '#ffffff' : '#b8ff9a'; g.lineWidth = 1; g.beginPath(); g.arc(ox + .5, cy + .5, Math.max(0, 4 + f * 1.4), 0, 7); g.stroke(); g.globalAlpha = 1; }
+    if (hit && f > 44 && (t + tx * 13) % 90 < 10) { const s = (t + tx * 13) % 90, a = s / 10 * Math.PI; g.fillStyle = '#e8ffd0'; g.fillRect(Math.round(ox + Math.cos(a) * 7), Math.round(cy + Math.sin(a) * 7) - 1, 1, 1); }
+  }
+  // Sluice gates: the door runs in iron rails under a beam with a lamp, and a counterweight on a chain rises
+  // as it sinks into the slot at its foot. It sinks piece by piece in step with the tiles that open
+  // (Game.setGate: the top one first), and shoots back up when it closes. Gates lying flat just drop away.
+  function drawGates(g, L, S, camX, camY, W, H, at, solidC) {
+    if (!L.gates || !L.gates.length) return;
+    const now = L.time || 0;
+    for (const gate of L.gates) {
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const c of gate) { x0 = Math.min(x0, c.x); x1 = Math.max(x1, c.x); y0 = Math.min(y0, c.y); y1 = Math.max(y1, c.y); }
+      if ((x1 + 2) * 16 < camX || (x0 - 2) * 16 > camX + W || (y1 + 2) * 16 < camY || (y0 - 2) * 16 > camY + H) continue;
+      const vert = x0 === x1, f = gate.t === undefined ? 1e9 : now - gate.t, fs = gate.shutT === undefined ? 1e9 : now - gate.shutT;
+      const jx = gate.open ? (f < 6 ? (f & 1 ? 1 : -1) : 0) : fs < 8 ? (fs & 1 ? 1 : -1) * (fs < 4 ? 1 : 0) : 0;
+      let sinkV = 0, fullV = 16, moving = false;
+      for (let tx = x0; tx <= x1; tx++) {
+        const col = gate.filter(c => c.x === tx).sort((a, b) => a.y - b.y); if (!col.length) continue;
+        const n = col.length, full = n * 16, px = tx * 16 - camX, py = col[0].y * 16 - camY;
+        let cleared = 0; while (cleared < n && at(tx, col[cleared].y) !== 'G') cleared++;
+        let sink;
+        if (gate.open) {
+          // It jolts loose, then each piece is below the slot by the time its tile opens.
+          let s = full, pf = 5, ps = 0;
+          for (let j = 0; j < n; j++) { const d = 8 + gate.indexOf(col[j]) * 6; if (f <= d) { s = ps + (16 * (j + 1) - ps) * Math.max(0, f - pf) / Math.max(1, d - pf); break; } pf = d; ps = 16 * (j + 1); }
+          sink = cleared < n ? Math.min(Math.max(s, cleared * 16), cleared * 16 + 12) : full; if (cleared < n) moving = true;
+        } else sink = fs < 6 ? full * Math.pow(1 - fs / 6, 2) : 0;
+        if (sink < full) {
+          g.save(); g.beginPath(); g.rect(px + (vert ? 1 : 0), py, vert ? 14 : 16, full); g.clip();
+          for (let j = 0; j < n; j++) { const y = py + j * 16 + Math.round(sink); if (y >= py + full) break; if (!vert) g.drawImage(S.gates.hatch[tx === x0 ? 0 : 1], px + jx, y); else g.drawImage(n === 1 ? S.gates.one : j === 0 ? S.gates.top : j === n - 1 ? S.gates.bottom : S.gates.mid[j & 1], px + 2 + jx, y); }
+          g.restore();
+        }
+        if (vert) { sinkV = sink; fullV = full; }
+      }
+      if (!vert) continue;
+      const px = x0 * 16 - camX, top = y0 * 16 - camY, bot = (y1 + 1) * 16 - camY;
+      // Rails, the sill with its slot, and the beam.
+      g.fillStyle = OUT; g.fillRect(px, top, 1, bot - top); g.fillRect(px + 15, top, 1, bot - top);
+      g.fillStyle = IC[4]; g.fillRect(px + 1, top, 1, bot - top); g.fillStyle = IC[2]; g.fillRect(px + 14, top, 1, bot - top);
+      g.fillStyle = IC[5]; for (let y = top + 6; y < bot - 2; y += 16) { g.fillRect(px + 1, y, 1, 1); g.fillRect(px + 14, y + 8, 1, 1); }
+      g.fillStyle = OUT; g.fillRect(px - 1, bot - 1, 18, 2); g.fillStyle = IC[3]; g.fillRect(px - 1, bot + 1, 18, 1); g.fillStyle = IC[1]; g.fillRect(px + 2, bot - 1, 12, 1);
+      // Shut, the swamp seeps under it: a drop now and then runs out of the slot.
+      if (!gate.open && sinkV === 0) for (let i = 0; i < 2; i++) { const k = (now + i * 37 + x0 * 11) % 70; if (k < 12) { g.fillStyle = k < 8 ? '#8fd9d0' : '#4a8a90'; g.fillRect(px + 4 + i * 7, bot - 3 + (k >> 2), 1, 1); } }
+      const bx = px - 3, by = top - 6;
+      g.fillStyle = OUT; g.fillRect(bx, by, 22, 6); g.fillStyle = WC[6]; g.fillRect(bx + 1, by + 1, 20, 1); g.fillStyle = WC[4]; g.fillRect(bx + 1, by + 2, 20, 1); g.fillStyle = WC[3]; g.fillRect(bx + 1, by + 3, 20, 1); g.fillStyle = WC[2]; g.fillRect(bx + 1, by + 4, 20, 1);
+      g.fillStyle = IC[5]; g.fillRect(bx + 2, by + 2, 1, 1); g.fillRect(bx + 19, by + 2, 1, 1); g.fillStyle = IC[1]; g.fillRect(bx + 2, by + 3, 1, 1); g.fillRect(bx + 19, by + 3, 1, 1);
+      // Counterweight on the open side: low while the gate is shut, up under the beam when it is down.
+      const side = !solidC(at(x0 + 1, y0)) ? 1 : !solidC(at(x0 - 1, y0)) ? -1 : 0;
+      if (side) {
+        const chx = side > 0 ? px + 17 : px - 2, cwy = Math.round(top + 1 + (fullV - 12) * (1 - sinkV / fullV)), rat = moving || fs < 8 ? (now >> 1) & 1 : 0;
+        pline(g, chx + rat * side, by + 6, chx, cwy, IC[4], IC[1]);
+        g.fillStyle = OUT; g.fillRect(chx - 2, cwy, 5, 7); g.fillStyle = IC[3]; g.fillRect(chx - 1, cwy + 1, 3, 5); g.fillStyle = IC[5]; g.fillRect(chx - 1, cwy + 1, 1, 2); g.fillStyle = IC[1]; g.fillRect(chx + 1, cwy + 4, 1, 2);
+      }
+      // The signal lamp on a bracket low on the rail (on the beam if walled in): dim red while shut, blinking
+      // while it moves, green when open. Game.setGate aims the trigger's spark at it.
+      const ls = side ? -side : 0, lx = ls > 0 ? px + 19 : ls < 0 ? px - 4 : px + 8, ly = ls ? Math.max(top + 3, bot - 30) : by - 5;
+      gate.lamp = { x: lx + camX, y: ly + 2 + camY };
+      if (ls) { g.fillStyle = OUT; g.fillRect(ls > 0 ? px + 15 : lx + 2, ly + 1, ls > 0 ? lx - px - 16 : px - lx - 2, 3); g.fillStyle = IC[4]; g.fillRect(ls > 0 ? px + 15 : lx + 2, ly + 2, ls > 0 ? lx - px - 16 : px - lx - 2, 1); }
+      const arrive = gate.open && f >= 5 && f < 10, col = gate.open ? (arrive ? '#ffffff' : moving && (now >> 2) & 1 ? '#3f8a3a' : '#8ff0a0') : '#7a2a24';
+      if (gate.open && !moving) { g.globalAlpha = .16 + Math.sin(now / 20) * .04; g.fillStyle = '#8ff0a0'; g.beginPath(); g.arc(lx + .5, ly + 2, 8, 0, 7); g.fill(); g.globalAlpha = 1; }
+      g.fillStyle = OUT; g.fillRect(lx - 1, ly - 2, 3, 1); g.fillRect(lx - 2, ly - 1, 5, 6); g.fillStyle = IC[4]; g.fillRect(lx - 2, ly - 1, 5, 1); g.fillStyle = IC[3]; g.fillRect(lx - 2, ly + 4, 5, 1);
+      g.fillStyle = col; g.fillRect(lx - 1, ly, 3, 4); g.fillStyle = gate.open ? '#e8ffe8' : '#b8504a'; g.fillRect(lx - 1, ly, 1, 1); g.fillStyle = OUT; g.fillRect(lx, ly, 1, 4);
+    }
+  }
+  // A spark flies from what was triggered to the gate's lamp, so the link between them reads.
+  function drawLinks(g, L, camX, camY) {
+    if (!L.links || !L.links.length) return;
+    const now = L.time || 0;
+    for (const k of L.links) {
+      const f = now - k.t0; if (f < 0 || f > 16) continue;
+      const pt = u => ({ x: k.x0 + (k.x1 - k.x0) * u - camX, y: k.y0 + (k.y1 - k.y0) * u - Math.sin(u * Math.PI) * (10 + Math.abs(k.x1 - k.x0) * .15) - camY });
+      if (f <= 6) for (let i = 5; i >= 0; i--) { const u = f / 6 - i * .045; if (u < 0) continue; const p = pt(Math.min(1, u)); g.globalAlpha = 1 - i * .15; g.fillStyle = i === 0 ? '#ffffff' : i < 3 ? '#b8ff9a' : '#6cbf4e'; const s = i === 0 ? 3 : i < 3 ? 2 : 1; g.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s / 2), s, s); }
+      else { const p = pt(1), r = 2 + (f - 6) * 1.4; g.globalAlpha = 1 - (f - 6) / 10; g.strokeStyle = '#b8ff9a'; g.lineWidth = 1; g.beginPath(); g.arc(Math.round(p.x) + .5, Math.round(p.y) + .5, Math.max(0, r), 0, 7); g.stroke(); }
+      g.globalAlpha = 1;
+    }
+  }
   // Draws the non-earth tiles of one layer ('back' or 'front').
   function drawTiles(g, L, camX, camY, layer, W, H, t) {
     const x0 = Math.max(0, camX >> 4), x1 = Math.min(L.w - 1, (camX + W) >> 4), y0 = Math.max(0, camY >> 4), y1 = Math.min(L.h - 1, (camY + H) >> 4);
@@ -692,8 +819,7 @@ const MUNDO = (() => {
           case 'x': g.drawImage(S.cracked[(tx + ty) & 1], px, py); if (!solidC(at(tx, ty - 1))) g.drawImage(S.caps[tx % 3], px, py - 4); break;
           case 'X': g.drawImage(S.hard[ty & 1], px, py); if (!solidC(at(tx, ty - 1))) g.drawImage(S.caps[(tx + 1) % 3], px, py - 4); break;
           case 'M': { const u = at(tx, ty - 1) === 'M', d = at(tx, ty + 1) === 'M'; g.drawImage(!u ? S.rootWall.top : !d && !solidC(at(tx, ty + 1)) ? S.rootWall.bottom : S.rootWall.mid[ty & 1], px, py); if (!solidC(at(tx, ty - 1))) g.drawImage(S.caps[tx % 3], px, py - 4); break; }
-          case 'G': { const u = at(tx, ty - 1) === 'G', d = at(tx, ty + 1) === 'G'; g.drawImage(!u && !d ? S.gates.one : !u ? S.gates.top : !d ? S.gates.bottom : S.gates.mid, px, py); break; }
-          case 'T': g.drawImage(L.hitTargets.has(tx + ',' + ty) ? S.targets.on : S.targets.off, px, py); break;
+          case 'T': drawTarget(g, L, S, tx, ty, px, py, t, at, solidC); break;
           case '%': { if (L.mush.get(tx + ',' + ty)) g.drawImage(S.mushroomSquash, px, py + 10); else g.drawImage(S.mushroom, px, py + 6); break; }
           case ',': g.drawImage(S.tuft, px + 2 + (h * 4 | 0), py + 9); break;
           case "'": g.drawImage(S.reed, px + 2 + (h * 3 | 0), py + 1); break;
@@ -702,8 +828,10 @@ const MUNDO = (() => {
         }
       }
       for (const [x, y] of posts) g.drawImage(S.post, x, y);
+      drawGates(g, L, S, camX, camY, W, H, at, solidC);
       return T;
     }
+    drawLinks(g, L, camX, camY);
     for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
       const ch = L.t[ty][tx]; if (ch !== '~') continue; const px = tx * 16 - camX, py = ty * 16 - camY;
       if (wet(at(tx, ty - 1))) { g.drawImage(A.deepFront, px, py); continue; }
