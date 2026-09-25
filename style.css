@@ -26,7 +26,7 @@ body.touch #hint { display: none; }
 
 /* Left: the floating stick. Touch anywhere in the zone and the pad jumps under the thumb. */
 #stick-zone { position: absolute; left: 0; bottom: 0; width: 46%; height: 72%; z-index: 3; touch-action: none; }
-#stick { position: absolute; width: 132px; height: 132px; margin: -66px 0 0 -66px; left: calc(max(14px, env(safe-area-inset-left)) + 74px); top: calc(100% - max(14px, env(safe-area-inset-bottom)) - 74px); opacity: .78; transition: opacity .15s, transform .12s; pointer-events: none; }
+#stick { position: absolute; width: 132px; height: 132px; margin: -66px 0 0 -66px; left: calc(max(14px, env(safe-area-inset-left)) + 74px); top: calc(100% - max(14px, env(safe-area-inset-bottom)) - 74px); opacity: .32;   /* floating over the game: faint at rest, lit when touched */ transition: opacity .15s, transform .12s; pointer-events: none; }
 #stick.on { opacity: .95; transition: opacity .05s; }
 #stick.snap { transition: left .14s cubic-bezier(.3, 1.6, .5, 1), top .14s cubic-bezier(.3, 1.6, .5, 1), opacity .25s; }
 #stick .base { width: 132px; height: 132px; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .35)); }
