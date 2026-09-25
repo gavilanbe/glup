@@ -48,23 +48,23 @@ const ART = (() => {
   // flequillo y la cara abierta hacia delante. Las filas 8–10, columnas 7–14, son el gesto.
   const HOOD = [
     '.....oooooo.....',
-    '...ooWWWWYYoo...',
+    '...ooWWWYYYoo...',
     '..oWWYYYYYYYYoo.',
-    '.oWYYYYYYYYYYYyo',
-    '.oWYYYYYYyyyyyyo',
-    'oWYYYYYyzhhhhhho',
-    'oYYYYYyzhnnhhnho',
-    'oYYYYYyhhhshhsho',
-    'oYYYYyh........o',
-    'oyYYYyh........o',
-    'oyyYyyh........o',
-    '.ozzzzzooksssoo.'];
-  // Gestos: ojo de atrás en la columna 9, el de delante (con brillo) en 12–13; mejillas y boca debajo.
+    '.oWYYYYYYYYYYYYo',
+    '.oWYYYYYyyyyyyyo',
+    'oWYYYYyhhhhhhhho',
+    'oYYYYyhhnnhhhnho',
+    'oYYYYyhhhshhshso',
+    'oYYYYyhssessesso',
+    'oYYYyyhssessesso',
+    'oyYYyyhkpssmspko',
+    '.oyyyyyokkkkkoo.'];
+  // Gestos (filas 8–10, columnas 7–14): dos ojos que miran de frente, mejillas y boca — la cara de siempre.
   const FACES = {
-    calm: ['ssesswes', 'ssessees', 'kpssmspk'], blink: ['ssssssss', 'seessees', 'kpssmspk'],
-    happy: ['seessees', 'ssssssss', 'kpsmmmpk'], hurt: ['sesssses', 'ssessess', 'kpsmmspk'],
-    oh: ['ssesswes', 'ssessees', 'kpsmmspk'], strain: ['ssssssss', 'seessees', 'kpmwwmpk'], shut: ['ssssssss', 'seessees', 'kpsmmspk'],
-    look: ['sesswess', 'sesseess', 'kpsmsspk'], up: ['sesswess', 'ssssssss', 'kpssmspk'] };
+    calm: ['ssessess', 'ssessess', 'kpssmspk'], blink: ['ssssssss', 'seessees', 'kpssmspk'],
+    happy: ['ssessess', 'seseeses', 'kpsmmspk'], hurt: ['sesssses', 'ssessess', 'kesmmsek'],
+    oh: ['ssessess', 'ssessess', 'kpsmmspk'], strain: ['ssssssss', 'seessees', 'kpmwwmpk'], shut: ['ssssssss', 'seessees', 'kpsmmspk'],
+    look: ['sessesss', 'sessesss', 'kpssmspk'], up: ['ssessess', 'ssssssss', 'kpssmspk'] };
   const head = face => HOOD.map((r, i) => i >= 8 && i <= 10 ? r.slice(0, 7) + FACES[face][i - 8] + r.slice(15) : r);
   // Botas de agua, ancladas arriba a la izquierda de la caña (donde acaba la pierna): plana, con la
   // punta levantada (el talón llega primero), de puntillas (despegando) y colgando.
@@ -102,7 +102,8 @@ const ART = (() => {
   // The raincoat: an A-line from the collar (row 11) to the hem (row 17), lit on its back edge, a
   // darker band along the hem and two toggles. fb/ff flare the hem back/forward, lift shortens it.
   function coat(h, x, y, fb = 0, ff = 0, lift = 0) {
-    const g = blank(h), L0 = [5, 4, 3, 3, 2, 2], R0 = [10, 11, 11, 12, 12, 12], n = 5 - lift;
+    // Square shoulders and an A-line: the body stands straight under the hood instead of hiding in it.
+    const g = blank(h), L0 = [4, 3, 3, 2, 2, 1], R0 = [11, 12, 12, 13, 13, 14], n = 5 - lift;
     for (let r = 0; r <= n; r++) {
       let l = L0[r] + x, rr = R0[r] + x; if (r >= 4 || r === n) { const f = Math.max(1, r - 3) / 2; l -= Math.round(fb * f); rr += Math.round(ff * f); }
       for (let c = l; c <= rr; c++) put(g, c, 11 + y + r, r === 0 ? 'y' : r === n ? (c >= rr - 1 ? 'z' : c === l ? 'Y' : 'y') : c === l ? 'W' : c >= rr - 1 ? 'y' : c === l + 1 && r < 3 ? 'W' : 'Y');
