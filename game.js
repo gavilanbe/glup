@@ -581,7 +581,7 @@ function loadLevel(index) {
   L.def = def; L.index = index; L.rows = def.rows; L.h = def.rows.length; L.w = def.rows[0].length;
   L.t = def.rows.map(r => r.split(''));
   L.ents = []; L.projs = []; L.parts = []; L.solids = []; L.signs = []; L.broken = new Set(); L.targets = new Map(); L.gates = []; L.gateOpen = new Set();
-  L.lit = new Set(); L.taken = new Set(); L.pearlsTotal = 0; L.pearls = 0; L.time = 0; L.boss = null; L.breakQueue = []; L.gateQueue = []; L.mush = new Map(); L.hitTargets = new Set(); L.hitAt = new Map(); L.links = []; L.boatSpawned = false; L.exit = null; L.words = []; L.ghosts = []; L.lily = new Map(); L.triggerIdx = new Map(); L.gusts = []; L.bossCk = 0; L.bossFreed = 0; L.bossSlow = 0; L.bossGustHint = false; L.bossDodgeHint = false;
+  L.lit = new Set(); L.taken = new Set(); L.pearlsTotal = 0; L.pearls = 0; L.time = 0; L.boss = null; L.breakQueue = []; L.gateQueue = []; L.mush = new Map(); L.hitTargets = new Set(); L.hitAt = new Map(); L.ashes = []; L.links = []; L.boatSpawned = false; L.exit = null; L.words = []; L.ghosts = []; L.lily = new Map(); L.triggerIdx = new Map(); L.gusts = []; L.bossCk = 0; L.bossFreed = 0; L.bossSlow = 0; L.bossGustHint = false; L.bossDodgeHint = false;
   L.bg = ART.background(def.theme); L.spawn = [];
   // Gates are grouped by adjacency and paired with targets in reading order.
   const targets = [], gateTiles = [], seen = new Set();
@@ -1973,7 +1973,7 @@ const Proj = {
     for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
       const ch = tileAt(tx, ty);
       if (ch === 'T' && !L.hitTargets.has(key(tx, ty))) { Game.hitTarget(tx, ty); if (p.kind === 'agua') { p.dead = true; Proj.splashOut(p); return; } p.vx *= -.3; p.vy = -2; }
-      if (ch === 'F' && p.kind === 'agua') { Game.douse(tx, ty); p.dead = true; Proj.splashOut(p); return; }
+      if (ch === 'F' && p.kind === 'agua') { Game.douse(tx, ty, p); p.dead = true; Proj.splashOut(p); return; }
     }
     for (const e of L.ents) {
       if (e.dead || !e.enemy && !e.boss || e === p.proto) continue;
@@ -2005,6 +2005,7 @@ const Proj = {
     if (first || (v && v.splashes % 3 === 0)) Sound.play('splash');
     if (first) { Cam.shake(v && v.charged ? 2 : 1, 4); if (strong) Game.word('¡CHOF!', x, y - 10, '#bdf0e4', false); }
     Water.impact(x, y, nx, ny, strong, wall ? (wall > 0 ? p.x + p.w + 1 : p.x - 1) : undefined);
+    MUNDO.fire.splash(L, x, y, Math.sign(p.vx));   // a fire close by ducks and hisses
     if (first || Math.random() < .5) L.parts.push({ x: p.x + 4, y: p.y + (ground ? 8 : 4), vx: 0, vy: 0, life: 16, color: '#c8f2ea', size: 1, g: 0, kind: 'ripple' });
     if (ground) L.parts.push({ x: p.x + 4, y: p.y + 8, vx: 0, vy: 0, life: 90, color: '#2f7f88', size: 5 + Math.random() * 3 + (first ? 3 : 0), g: 0, kind: 'puddle' });
   },
@@ -2284,9 +2285,8 @@ const Game = {
     if (th === 'cave' && Math.random() < .03) L.parts.push({ x, y: Cam.y + rnd(0, 10), vx: 0, vy: .2, life: 90, color: '#9ac8e8', size: 1, g: .12, kind: 'drip' });
     if (th === 'storm' && Math.random() < .03) L.parts.push({ x: Cam.x + W + 4, y: Cam.y + rnd(20, 150), vx: -rnd(2.2, 3.4), vy: rnd(-.3, .4), life: 160, color: ['#5e7a3a', '#7a6a3a', '#3e5a34'][(Math.random() * 3) | 0], size: 1, g: .01, kind: 'leaf', ph: rnd(0, 6) });
     if (th === 'nest' && Math.random() < .07) L.parts.push({ x, y: Cam.y - 4, vx: rnd(-.3, .1), vy: rnd(.15, .4), life: 220, color: ['#e9eef2', '#f2c46a', '#d0684a'][(Math.random() * 3) | 0], size: 1, g: 0, kind: 'amb', ph: rnd(0, 6) });
-    // Embers from any fire in view.
-    const x0 = Math.max(0, Cam.x >> 4), x1 = Math.min(L.w - 1, (Cam.x + W) >> 4), y0 = Math.max(0, Cam.y >> 4), y1 = Math.min(L.h - 1, (Cam.y + H) >> 4);
-    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (L.t[ty][tx] === 'F' && Math.random() < .08) L.parts.push({ x: tx * TS + rnd(3, 13), y: ty * TS + rnd(2, 10), vx: rnd(-.2, .2), vy: rnd(-.7, -.25), life: rnd(16, 34), color: ['#b4f8dc', '#5ed8b8', '#f0fff6'][(Math.random() * 3) | 0], size: 1, g: -.01, kind: 'dot' });
+    // The fires in view: embers, sparks, smoke, the steam of the ones going out, rain hissing on them.
+    MUNDO.fire.update(L, Math.round(Cam.x), Math.round(Cam.y), W, H);
   },
   breakCracked(tx, ty, kind = 'x') {
     const seen = new Set(), stack = [[tx, ty]]; let n = 0; Sound.play('crack', null, { x: tx * TS }); Cam.shake(3, 8); Game.stop(3); Cam.punch(1.04); Game.word('¡CRAC!', tx * TS + 8, ty * TS - 6, '#d0d6da', true); Input.rumble(120, .7, .4);
@@ -2377,9 +2377,11 @@ const Game = {
     spawnParts(24, p.x + 5 + p.dir * 12, p.y + 10, { color: ['#ffe36a', '#fff6d6', '#e8fbff', '#e79b3f'], speed: [.5, 3], life: [20, 50], g: -.02 });
   },
   word(text, x, y, color = '#fff6d6', big = false) { L.words.push({ text, x, y, t: 0, life: big ? 46 : 34, color, big, wob: Math.random() * 6 }); if (L.words.length > 12) L.words.shift(); },
-  douse(tx, ty) {
-    const seen = new Set(), stack = [[tx, ty]]; Sound.play('hiss'); Game.word('SSSH', tx * TS + 8, ty * TS - 4, '#cfe0e8', false);
-    while (stack.length) { const [x, y] = stack.pop(); const k = key(x, y); if (seen.has(k) || tileAt(x, y) !== 'F') continue; seen.add(k); setTile(x, y, '.'); spawnParts(14, x * TS + 8, y * TS + 8, { color: ['#c8d0d6', '#9fa8b0', '#e8eef2'], angle: -Math.PI / 2, spread: 1, speed: [.3, 1.6], life: [30, 70], g: -.03, kind: 'smoke' }); spawnParts(4, x * TS + 8, y * TS + 12, { color: ['#8fd9d0', '#c8f2ea'], speed: [.5, 1.5], life: [10, 18], g: .08 }); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) stack.push([x + dx, y + dy]); }
+  douse(tx, ty, p) {
+    const seen = new Set(), stack = [[tx, ty]], out = []; Sound.play('hiss'); Game.word('SSSH', tx * TS + 8, ty * TS - 4, '#cfe0e8', false); Cam.shake(1, 6); Input.rumble(90, .3, .2);
+    while (stack.length) { const [x, y] = stack.pop(); const k = key(x, y); if (seen.has(k) || tileAt(x, y) !== 'F') continue; seen.add(k); setTile(x, y, '.'); out.push([x, y]); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) stack.push([x + dx, y + dy]); }
+    // The look of it going out (collapse, steam, the charred logs) lives in mundo.js.
+    if (out.length) MUNDO.fire.doused(L, out, p ? { x: p.x + p.w / 2, y: p.y + p.h / 2, vx: p.vx } : null);
   },
   tap(pt) {
     if (Game.state === 'gramola') { Gramola.tap(pt); return; }
@@ -2472,7 +2474,9 @@ const Game = {
     Game.drawTiles(g, camX, camY, 'front');
     if (L.boss) Boss.drawFront(g);
     if (Game.weather && Game.weather.bolt > 8 && L.def.theme === 'storm' && !Game.still) { g.globalAlpha = (Game.weather.bolt - 8) / 4 * .35; g.fillStyle = '#e8f0ff'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
+    MUNDO.fire.front(g, L, camX, camY, W, H, !(zoom > 1 || Game.capZoom));
     Game.drawLight(g, camX, camY);
+    MUNDO.fire.glow(g, L, camX, camY, W, H);
     Game.drawWords(g);
     if (zoom > 1 || Game.capZoom) g.restore();
     Game.drawHud(g);
@@ -2501,7 +2505,8 @@ const Game = {
     // Glowing fungi growing on the earth.
     if (Game.terrain && Game.terrain.glow) for (const q of Game.terrain.glow) if (q.x > camX - 20 && q.x < camX + W + 20 && q.y > camY - 20 && q.y < camY + H + 20) hole(q.x, q.y, 15 + Math.sin(Game.t / 20 + q.x) * 1.5, .7);
     const x0 = Math.max(0, camX >> 4), x1 = Math.min(L.w - 1, (camX + W) >> 4), y0 = Math.max(0, camY >> 4), y1 = Math.min(L.h - 1, (camY + H) >> 4);
-    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) { const ch = L.t[ty][tx]; if (ch === 'F') hole(tx * TS + 8, ty * TS + 8, 40 * fl); else if (ch === '%') hole(tx * TS + 8, ty * TS + 10, 16, .8); else if (ch === 'T' && L.hitTargets.has(key(tx, ty))) hole(tx * TS + 8, ty * TS + 8, 14); }
+    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) { const ch = L.t[ty][tx]; if (ch === 'F') hole(tx * TS + 8, ty * TS + 6, 42 * MUNDO.fire.flick(tx, ty)); else if (ch === '%') hole(tx * TS + 8, ty * TS + 10, 16, .8); else if (ch === 'T' && L.hitTargets.has(key(tx, ty))) hole(tx * TS + 8, ty * TS + 8, 14); }
+    for (const q of L.ashes || []) { const e = MUNDO.fire.ember(q); if (e > 0 && L.t[q.y][q.x] !== 'F') hole(q.x * TS + 8, q.y * TS + 13, 8 + e * 14, .8); }
     g.drawImage(Game.lightMask, 0, 0);
   },
   // A wavy ribbon of water between two points: dark edges, light core, bright beads sliding along.

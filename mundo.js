@@ -439,7 +439,6 @@ const MUNDO = (() => {
   const RUST = ['#5a2a20', '#8a4428', '#b86a38'];
   const VINE = ramp(['#1e1020', '#3a1c2c', '#5c2c38', '#84464a'], 4);
   const CAP = ramp(['#2a1020', '#5a1a2c', '#8a2834', '#b83c3c', '#dc5c44', '#f08c5c', '#fcc088'], 7);
-  const WISP = ramp(['#123a4a', '#17666c', '#22a092', '#5ed8b8', '#b4f8dc', '#f0fff6'], 6);
   const tileCache = {};
   function tiles(theme) {
     if (tileCache[theme]) return tileCache[theme];
@@ -623,22 +622,6 @@ const MUNDO = (() => {
       outline(b, OUT);
     });
     const mushroom = toad(false), mushroomSquash = toad(true);
-    // Will-o'-wisp fire: pale ghost flames licking up from a charred, mossy stump.
-    const fire = [0, 1, 2, 3].map(f => paint(16, 16, b => {
-      for (let y = 12; y < 16; y++) { const hw = [5, 6, 7, 7][y - 12]; for (let x = 8 - hw; x < 8 + hw; x++) put(b, x, y, y === 12 ? '#3a2c34' : hash(x, y, f) < .14 ? WISP[2] : hash(x, y, 60) < .5 ? '#241c26' : '#2e2430'); }
-      const TONGUES = [[[4, 7, 3], [8, 12, 3.6], [12, 8, 2.8]], [[4, 9, 3], [8, 10, 3.4], [11.5, 6, 2.6]], [[4.5, 6, 2.8], [8, 12, 3.8], [12, 9, 3]], [[3.5, 8, 3], [8.5, 11, 3.4], [12, 7, 2.6]]][f];
-      for (let y = 0; y < 13; y++) for (let x = 0; x < 16; x++) {
-        let inten = 0;
-        for (const [tx, th, tw] of TONGUES) {
-          const top = 12 - th, u = (y - top) / th; if (u < 0) continue;
-          const sway = Math.sin(u * 3 + f * 1.57 + tx) * (1 - u) * 1.2, w = tw * Math.pow(Math.sin(Math.min(1, u * 1.15) * Math.PI / 2), .8) + .3;
-          const v = 1 - Math.abs(x - tx - sway) / w; if (v > 0) inten = Math.max(inten, v * (.55 + u * .6));
-        }
-        if (inten <= .05) continue;
-        put(b, x, y, WISP[inten > .72 ? 5 : inten > .52 ? 4 : inten > .32 ? 3 : inten > .16 ? 2 : 1]);
-      }
-      const ox = [3, 12, 5, 11][f], oy = [2, 1, 0, 3][f]; put(b, ox, oy, WISP[4]); put(b, 15 - ox, (oy + 3) % 5, WISP[3]);
-    }));
     // Lily pads seen at a slight angle: a round leaf with its notch, veins from the centre, a lit rim,
     // a darker underside and a wet shine; three variants. The water lily has layered petals.
     const lilyPad = (seed, notch) => { const c = document.createElement('canvas'); c.width = 18; c.height = 9; const g = c.getContext('2d'); const cx = 9, cy = 4, rx = 8.2, ry = 3.6;
@@ -688,7 +671,7 @@ const MUNDO = (() => {
         if (w > 2) { put(b, cx, y0 - 1, caps[2]); put(b, cx + 1, y0 - 1, caps[1]); }
       }
     });
-    return tileCache[theme] = { planks, post, thorns, cracked: [cracked(0), cracked(1)], hard: [hard(0), hard(1)], rootWall, caps, gates, targets, mushroom, mushroomSquash, fire, lilies, lotus, tuft, reed, shroom };
+    return tileCache[theme] = { planks, post, thorns, cracked: [cracked(0), cracked(1)], hard: [hard(0), hard(1)], rootWall, caps, gates, targets, mushroom, mushroomSquash, lilies, lotus, tuft, reed, shroom };
   }
 
   const WC = WOOD.map(css), IC = IRON.map(css);
@@ -814,7 +797,7 @@ const MUNDO = (() => {
             const sunk = L.lily.has(tx + ',' + ty), rr = 9 + Math.sin((t + tx * 13) / 16) * .8; g.globalAlpha = .35; g.strokeStyle = '#cfeede'; g.beginPath(); g.ellipse(px + 8, py + 5 + bob, rr, 3.2, 0, 0, 7); g.stroke(); g.globalAlpha = 1;
             if (sunk) { const k = (t % 24) / 24; g.globalAlpha = 1 - k; g.strokeStyle = '#e8fbff'; g.beginPath(); g.ellipse(px + 8, py + 5 + bob, 9 + k * 10, 3 + k * 2, 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
             g.drawImage(S.lilies[(tx * 7 + ty) % 3], px - 1, py + bob); if (h < .4) g.drawImage(S.lotus, px + 3 + (tx & 1) * 3, py - 5 + bob); break; }
-          case 'F': g.drawImage(S.fire[((t >> 3) + tx) % 4], px, py); break;
+          case 'F': fire.tile(g, L, tx, ty, px, py); break;
           case '^': g.drawImage(S.thorns[tx & 1], px, py + 8); break;
           case 'x': g.drawImage(S.cracked[(tx + ty) & 1], px, py); if (!solidC(at(tx, ty - 1))) g.drawImage(S.caps[tx % 3], px, py - 4); break;
           case 'X': g.drawImage(S.hard[ty & 1], px, py); if (!solidC(at(tx, ty - 1))) g.drawImage(S.caps[(tx + 1) % 3], px, py - 4); break;
@@ -828,6 +811,7 @@ const MUNDO = (() => {
         }
       }
       for (const [x, y] of posts) g.drawImage(S.post, x, y);
+      fire.back(g, L, camX, camY, W, H);
       drawGates(g, L, S, camX, camY, W, H, at, solidC);
       return T;
     }
@@ -1347,8 +1331,230 @@ const MUNDO = (() => {
     g.drawImage(S.reed, 232, 113); g.drawImage(S.reed, 244, 115); g.drawImage(S.tuft, 60, 121); g.drawImage(S.shroom, 30, 122); g.drawImage(S.reed, 72, 114);
   }
 
+
+  // ---------------------------------------------------------------- Fuego
+  // The bonfire (F): banded noise flames (a white-yellow heart, yellow and orange tongues, red and dark-red
+  // edges) over two crossed logs with glowing cracks; embers and sparks on the wind, a thin smoke column, heat
+  // shimmer and a flickering warm light. Water makes it duck and hiss; doused, the flames collapse under a
+  // billow of steam and the charred, wet logs stay, smoking now and then. All cosmetic: the rules of the tile
+  // (it hurts; water puts it out at once) live in game.js. Flames are cached loops (N frames) read at an
+  // uneven speed, two layers with their own phase and swayed in bands, so no two moments repeat.
+  const fire = (() => {
+    const N = 32, FC = ['#3a0d14', '#74190f', '#b8321a', '#e4661e', '#f99c2c', '#ffd24c', '#fff6c8'], FR = FC.map(rgb);
+    const band = I => I > 1 ? 6 : I > .8 ? 5 : I > .63 ? 4 : I > .47 ? 3 : I > .33 ? 2 : I > .21 ? 1 : I > .13 ? 0 : -1;
+    // Value noise that wraps every py lattice rows (the flame wall tiles vertically).
+    const pn = (x, y, s, py) => { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), y0 = ((yi % py) + py) % py, y1 = (y0 + 1) % py;
+      const a = hash(xi, y0, s), b = hash(xi + 1, y0, s), c = hash(xi, y1, s), d = hash(xi + 1, y1, s); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; };
+    // Rising turbulence that loops over N frames: two scrolls cross-faded, keeping the contrast.
+    const CA = [], SA = []; for (let f = 0; f < N; f++) { CA.push(Math.cos(f / N * 1.5708)); SA.push(Math.sin(f / N * 1.5708)); }
+    const turb = (x, y, f, sx, sy, P, s, py) => { const k = f / N, y0 = (y + k * P) * sy, y1 = (y + (k - 1) * P) * sy;
+      return .5 + ((py ? pn(x * sx, y0, s, py) : noise(x * sx, y0, s)) - .5) * CA[f] + ((py ? pn(x * sx, y1, s, py) : noise(x * sx, y1, s)) - .5) * SA[f]; };
+    // A tongue of fire standing on row `base`, `len` tall, hw0 half-wide at the foot (a neck pinches it at the logs).
+    const flame = (w, base, len, hw0, neck, s, heat) => (x, y, f) => {
+      const u = (base - y) / len; if (u < -.25) return -1;
+      const uu = clamp01(u), n1 = turb(x, y, f, .32, .13, 36, s), n2 = turb(x, y, f, .55, .3, 54, s + 7);
+      const cx = w / 2 + (n2 - .5) * 2.4 * uu, hw = hw0 * Math.pow(1 - uu * .92, .62) * (neck ? Math.min(1, .7 + uu * 2.4) : 1) + .35, b = 1 - Math.abs(x + .5 - cx) / hw;
+      return b * 1.05 - uu * .8 + (n1 - .5) * 1.3 * (.4 + uu) + (n2 - .5) * .35 + .22 + heat + (u < 0 ? u * 3 : 0);
+    };
+    const wall = (s, heat) => (x, y, f) => { const n1 = turb(x, y, f, .26, .1875, 36, s, 3), n2 = turb(x, y, f, .6, .375, 54, s + 7, 6), b = 1 - Math.abs(x + .5 - 10 + (n2 - .5) * 4) / 9.6; return b * .95 + (n1 - .5) * 1.45 + (n2 - .5) * .35 - .02 + heat; };
+    // Frames are painted the first time they are shown (about a millisecond each), never all at once.
+    const seq = (w, h, fn, cut = -1) => { const out = []; return f => out[f] || (out[f] = paint(w, h, b => { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const l = band(fn(x, y, f)); if (l > cut) put(b, x, y, FR[l]); } })); };
+    // Two crossed logs (and two stones), seen from the front; lit from the fire above, or charred and wet.
+    const logs = kind => paint(24, 10, b => {
+      const ch = kind === 'ash';
+      const bark = ch ? ['#0e090c', '#181114', '#231a1e', '#342a2c', '#40363a'] : ['#140b0d', '#2a1510', '#43241a', '#643a24', '#8e5630'];
+      const cut = ch ? ['#1e1619', '#3a2e2e', '#2a2024'] : ['#6a4026', '#d8a064', '#a8703e'];
+      for (const [sx, sy, c] of [[0, 9, 0], [1, 8, 1], [2, 9, 0], [1, 9, 0], [22, 9, 0], [23, 9, 0], [21, 9, 0], [22, 8, 1], [3, 9, 0], [20, 9, 0]]) put(b, sx, sy, c ? '#7a7680' : '#45414d');
+      const log = (x0, y0, x1, y1, sd, sh) => { const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy), nx = -dy / l, ny = dx / l;
+        for (let y = 0; y < 10; y++) for (let x = 0; x < 24; x++) { const qx = x + .5 - x0, qy = y + .5 - y0, t = (qx * dx + qy * dy) / (l * l), d = qx * nx + qy * ny; if (t < 0 || t > 1 || Math.abs(d) > 1.7) continue;
+          const top = ny > 0 ? d < -.6 : d > .6, bot = ny > 0 ? d > .6 : d < -.6, far = t;   // the raised end (the first) shows its cut
+          let c = far * l < 1.6 ? (Math.abs(d) < .7 ? cut[1] : cut[0]) : bark[(top ? 3 : bot ? 1 : 2) + sh];
+          if (far * l >= 1.6 && !top && hash(x, y, sd) < .14) c = bark[sh];   // knots and bark cracks
+          if (ch && top && hash(x, y, sd + 3) < .35) c = '#6a7886';   // the wet shine
+          if (ch && !top && hash(x, y, sd + 4) < .1) c = '#5a5456';   // grey ash flecks
+          put(b, x, y, c); } };
+      log(21.5, 3, 2.5, 8.5, 6, 0); log(2.5, 3, 21.5, 8.5, 5, 1);
+      outline(b, OUT);
+    });
+    // Glowing cracks on the hot logs and the bed of coals between them; what still glows once doused.
+    const cracks = few => paint(24, 10, b => {
+      for (const [x, y, c] of [[9, 8, 3], [10, 9, 5], [11, 9, 6], [12, 9, 6], [13, 9, 5], [14, 8, 3], [8, 9, 3], [15, 9, 4], [11, 8, 4], [12, 8, 5], [10, 8, 4], [13, 8, 3]]) if (!few || c > 4) put(b, x, y, FC[c]);
+      for (const [x, y, c] of [[6, 4, 4], [7, 5, 3], [17, 4, 4], [16, 5, 5], [5, 4, 2], [18, 4, 2], [8, 6, 5], [15, 6, 3], [9, 6, 3], [14, 6, 4], [4, 4, 3], [19, 4, 3]]) if (!few || c > 3) put(b, x, y, FC[c]);
+    });
+    // A warm pool of light: dithered bands, drawn additively.
+    const glowC = paint(120, 84, b => { for (let y = 0; y < 84; y++) for (let x = 0; x < 120; x++) { const dx = (x + .5 - 60) / 60, dy = (y + .5 - 50) / 44, d = Math.sqrt(dx * dx + dy * dy); if (d >= 1) continue; const v = Math.pow(1 - d, 1.6) * 4 + dith(x, y) * .9, k = Math.min(4, Math.floor(v)); if (k > 0) put(b, x, y, [0, '#2a0e04', '#4a1c06', '#6e2e0c', '#8e4012'][k]); } });
+    let A = null;
+    const art = () => A || (A = { bon: seq(24, 34, flame(24, 31, 25, 7.2, true, 11, 0)), core: seq(24, 34, flame(24, 31, 18, 4.6, true, 23, 0), 3), weak: seq(24, 34, flame(24, 31, 17, 6.2, true, 11, -.3)),
+      wall: seq(20, 16, wall(31, 0)), wallW: seq(20, 16, wall(31, -.32)), crown: seq(20, 18, flame(20, 16, 16, 8.2, false, 41, 0)), crownW: seq(20, 18, flame(20, 16, 11, 7.6, false, 41, -.3)),
+      logs: [logs('hot'), logs('ash')], cracks: cracks(false), embers: cracks(true), glow: glowC });
+
+    // ---- state: particles, and per-tile hits (water), pops (crackles) and the fires going out
+    let T = 0, grid = null, lastHiss = -99; const P = [], st = new Map(), dying = [];
+    const reset = L => { if (grid !== L.t) { grid = L.t; P.length = 0; st.clear(); dying.length = 0; } };
+    const isF = (L, x, y) => y >= 0 && y < L.h && x >= 0 && x < L.w && L.t[y][x] === 'F';
+    const solidAt = (L, x, y) => y >= 0 && y < L.h && x >= 0 && x < L.w && '#xXMG'.includes(L.t[y][x]);
+    const wind = L => L.def.theme === 'storm' ? -.32 : Math.sin(T / 190) * .12;
+    const r = (a, b) => a + Math.random() * (b - a);
+    const S = (tx, ty) => { const k = tx + ',' + ty; let s = st.get(k); if (!s) st.set(k, s = { hitT: -99, hitK: 0, dir: 0, popT: -99 }); return s; };
+    const recoil = s => s ? s.hitK * Math.exp(-(T - s.hitT) / 9) : 0;
+    const popK = s => s ? Math.max(0, 1 - (T - s.popT) / 6) : 0;
+    const fi = (s, sp) => { const v = Math.floor(T * sp + Math.sin(T * .043 + s) * 3 + Math.sin(T * .017 + s * 2.3) * 5 + s * 5); return ((v % N) + N) % N; };
+    const flick = (tx, ty) => { const s = (tx * 7 + ty * 13) % 17; return 1 + Math.sin(T * .31 + s) * .04 + Math.sin(T * .13 + s * 2) * .05 + (Math.random() - .5) * .04 + popK(st.get(tx + ',' + ty)) * .15 - recoil(st.get(tx + ',' + ty)) * .25; };
+    const push = p => { if (P.length < 500) P.push(p); };
+    const steam = (x, y, n, big, vy = -.8) => { for (let i = 0; i < n; i++) { const m = r(big ? 44 : 18, big ? 90 : 34) | 0; push({ k: 'st', x: x + r(-4, 4), y: y + r(-3, 2), vx: r(-.55, .55), vy: vy * r(.6, 1.5), life: m, max: m, r: r(1, 2), gr: big ? r(.06, .12) : r(.05, .09) }); } };
+    const WATERC = new Set(['#8fd9d0', '#c8f2ea', '#e8fbff', '#f2fffb']);
+    // Water hits a burning tile (or lands by it): the flames duck away from it, and it hisses.
+    function sizzle(tx, ty, x, y, k, dir, sound) {
+      const s = S(tx, ty); s.hitK = Math.min(1, recoil(s) + k); s.hitT = T; s.dir = dir || (x < tx * 16 + 8 ? 1 : -1);
+      steam(x, y - 2, k > .2 ? 3 : 1, false, -.6);
+      for (let i = 0; i < (k > .2 ? 3 : 1); i++) push({ k: 'sp', x, y: y - 2, vx: r(-1, 1), vy: -r(.6, 1.6), life: 8, max: 8, c: '#e8fbff' });
+      if (sound && T - lastHiss > 20 && typeof Sound !== 'undefined') { lastHiss = T; Sound.play('hiss', null, { x }); }
+    }
+
+    return {
+      flick,
+      update(L, cx, cy, W, H) {
+        reset(L); T++; if (!L.ashes) L.ashes = [];
+        const w = wind(L), x0 = Math.max(0, (cx >> 4) - 1), x1 = Math.min(L.w - 1, ((cx + W) >> 4) + 1), y0 = Math.max(0, (cy >> 4) - 1), y1 = Math.min(L.h - 1, ((cy + H) >> 4) + 2);
+        let any = false;
+        for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
+          if (L.t[ty][tx] !== 'F') continue; any = true;
+          const up = isF(L, tx, ty - 1), dn = isF(L, tx, ty + 1), X = tx * 16, Y = ty * 16, s = st.get(tx + ',' + ty), low = recoil(s) > .4;
+          if (!up) {
+            if (Math.random() < (low ? .08 : .2)) { const m = r(26, 64) | 0; push({ k: 'em', x: X + 8 + r(-5, 5), y: Y + (dn ? -2 : 4) + r(-4, 2), vx: r(-.3, .3), vy: -r(.5, 1.3), life: m, max: m, ph: r(0, 6) }); }
+            if ((T + tx * 5) % 6 === 0 && !solidAt(L, tx, ty - 1)) { const m = r(70, 110) | 0; push({ k: 'sm', x: X + 8 + r(-1.5, 1.5), y: Y - (dn ? 12 : 6), vx: 0, vy: -r(.3, .45), life: m, max: m, r: .6, ph: r(0, 6) }); }
+          } else if (Math.random() < .05) { const m = r(20, 40) | 0; push({ k: 'em', x: X + r(1, 15), y: Y + r(0, 14), vx: r(-.4, .4), vy: -r(.4, 1), life: m, max: m, ph: r(0, 6) }); }
+          // A crackle: a knot pops, the fire flares and throws a fan of sparks.
+          if (!dn && Math.random() < .009) { S(tx, ty).popT = T; const n = 4 + (Math.random() * 5 | 0); for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + r(-1.1, 1.1), sp = r(1, 2.6), m = r(10, 22) | 0; push({ k: 'sp', x: X + 8 + r(-3, 3), y: Y + 9, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: m, max: m, c: Math.random() < .5 ? '#fff6c8' : '#ffd24c' }); } }
+        }
+        // Rain, spray and the jet's drops hiss where they fall into the flames.
+        if (any) for (const p of L.parts) {
+          if (p.life <= 0 || !(p.kind === 'rain' || p.kind === 'spray' || p.kind === 'drip' || (p.kind === 'dot' && WATERC.has(p.color)))) continue;
+          const tx = Math.floor(p.x) >> 4, ty = Math.floor(p.y) >> 4; if (!isF(L, tx, ty) || (Math.floor(p.y) & 15) < 3) continue;
+          p.life = 0; sizzle(tx, ty, p.x, p.y, p.kind === 'rain' ? .1 : .3, Math.sign(p.vx) || 0, p.kind !== 'rain');
+        }
+        // Fires going out: the big hiss, then steam keeps billowing off them for a while.
+        for (let i = dying.length - 1; i >= 0; i--) {
+          const d = dying[i], f = T - d.t0, X = d.x * 16, Y = d.y * 16;
+          if (f === 0) {
+            steam(X + 8, Y + (d.base ? 8 : 6), d.base ? 16 : 9, true, -1.1);
+            for (let k = 0; k < (d.top ? 7 : 3); k++) { const m = r(24, 50) | 0; push({ k: 'em', x: X + 8 + r(-5, 5), y: Y + r(0, 12), vx: r(-1, 1), vy: -r(1, 2.2), life: m, max: m, ph: r(0, 6) }); }
+            if (d.base) for (let k = 0; k < 5; k++) push({ k: 'dr', x: X + 8 + r(-6, 6), y: Y + r(0, 8), vx: r(-1.2, 1.2), vy: -r(.5, 2), fy: Y + 12 + r(0, 2), b: 0, life: 40, max: 40 });
+          } else if (f > 0 && f < 18 && f % 2 === 0) steam(X + 8, Y + (d.base ? 10 : 8), 1, true, -1.1);
+          if (f > 24) dying.splice(i, 1);
+        }
+        // Charred logs: a thin wisp for a good while, then a puff now and then; the last embers pop.
+        for (const a of L.ashes) {
+          const X = a.x * 16, Y = a.y * 16, age = T - a.t0; if (X < cx - 32 || X > cx + W + 16 || Y < cy - 16 || Y > cy + H + 32) continue;
+          if (age < 420 ? (T + a.x) % (age < 200 ? 4 : 8) === 0 : Math.random() < .012) { const m = r(60, 100) | 0; push({ k: 'sm', x: X + 8 + r(-2, 2), y: Y + 11, vx: 0, vy: -r(.25, .4), life: m, max: m, r: .5, ph: r(0, 6), pale: 1 }); }
+          if (age < 150 && Math.random() < .03) { const m = r(16, 30) | 0; push({ k: 'em', x: X + 8 + r(-5, 5), y: Y + 11, vx: r(-.2, .2), vy: -r(.3, .8), life: m, max: m, ph: r(0, 6) }); }
+        }
+        for (let i = P.length - 1; i >= 0; i--) {
+          const p = P[i]; if (--p.life <= 0) { P.splice(i, 1); continue; }
+          if (p.k === 'em') { p.vx += (w - p.vx) * .04 + Math.sin(T * .13 + p.ph) * .045; p.vy = Math.max(-1.5, p.vy - .004); }
+          else if (p.k === 'sp') { p.vy += .06; p.vx *= .96; }
+          else if (p.k === 'sm') { p.vx += (w * .9 - p.vx) * .03 + Math.sin(T * .05 + p.ph) * .012; p.r += .028; }
+          else if (p.k === 'st') { p.vx = p.vx * .96 + w * .02; p.vy = p.vy * .965 - .012; p.r += p.gr; }
+          else if (p.k === 'dr') { p.vy += .16; if (p.y + p.vy > p.fy) { p.y = p.fy; p.vy *= -.3; p.vx *= .5; if (!p.b++) { steam(p.x, p.y, 1, false, -.5); p.life = Math.min(p.life, 8); } } }
+          p.x += p.vx; p.y += p.vy;
+        }
+      },
+      // Water landed at (x, y): anything burning (or still hot) within reach ducks and hisses.
+      splash(L, x, y, dir) {
+        reset(L); const tx0 = (x - 14) >> 4, tx1 = (x + 14) >> 4, ty0 = (y - 14) >> 4, ty1 = (y + 14) >> 4; let hit = false;
+        for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) if (isF(L, tx, ty)) { const d = Math.hypot(tx * 16 + 8 - x, ty * 16 + 8 - y); if (d < 24) { sizzle(tx, ty, x, y, .7 * (1 - d / 30), dir, !hit); hit = true; } }
+        if (!hit && L.ashes) for (const a of L.ashes) if (T - a.t0 < 200 && Math.abs(a.x * 16 + 8 - x) < 14 && Math.abs(a.y * 16 + 10 - y) < 12) { steam(x, y - 2, 3, false, -.7); if (T - lastHiss > 20 && typeof Sound !== 'undefined') { lastHiss = T; Sound.play('hiss', null, { x }); } break; }
+      },
+      // The tiles of one fire just went out (the rules already cleared them): hit = where the water struck.
+      doused(L, list, hit) {
+        reset(L); if (!L.ashes) L.ashes = []; lastHiss = T;
+        const has = (x, y) => list.some(q => q[0] === x && q[1] === y), hx = hit ? hit.x : list[0][0] * 16 + 8, hy = hit ? hit.y : list[0][1] * 16 + 8;
+        for (const [x, y] of list) {
+          const d = Math.hypot(x * 16 + 8 - hx, y * 16 + 8 - hy) / 16, base = !has(x, y + 1), top = !has(x, y - 1) && !solidAt(L, x, y - 1), s = st.get(x + ',' + y);
+          dying.push({ x, y, t0: T + Math.round(d * 2), base, top, up: has(x, y - 1), dir: hit && hit.vx ? Math.sign(hit.vx) : 0, s: (x * 7 + y * 13) % 17, k0: recoil(s) });
+          if (base) L.ashes.push({ x, y, t0: T + Math.round(d * 2) });
+        }
+      },
+      // Live fire, drawn with the back tiles.
+      tile(g, L, tx, ty, px, py) {
+        const a = art(), up = isF(L, tx, ty - 1), dn = isF(L, tx, ty + 1), s = (tx * 7 + ty * 13) % 17, ss = st.get(tx + ',' + ty);
+        drawFire(g, a, px, py, s, !dn, up, !up && !solidAt(L, tx, ty - 1), recoil(ss), popK(ss), wind(L) * 4 + (ss ? ss.dir * 5 * recoil(ss) : 0), -1, tx);
+      },
+      // Fires going out and the charred logs, drawn with the back tiles after the live ones.
+      back(g, L, camX, camY, W, H) {
+        if (!dying.length && !(L.ashes && L.ashes.length)) return; reset(L); const a = art();
+        for (const d of dying) { const px = d.x * 16 - camX, py = d.y * 16 - camY; if (px < -24 || px > W + 8 || py < -32 || py > H + 16) continue; const f = T - d.t0;
+          drawFire(g, a, px, py, d.s, d.base, d.up, d.top, f < 0 ? Math.max(d.k0, .8) : 1, 0, d.dir * 4, f, d.x); }
+        if (L.ashes) for (const q of L.ashes) {
+          if (L.t[q.y][q.x] === 'F') continue; const px = q.x * 16 - camX, py = q.y * 16 - camY, age = T - q.t0; if (px < -24 || px > W + 8 || py < -16 || py > H + 16) continue;
+          const fl = q.x & 1 ? ART.flip : c => c;
+          if (age < 36) { g.drawImage(fl(a.logs[0]), px - 4, py + 6); g.globalAlpha = clamp01(age / 36); }
+          g.drawImage(fl(a.logs[1]), px - 4, py + 6); g.globalAlpha = 1;
+          if (age < 36) { g.globalAlpha = 1 - clamp01(age / 20); g.drawImage(fl(a.cracks), px - 4, py + 6); }
+          const e = age < 0 ? 1 : clamp01(1 - age / 300); if (e > 0) { g.globalAlpha = e * (.55 + Math.sin(T * .09 + q.x) * .35 + Math.sin(T * .23) * .1); g.drawImage(fl(a.embers), px - 4, py + 6); }
+          g.globalAlpha = 1;
+        }
+      },
+      // Sparks, embers, smoke, steam, and the heat shimmer over each blaze (only when not zoomed).
+      front(g, L, camX, camY, W, H, flat) {
+        reset(L);
+        if (flat && g.canvas && g.canvas.width === W) {
+          const x0 = Math.max(0, camX >> 4), x1 = Math.min(L.w - 1, (camX + W) >> 4), y0 = Math.max(0, camY >> 4), y1 = Math.min(L.h - 1, ((camY + H) >> 4) + 1);
+          for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
+            if (L.t[ty][tx] !== 'F' || isF(L, tx, ty - 1) || solidAt(L, tx, ty - 1)) continue;
+            const bx = tx * 16 - camX - 4, top = ty * 16 - camY - (isF(L, tx, ty + 1) ? 30 : 30);
+            for (let j = 0; j < 22; j++) { const y = top + j; if (y < 0 || y >= H || bx < 0 || bx + 24 > W) continue; const o = Math.round(Math.sin(T * .31 + j * .75 + tx) * (j / 22) * 1.2); if (o) g.drawImage(g.canvas, bx, y, 24, 1, bx + o, y, 24, 1); }
+          }
+        }
+        for (const p of P) {
+          const x = Math.round(p.x - camX), y = Math.round(p.y - camY), k = p.life / p.max; if (x < -12 || x > W + 12 || y < -12 || y > H + 12) continue;
+          if (p.k === 'em') { const c = k > .78 ? FC[6] : k > .55 ? FC[5] : k > .35 ? FC[4] : k > .18 ? FC[3] : FC[2]; if (k < .12 && (T & 2)) continue; g.fillStyle = c; if (k > .55) { g.globalAlpha = .3; g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3); g.globalAlpha = 1; } g.fillRect(x, y, 1, 1); }
+          else if (p.k === 'sp') { g.fillStyle = p.c || FC[6]; g.fillRect(x, y, 1, 1); g.globalAlpha = .6; g.fillStyle = FC[4]; g.fillRect(Math.round(x - p.vx), Math.round(y - p.vy), 1, 1); g.globalAlpha = 1; }
+          else if (p.k === 'sm') { g.globalAlpha = (p.pale ? .45 : .3) * k * Math.min(1, (1 - k) * 8); g.fillStyle = p.pale ? '#a0a4ac' : '#6a626c'; disc(g, x, y, p.r); g.globalAlpha = 1; }
+          else if (p.k === 'st') { const a = .7 * Math.pow(k, .8) * Math.min(1, (1 - k) * 12); g.globalAlpha = a; g.fillStyle = '#b4c0c8'; disc(g, x, y, p.r); g.fillStyle = '#f0f6f8'; disc(g, x - Math.round(p.r * .3), y - Math.round(p.r * .35), p.r * .62); g.globalAlpha = 1; }
+          else if (p.k === 'dr') { g.fillStyle = '#8fd9d0'; g.fillRect(x, y, 1, 1); g.fillStyle = '#e8fbff'; g.fillRect(x, y - 1, 1, 1); }
+        }
+      },
+      // The warm light: an additive pool round every blaze (and what is left glowing).
+      glow(g, L, camX, camY, W, H) {
+        const a = art(), x0 = Math.max(0, (camX >> 4) - 3), x1 = Math.min(L.w - 1, ((camX + W) >> 4) + 3), y0 = Math.max(0, (camY >> 4) - 2), y1 = Math.min(L.h - 1, ((camY + H) >> 4) + 3);
+        const k = L.def.theme === 'cave' || L.def.theme === 'night' ? .5 : .38; let on = false;
+        const pool = (x, y, v) => { if (v <= .01) return; if (!on) { g.globalCompositeOperation = 'lighter'; on = true; } g.globalAlpha = Math.min(1, v); g.drawImage(a.glow, Math.round(x - camX - 60), Math.round(y - camY - 50)); };
+        for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (L.t[ty][tx] === 'F') { const n = isF(L, tx, ty - 1) + isF(L, tx, ty + 1); pool(tx * 16 + 8, ty * 16 + 6, k * flick(tx, ty) * (n ? .6 : 1)); }
+        for (const d of dying) { const f = T - d.t0; pool(d.x * 16 + 8, d.y * 16 + 8, k * (f < 0 ? .8 : clamp01(1 - f / 18))); }
+        if (L.ashes) for (const q of L.ashes) { const age = T - q.t0; if (age >= 0 && age < 300 && L.t[q.y][q.x] !== 'F') pool(q.x * 16 + 8, q.y * 16 + 14, k * .22 * (1 - age / 300) * (.7 + Math.sin(T * .09 + q.x) * .3)); }
+        if (on) { g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; }
+      },
+      // How much a hot ember bed still lights the dark (0..1), for the light mask.
+      ember(q) { return clamp01(1 - (T - q.t0) / 300); }
+    };
+    // A crisp pixel disc.
+    function disc(g, x, y, r) { r = Math.max(.5, r); const n = Math.ceil(r - .5); for (let j = -n; j <= n; j++) { const w = Math.round(Math.sqrt(Math.max(0, r * r - j * j))); if (w > 0 || j === 0) g.fillRect(x - Math.max(w, 1) + 1, y + j, Math.max(w, 1) * 2 - 1, 1); } }
+    // One blaze: the flames (bonfire, flame wall, crown above the wall) and the logs under a bonfire.
+    // f >= 0: going out, f frames since the water; the flames flash white, then collapse into the logs.
+    function drawFire(g, a, px, py, s, base, up, crownOk, rec, pop, lean, f, tx) {
+      const out = f >= 0, k = out ? clamp01((f - 1) / 17) : 0, weak = out ? f > 2 : rec > .35;
+      if (out && k >= 1) return;
+      const fs = 1 + Math.sin(T * .13 + s) * .06 + Math.sin(T * .29 + s * 3) * .04 + pop * .14 - rec * .45, sx = 1 - rec * .12 + Math.sin(T * .2 + s) * .03 - k * .35, sy = out ? (f < 2 ? .95 : Math.pow(1 - k, 1.3)) : fs;
+      const white = out && f < 3 ? c => ART.tint(c, f < 1 ? '#ffffff' : f < 2 ? '#e8f4f8' : '#fff6c8') : c => c, sway = out ? .6 : 1.2;
+      if (base && !up) {
+        strips(g, white((weak ? a.weak : a.bon)(fi(s, .5))), px + 8, py + 16, sx, sy, lean, sway, s);
+        if (!weak) strips(g, a.core(fi(s + 5, .62)), px + 8, py + 16, sx, fs * (1 - rec * .4), lean * .6, sway * .7, s + 2);
+      } else {
+        strips(g, white((weak ? a.wallW : a.wall)(fi(s, .5))), px + 8, py + 16, sx, out ? sy : 1, lean * .25, .5, s);
+        if (crownOk && !up) strips(g, white((weak ? a.crownW : a.crown)(fi(s + 3, .55))), px + 8, py + 6, sx, out ? sy : fs, lean, sway, s + 1);
+      }
+      if (base && !out) { const fl = tx & 1 ? ART.flip : c => c; g.drawImage(fl(a.logs[0]), px - 4, py + 6); g.globalAlpha = .7 + Math.sin(T * .21 + s) * .15 + pop * .3; g.drawImage(fl(a.cracks), px - 4, py + 6); g.globalAlpha = 1; }
+    }
+    // A flame canvas with its foot at (cx, foot), squashed by sx/sy; each band of rows swayed and leaned more the higher it is.
+    function strips(g, c, cx, foot, sx, sy, lean, sway, ph) {
+      const w = c.width, h = c.height, dw = Math.max(1, Math.round(w * sx)); if (sy <= .02) return;
+      for (let j = 0; j < h; j += 3) { const n = Math.min(3, h - j), u = (h - j) / h, y0 = Math.round(foot - (h - j) * sy), y1 = Math.round(foot - (h - j - n) * sy); if (y1 <= y0) continue;
+        const off = Math.round(lean * u * u + Math.sin(ph + T * .11 - j * .45) * sway * u); g.drawImage(c, 0, j, w, n, Math.round(cx - dw / 2) + off, y0, dw, y1 - y0); }
+    }
+  })();
   return { rgb, mix, css, ramp, pick, dith, hash, noise, Buf, put, rect, paint, toCanvas, outline, newCanvas, alphaAt,
-    TERRA, AGUA, BG, STONE, ROOT, WOOD, OUT, buildTerrain, levelTerrain, drawTerrain, sceneTerrain, water, tiles, drawTiles, props, background, drawBackground, drawScene };
+    TERRA, AGUA, BG, STONE, ROOT, WOOD, OUT, buildTerrain, levelTerrain, drawTerrain, sceneTerrain, water, tiles, drawTiles, props, background, drawBackground, drawScene, fire };
 })();
 // The world pieces replace the simple ones in ART; characters are left alone.
 Object.assign(ART, MUNDO.props, { background: MUNDO.background });
