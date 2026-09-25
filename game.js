@@ -55,9 +55,9 @@ const Touch = {
       b.addEventListener('pointerdown', e => {
         e.preventDefault(); e.stopPropagation();
         if (act === 'pause' || act === 'mute' || act === 'fullscreen') { Sound.init(); Input.press(act); Input.mode = 'touch'; Touch.buzz(10); return; }
-        Touch.pointers.set(e.pointerId, act); b.setPointerCapture && b.setPointerCapture(e.pointerId); Touch.buzz(act === 'jump' ? 12 : 9); Touch.ripple(b); Touch.apply();
+        Touch.pointers.set(e.pointerId, act); b.setPointerCapture && b.setPointerCapture(e.pointerId); Touch.buzz(act === 'jump' ? 12 : 9); Touch.ripple(b); b.classList.remove('boing'); Touch.pressFx(b, act); Touch.apply();
       });
-      const end = e => { if (Touch.pointers.has(e.pointerId)) { Touch.pointers.delete(e.pointerId); Touch.apply(); } };
+      const end = e => { if (Touch.pointers.has(e.pointerId)) { Touch.pointers.delete(e.pointerId); Touch.apply(); b.classList.remove('boing'); void b.offsetWidth; b.classList.add('boing'); } };
       b.addEventListener('pointerup', end); b.addEventListener('pointercancel', end); b.addEventListener('lostpointercapture', end);
       b.addEventListener('contextmenu', e => e.preventDefault());
     }
@@ -114,6 +114,51 @@ const Touch = {
   release() { Touch.pointers.clear(); Touch.dirs = new Set(); for (const b of Touch.buttons) b.classList.remove('held'); if (Touch.knob) { Touch.knob.style.transform = ''; Touch.stick.id = null; $('stick').classList.remove('on'); } },
   buzz(ms) { if (!Touch.enabled || Game.still || Save.data.noBuzz) return; try { navigator.vibrate && navigator.vibrate(ms); } catch (e) { /* not on this phone */ } },
   ripple(b) { b.classList.remove('ripple'); void b.offsetWidth; b.classList.add('ripple'); },
+  // ---- Juice layer over the controls: pixel particles in screen space (half-resolution canvas, so they look like
+  // the game's pixels). Bursts on press, the inhale swirling into Bigotes' button, sparks at full charge, sparkles
+  // around the 'ok' button, pops when a button changes what it does.
+  fx: [], labs: {},
+  fxCanvas() { const c = $('touch-fx'); if (!c) return null; const w = Math.ceil(innerWidth / 2), h = Math.ceil(innerHeight / 2); if (c.width !== w || c.height !== h) { c.width = w; c.height = h; } return c; },
+  center(b) { const r = b.getBoundingClientRect(); return { x: (r.left + r.width / 2) / 2, y: (r.top + r.height / 2) / 2, r: r.width / 4 }; },
+  spark(x, y, vx, vy, col, life, o = {}) { if (Touch.fx.length > 260) Touch.fx.shift(); Touch.fx.push(Object.assign({ x, y, vx, vy, col, life: Math.round(life * 1.5), max: Math.round(life * 1.5), g: .08, s: 2 }, o)); },
+  pressFx(b, act) {
+    const c = Touch.center(b), R = c.r, col = { jump: ['#f2c43d', '#fff3b8', '#ffffff'], fish: ['#7fd0a0', '#c8f2ea', '#ffffff'], puff: ['#a8d8f0', '#e8fbff', '#ffffff'], up: ['#fff6d6', '#f2c46a'] }[act] || ['#fff6d6'];
+    const ok = act === 'jump' && (Game.state !== 'play' || Game.paused || Charla.active() || Game.learning);
+    if (ok) { for (let i = 0; i < 22; i++) { const a = i / 22 * 6.28, v = 1.4 + (i % 3) * .5; Touch.spark(c.x + Math.cos(a) * R, c.y + Math.sin(a) * R, Math.cos(a) * v, Math.sin(a) * v, i % 2 ? '#ffe36a' : '#ffffff', 22, { g: .03, s: i % 4 ? 1 : 2 }); } Touch.spark(c.x, c.y, 0, 0, '#ffe36a', 14, { ring: R * 1.1, g: 0 }); return; }
+    if (act === 'jump') { for (let i = 0; i < 10; i++) Touch.spark(c.x + (Math.random() - .5) * R * 1.4, c.y + R * .8, (Math.random() - .5) * 1.6, -Math.random() * .6, i % 2 ? '#c9b08a' : '#a08a6a', 16, { g: .04, s: 2 }); for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + (Math.random() - .5) * 1.8; Touch.spark(c.x, c.y - R * .4, Math.cos(a) * 1.8, Math.sin(a) * 2.2, col[i % 3], 20, { g: .1, star: true }); } }
+    else if (act === 'fish') { for (let i = 0; i < 12; i++) { const a = Math.random() * 6.28, v = .6 + Math.random() * 1.2; Touch.spark(c.x + Math.cos(a) * R * .6, c.y + Math.sin(a) * R * .6, Math.cos(a) * v, Math.sin(a) * v - .6, col[i % 3], 24, { g: -.02, bubble: i % 3 === 0, s: i % 2 ? 1 : 2 }); } }
+    else if (act === 'puff') { for (let i = 0; i < 9; i++) { const a = -2.4 + i * .12, v = 2.2 + Math.random(); Touch.spark(c.x, c.y, Math.cos(a) * v, Math.sin(a) * v, col[i % 3], 18, { g: 0, streak: true }); } }
+    else { for (let i = 0; i < 8; i++) { const a = Math.random() * 6.28; Touch.spark(c.x, c.y, Math.cos(a) * 1.5, Math.sin(a) * 1.5, col[i % 2], 16, { g: .05 }); } }
+    Touch.spark(c.x, c.y, 0, 0, col[0], 12, { ring: R, g: 0 });
+  },
+  labPop(b, k, lab, col) { if (Touch.labs[k] === lab) return; const had = Touch.labs[k] !== undefined; Touch.labs[k] = lab; if (!had || !b || b.offsetParent === null) return; b.classList.remove('lab'); void b.offsetWidth; b.classList.add('lab'); const c = Touch.center(b); for (let i = 0; i < 12; i++) { const a = i / 12 * 6.28; Touch.spark(c.x + Math.cos(a) * c.r, c.y + Math.sin(a) * c.r, Math.cos(a) * 1.2, Math.sin(a) * 1.2, i % 2 ? col : '#ffffff', 16, { g: 0, s: 1 }); } },
+  fxDraw(t) {
+    const c = Touch.fxCanvas(); if (!c) return; const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height);
+    const p = Player, B = Touch.btn || {};
+    // Continuous juice tied to what Bigotes is doing.
+    if (Game.state === 'play' && B.fish && B.fish.offsetParent !== null) {
+      const f = Touch.center(B.fish), R = f.r;
+      if (p.sucking && t % (4 - Math.min(2, (p.suckLv || 1) - 1)) === 0) { const a = Math.random() * 6.28, d = R * (1.9 + Math.random() * .8), lv = p.suckLv || 1; Touch.spark(f.x + Math.cos(a) * d, f.y + Math.sin(a) * d, 0, 0, lv === 3 ? '#fff6d6' : '#cfe8f0', 22, { to: f, g: 0, spin: .06 * lv, s: lv === 3 ? 2 : 1 }); }
+      if (p.charge >= CHARGE_FULL && t % 3 === 0) { const a = Math.random() * 6.28; Touch.spark(f.x + Math.cos(a) * R, f.y + Math.sin(a) * R, Math.cos(a) * 1.4, Math.sin(a) * 1.4, Math.random() < .5 ? '#f2c46a' : '#e79b3f', 14, { g: 0, star: true }); }
+      if (p.held && p.held.kind === 'agua' && t % 9 === 0) Touch.spark(f.x + (Math.random() - .5) * R, f.y + R * .6, 0, .3, '#8fd9d0', 26, { g: .06, bubble: true });
+    }
+    // The 'ok' button calls for attention: a sparkle every so often.
+    if (B.jump && (Game.state !== 'play' || Game.paused || Charla.active() || Game.learning) && B.jump.offsetParent !== null && t % 26 === 0) { const f = Touch.center(B.jump), a = Math.random() * 6.28; Touch.spark(f.x + Math.cos(a) * f.r * 1.05, f.y + Math.sin(a) * f.r * 1.05, 0, -.15, '#fff6d6', 26, { g: 0, star: true }); }
+    const E = $('empezar'); if (E && E.offsetParent !== null && t % 20 === 0) { const r = E.getBoundingClientRect(), x = (r.left + Math.random() * r.width) / 2, y = (r.top + (Math.random() < .5 ? 0 : r.height)) / 2; Touch.spark(x, y, 0, -.2, '#ffe36a', 28, { g: 0, star: true }); }
+    for (let i = Touch.fx.length - 1; i >= 0; i--) {
+      const q = Touch.fx[i]; if (--q.life <= 0) { Touch.fx.splice(i, 1); continue; }
+      const k = q.life / q.max;
+      if (q.to) { const dx = q.to.x - q.x, dy = q.to.y - q.y, d = Math.hypot(dx, dy) || 1; if (d < 3) { Touch.fx.splice(i, 1); continue; } const v = Math.min(d, 1.2 + (1 - k) * 3); q.x += dx / d * v - dy / d * v * q.spin * 8; q.y += dy / d * v + dx / d * v * q.spin * 8; }
+      else { q.x += q.vx; q.y += q.vy; q.vy += q.g; q.vx *= .96; }
+      g.globalAlpha = Math.min(1, k * 1.6);
+      if (q.ring) { const r = q.ring * (1 + (1 - k) * 1.1); g.fillStyle = q.col; for (let a = 0; a < 40; a++) g.fillRect(Math.round(q.x + Math.cos(a / 40 * 6.28) * r), Math.round(q.y + Math.sin(a / 40 * 6.28) * r), 2, 2); }
+      else if (q.star) { const x = Math.round(q.x), y = Math.round(q.y), s = k > .5 ? 3 : 2; g.fillStyle = '#1b1420'; g.fillRect(x - s, y - 1 + 1, s * 2 + 1, 1); g.fillStyle = q.col; g.fillRect(x - s, y, s * 2 + 1, 1); g.fillRect(x, y - s, 1, s * 2 + 1); g.fillStyle = '#ffffff'; g.fillRect(x, y, 1, 1); }
+      else if (q.streak) { g.fillStyle = q.col; g.fillRect(Math.round(q.x), Math.round(q.y), 5, 1); g.fillRect(Math.round(q.x) + 1, Math.round(q.y) + 1, 3, 1); }
+      else if (q.bubble) { g.fillStyle = q.col; const x = Math.round(q.x), y = Math.round(q.y); g.fillRect(x - 1, y - 2, 2, 1); g.fillRect(x - 2, y - 1, 1, 2); g.fillRect(x + 1, y - 1, 1, 2); g.fillRect(x - 1, y + 1, 2, 1); g.fillStyle = '#ffffff'; g.fillRect(x - 1, y - 1, 1, 1); }
+      else { g.fillStyle = q.col; g.fillRect(Math.round(q.x), Math.round(q.y), q.s, q.s); }
+    }
+    g.globalAlpha = 1;
+  },
   layout() {
     const coarse = matchMedia('(any-pointer: coarse)').matches;
     Touch.enabled = Touch.forced || coarse || (innerWidth <= 900 && innerHeight <= 500);
@@ -153,11 +198,13 @@ const Touch = {
     g.drawImage(face, fx, fy); Player.fishOverlay(g, face, fx, fy, t, { noWhiskers: true, mood: p.sucking || p.charge > 8 ? 'mad' : null, lx: 1 });
     if (p.sucking) { g.fillStyle = p.suckLv === 3 ? '#fff6d6' : '#cfe8f0'; for (let i = 0; i < 2 + p.suckLv; i++) { const k = (t * (.1 + p.suckLv * .04) + i / (2 + p.suckLv)) % 1; g.fillRect(Math.round(34 - k * 7), 7 + i * 2, 2, 1); } }
     const lab = full ? '¡zas!' : held ? (held.kind === 'agua' && !p.onGround ? 'flota' : 'escupe') : p.grapple ? 'suelta' : p.target && ((!p.onGround && p.airT > 3) || Input.held.up) ? 'pica' : 'sorbe';
+    Touch.labPop(Touch.btn && Touch.btn.fish, 'fish', lab, '#7fd0a0');
     Touch.label(g, lab, 18, 21, full ? '#f2c46a' : p.sucking ? '#fff6d6' : held ? '#bdf0d0' : '#e8fbff');
   },
   drawJump(g, t) {
     const p = Player; g.clearRect(0, 0, 36, 36);
     const air = !p.onGround && !p.grapple, lab = p.hanging || p.grapple ? 'suelta' : air && Input.held.down && Game.has('panzazo') ? 'panzazo' : air && p.airJumps > 0 && Game.has('aleteo') ? 'aletea' : 'salta';
+    Touch.labPop(Touch.btn && Touch.btn.jump, 'jump', lab, '#f2c43d');
     const N = ART.nila, spr = lab === 'panzazo' ? N.fall : lab === 'aletea' ? N.jump : N.jump, bob = lab === 'salta' ? Math.round(Math.abs(Math.sin(t / 14)) * -2) : 0;
     g.drawImage(spr, 10, 0 + bob);
     if (lab === 'aletea') { g.fillStyle = '#e8fbff'; const f = (t >> 3) & 1; g.fillRect(6, 10 + f, 3, 1); g.fillRect(27, 10 + f, 3, 1); g.fillRect(5, 12 - f, 2, 1); g.fillRect(29, 12 - f, 2, 1); }
@@ -252,7 +299,7 @@ const Touch = {
     const px = (g, x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
     const bounce = b => { const k = b.animT > 0 ? b.animT-- : 0; return k ? Math.round(Math.sin(k / 12 * Math.PI) * -2) : 0; };
     { const g = pb.querySelector('canvas').getContext('2d'), d = bounce(pb); g.clearRect(0, 0, 16, 16);
-      if (Game.paused) { for (let i = 0; i < 9; i++) { const h = 9 - Math.abs(i - 4) * 2; px(g, 4 + i, 4 + (9 - h) / 2 - 1 + d, 1, h + 2, O); } for (let i = 0; i < 8; i++) { const h = 8 - Math.abs(i - 4) * 2; px(g, 5 + i, 4 + (9 - h) / 2 + d, 1, Math.max(1, h), i < 2 ? '#ffffff' : C); } }
+      if (Game.paused) { for (let i = -1; i < 6; i++) { const h = 13 - (i + 1) * 2; px(g, 5 + i, 8 - (h >> 1) + d, 1, h, O); } for (let i = 0; i < 5; i++) { const h = 11 - i * 2; px(g, 5 + i, 8 - (h >> 1) + d, 1, h, i < 1 ? '#ffffff' : C); } }
       else { const b = Math.round(Math.sin(t / 20) * .6); for (const x of [4, 9]) { px(g, x - 1, 3 + d + b, 5, 11, O); px(g, x, 4 + d + b, 3, 9, C); px(g, x, 4 + d + b, 3, 1, '#ffffff'); } } }
     { const g = sb.querySelector('canvas').getContext('2d'), d = bounce(sb), m = Sound.isMuted(), beat = m ? 0 : Math.round(Math.abs(Math.sin(t / 9)) * -2), tilt = m ? 0 : Math.round(Math.sin(t / 18)); g.clearRect(0, 0, 16, 16);
       const c = m ? '#8a8a96' : C, y = 2 + d + beat;
@@ -312,19 +359,30 @@ const Touch = {
     ART.text(g, 'gira el móvil', 18, 3, '#9fc0cc', 'left', '#0a0610');
   },
   // Outside a level the jump button is the "ok": what it does, on a bouncing tag.
-  drawOk(g, t, lab) { g.clearRect(0, 0, 36, 36); const bob = Math.round(Math.abs(Math.sin(t / 12)) * -2); g.fillStyle = '#1b1420'; g.fillRect(12, 5 + bob, 13, 11); g.fillStyle = '#f2c43d'; g.fillRect(13, 6 + bob, 11, 9); g.fillStyle = '#1b1420'; g.fillRect(16, 8 + bob, 1, 5); g.fillRect(17, 9 + bob, 1, 3); g.fillRect(18, 9 + bob, 1, 3); g.fillRect(19, 10 + bob, 1, 1); g.fillRect(17, 8 + bob, 1, 5); Touch.label(g, lab, 18, 21, '#fff6d6'); },
+  drawOk(g, t, lab) {
+    // A golden arrow that hops forward with a trail, a shine sweeping over it, and the word underneath.
+    g.clearRect(0, 0, 36, 36); const k = (t % 40) / 40, hop = Math.round(Math.sin(Math.min(1, k * 2) * Math.PI) * 3), x0 = 11 + hop;
+    // A proper arrow pointing right: tall at the back, a point at the front (column heights 11, 9, 7...).
+    const col = (x, h, c) => { g.fillStyle = c; g.fillRect(x, 10 - (h >> 1), 1, h); };
+    for (let tr = 3; tr >= 1; tr--) { g.globalAlpha = .18 * (4 - tr); for (let i = 0; i < 6; i++) col(x0 - tr * 3 + i, 11 - i * 2, '#ffe36a'); } g.globalAlpha = 1;
+    for (let i = -1; i < 7; i++) col(x0 + i, 13 - (i + 1) * 2, '#1b1420');
+    for (let i = 0; i < 6; i++) col(x0 + i, 11 - i * 2, i < 1 ? '#fff6d6' : i < 3 ? '#ffe36a' : '#e79b3f');
+    const sh = (t % 70) - 10; if (sh >= 0 && sh < 7) { g.fillStyle = '#ffffff'; const hh = Math.max(1, 11 - sh * 2); g.fillRect(x0 + sh, 10 - (hh >> 1), 1, hh); }
+    Touch.label(g, lab, 18, 21, '#fff6d6');
+  },
   updateButtons() {
-    if (Touch.enabled) { Touch.drawTop(Game.t); Touch.drawBanda(Game.t); if (Touch.portrait && document.body.classList.contains('in-menu') && !Game.paused) Touch.drawEmpezar(Game.t); }
+    if (Touch.enabled) { Touch.fxDraw(Game.t); Touch.drawTop(Game.t); Touch.drawBanda(Game.t); if (Touch.portrait && document.body.classList.contains('in-menu') && !Game.paused) Touch.drawEmpezar(Game.t); }
     Touch.girarShow(!!(Touch.enabled && Touch.portrait && !Touch.girar.no && $('girar')));
     if (Touch.girar.on) Touch.girarDraw();
     if (Touch.enabled && Touch.btn && (Game.state !== 'play' || Game.paused || Charla.active() || Game.learning)) {
       const lab = Game.paused ? 'vale' : Game.state === 'play' ? 'sigue' : Game.state === 'title' || Game.state === 'gate' ? 'jugar' : Game.state === 'select' ? 'entrar' : 'sigue', k = lab + (Game.t >> 2);
-      if (Touch.keys.ok !== k) { Touch.keys.ok = k; Touch.keys.jump = null; Touch.drawOk(Touch.ctx.jump, Game.t, lab); }
+      if (Touch.keys.ok !== k) { Touch.keys.ok = k; Touch.keys.jump = null; Touch.labs.jump = undefined; Touch.drawOk(Touch.ctx.jump, Game.t, lab); Touch.labPop(Touch.btn.jump, 'ok', lab, '#ffe36a'); }
       return;
     }
     if (!Touch.enabled || !Touch.btn || Game.state !== 'play' || !L.def) return;
     const p = Player, t = Game.t, B = Touch.btn, K = Touch.keys;
     const talk = !Charla.active() && !Game.learning && !Maestros.busy() && !p.dead && !!((L.maestro && L.maestro.near) || L.ents.some(e => e.kind === 'ruca' && e.near));
+    if (talk && !B.talk.classList.contains('show')) { const c = Touch.center(B.talk); for (let i = 0; i < 14; i++) { const a = i / 14 * 6.28; Touch.spark(c.x, c.y, Math.cos(a) * 1.6, Math.sin(a) * 1.1, i % 2 ? '#fff6d6' : '#f2c46a', 18, { g: .02, star: i % 3 === 0 }); } }
     B.talk.classList.toggle('show', talk); if (talk && K.talk !== (t >> 4)) { K.talk = t >> 4; Touch.drawTalk(Touch.ctx.talk, t); }
     const fk = [!!p.grapple, !!p.target, p.held ? p.held.kind : '', p.sucking ? p.suckLv : 0, p.charge >= CHARGE_FULL, p.spitT > 6, p.onGround, p.sucking || p.charge >= CHARGE_FULL ? t >> 1 : t >> 3].join();
     if (K.fish !== fk) { K.fish = fk; Touch.drawFish(Touch.ctx.fish, t); }
@@ -334,7 +392,7 @@ const Touch = {
     const jk = [p.onGround, p.airJumps, !!Input.held.down, !!p.grapple, t >> 2].join(); if (K.jump !== jk) { K.jump = jk; Touch.drawJump(Touch.ctx.jump, t); }
     const slide = p.crouch && p.onGround && Game.has('resbalon') && !p.held;
     const pk = [Game.has('soplido'), slide, t >> 2].join(); if (K.puff !== pk) { K.puff = pk; Touch.drawPuff(Touch.ctx.puff, t); }
-    B.puff.classList.toggle('locked', !Game.has('soplido')); B.puff.classList.toggle('hot', slide);
+    B.puff.classList.toggle('locked', !Game.has('soplido')); B.puff.classList.toggle('hot', slide); Touch.labPop(B.puff, 'puff', !Game.has('soplido') ? 'lock' : slide ? 'slide' : 'puff', '#a8d8f0');
   }
 };
 

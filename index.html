@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GLUP">
-<link rel="stylesheet" href="style.css?v=15">
+<link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
 <main id="shell" aria-label="GLUP">
@@ -26,6 +26,7 @@
   <button type="button" id="update" hidden aria-label="Hay una versión nueva: toca para actualizar"><canvas width="128" height="14"></canvas></button>
   <canvas id="banda" class="touch-only" width="130" height="200" aria-hidden="true"></canvas>
   <button type="button" id="empezar" class="touch-only" aria-label="Jugar"><canvas width="112" height="40"></canvas></button>
+  <canvas id="touch-fx" class="touch-only" aria-hidden="true"></canvas>
   <div id="girar" hidden aria-label="Gira el móvil: se juega en horizontal"><canvas width="200" height="260"></canvas></div>
   <canvas id="rotate-hint" class="touch-only" width="104" height="18" aria-hidden="true"></canvas>
   <div id="stick-zone" class="touch-only" aria-label="Cruceta: arrastra el pulgar">
@@ -41,7 +42,7 @@
 <div id="hint" hidden>Flechas o WASD · Z salta (otra vez en el aire: aleteo) · X: mantén para sorber, pulsa para escupir · C: soplar · ↑ apunta arriba · ↓ agacha, desliza, suelta; ↓ y Z: planchazo · Esc pausa · M sonido</div>
 <script>
 (function () {
-  const version = location.protocol === 'file:' ? Date.now() : '43';
+  const version = location.protocol === 'file:' ? Date.now() : '44';
   const niveles = ['01-embarcadero', '02-juncos', '03-raices', '04-molino', '05-muelle', '06-turbera', '07-cueva', '08-rio', '09-nido'].map(n => 'niveles/' + n + '.js');
   // The songs: one file each in musica/ (see musica/LEEME.md); add new ones here and in sw.js.
   const musica = ['marsh', 'dock', 'omen', 'sad', 'march', 'victoria', 'alba', 'creditos', 'heron', 'heron2', 'heron3', 'turbera', 'cueva', 'rio', 'juncos', 'raices', 'molino', 'muelle'].map(n => 'musica/' + n + '.js');
