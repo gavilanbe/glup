@@ -29,8 +29,8 @@ body.in-menu:not(.paused) #touch-top [data-act=pause] { display: none; }
 #banda { display: none; }
 body.portrait #banda { display: block; position: absolute; left: 0; top: calc(56.25vw + max(0px, env(safe-area-inset-top))); width: 100%; height: calc(100% - 56.25vw - max(0px, env(safe-area-inset-top))); image-rendering: pixelated; image-rendering: crisp-edges; background: none; z-index: 0; pointer-events: none; }
 #empezar { display: none; }
-body.touch.portrait.in-menu:not(.paused) #empezar { display: flex; position: absolute; left: 50%; top: calc(56.25vw + (100% - 56.25vw) * .5); transform: translate(-50%, -50%); z-index: 3; width: 236px; height: 92px; border-radius: 22px; background: #8a5a34; box-shadow: inset 0 0 0 3px #1a1420, inset 0 5px 0 #b07848, inset 0 -7px 0 #5a3a24, 0 5px 0 rgba(0, 0, 0, .5), 0 0 30px rgba(242, 196, 106, .25); align-items: center; justify-content: center; animation: latido 1.3s ease-in-out infinite; }
-#empezar canvas { width: 224px; height: 80px; image-rendering: pixelated; background: none; }
+body.touch.portrait.in-menu:not(.paused) #empezar { display: flex; position: absolute; left: 50%; top: calc(56.25vw + (100% - 56.25vw) * .5); transform: translate(-50%, -50%); z-index: 3; width: 236px; height: 92px; border-radius: 40px; background: none; filter: drop-shadow(0 5px 0 rgba(0, 0, 0, .5)) drop-shadow(0 0 14px rgba(255, 227, 106, .35)); align-items: center; justify-content: center; animation: latido 1.3s ease-in-out infinite; }
+#empezar canvas { width: 224px; height: 80px; display: block; image-rendering: pixelated; background: none; }
 #empezar.held { animation: none; transform: translate(-50%, -46%) scale(.92); }
 #empezar.ripple::after { content: ""; position: absolute; inset: -4px; border-radius: 24px; border: 3px solid #f2c46a; animation: ripple .4s ease-out; pointer-events: none; }
 @keyframes latido { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 12% { transform: translate(-50%, -50%) scale(1.05); } 24% { transform: translate(-50%, -50%) scale(.98); } 36% { transform: translate(-50%, -50%) scale(1.03); } }
@@ -49,16 +49,14 @@ body.touch.portrait.in-menu:not(.paused) #touch-buttons .jump { opacity: 0; poin
 /* Right: jump, Bigotes and the puff in a thumb arc; "talk" pops up above them when someone is near. */
 #touch-buttons { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: 200px; height: 212px; z-index: 3; pointer-events: none; }
 #touch-buttons button { position: absolute; pointer-events: auto; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: transform .07s, opacity .2s; }
-#touch-buttons .act { --ring: rgba(242, 196, 106, .9); --fill: rgba(40, 26, 36, .7); background: radial-gradient(circle at 50% 38%, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 60%), var(--fill); box-shadow: inset 0 0 0 3px var(--ring), inset 0 -5px 0 rgba(0, 0, 0, .28), 0 3px 0 rgba(0, 0, 0, .4); }
-#touch-buttons .jump canvas, #touch-buttons .fish canvas { width: 72px; height: 72px; }
-#touch-buttons .puff canvas { width: 48px; height: 48px; }
-#touch-buttons .jump { right: 0; bottom: 0; width: 84px; height: 84px; --ring: #f2c43d; --fill: rgba(92, 62, 20, .72); }
-#touch-buttons .fish { right: 94px; bottom: 20px; width: 84px; height: 84px; --ring: #7fd0a0; --fill: rgba(22, 60, 52, .72); }
-#touch-buttons .puff { right: 52px; bottom: 102px; width: 62px; height: 62px; --ring: #a8d8f0; --fill: rgba(28, 46, 66, .72); }
-#touch-buttons .fish::before { content: ""; position: absolute; inset: -5px; border-radius: 50%; background: conic-gradient(var(--charge-col, #f2c46a) calc(var(--charge, 0) * 1turn), transparent 0); -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%); mask: radial-gradient(circle, transparent 62%, #000 63%); pointer-events: none; }
-#touch-buttons .fish.full::before { animation: glow .3s steps(2) infinite; }
+#touch-buttons .act { --ring: #f2c46a; background: none; box-shadow: none; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .45)); }
+#touch-buttons .jump canvas, #touch-buttons .fish canvas { width: 84px; height: 84px; }
+#touch-buttons .puff canvas { width: 62px; height: 62px; }
+#touch-buttons .jump { right: 0; bottom: 0; width: 84px; height: 84px; --ring: #f2c43d; }
+#touch-buttons .fish { right: 94px; bottom: 20px; width: 84px; height: 84px; --ring: #7fb040; }
+#touch-buttons .puff { right: 52px; bottom: 102px; width: 62px; height: 62px; --ring: #a8d8f0; }
 /* Juice: pressed, a button squashes and sinks; let go, it boings back and its icon pops (particles: #touch-fx). */
-#touch-buttons .act.held { transform: translateY(3px) scale(1.1, .84); --fill: rgba(255, 246, 214, .45); box-shadow: inset 0 0 0 3px #fff6d6, inset 0 -2px 0 rgba(0, 0, 0, .28), 0 1px 0 rgba(0, 0, 0, .4), 0 0 18px var(--ring); transition: transform .05s; }
+#touch-buttons .act.held { transform: translateY(3px) scale(1.1, .84); filter: brightness(1.25) drop-shadow(0 1px 0 rgba(0, 0, 0, .45)) drop-shadow(0 0 6px var(--ring)); transition: transform .05s; }
 #touch-buttons .act.boing { animation: boing .44s cubic-bezier(.3, 1.6, .5, 1); }
 #touch-buttons .act.boing canvas { animation: iconpop .34s ease-out; }
 #touch-buttons .act.lab canvas { animation: iconpop .3s ease-out; }
@@ -68,13 +66,14 @@ body.touch.portrait.in-menu:not(.paused) #touch-buttons .jump { opacity: 0; poin
 body.touch #touch-fx { display: block; position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; image-rendering: pixelated; image-rendering: crisp-edges; background: none; }
 /* The 'ok' button outside play (sigue / jugar / entrar / vale): a golden halo that breathes. */
 body.in-menu #touch-buttons .jump, body.in-talk #touch-buttons .jump { --ring: #ffe36a; animation: okglow 1.1s ease-in-out infinite; }
-@keyframes okglow { 50% { box-shadow: inset 0 0 0 3px #fff6d6, inset 0 -5px 0 rgba(0, 0, 0, .28), 0 3px 0 rgba(0, 0, 0, .4), 0 0 22px rgba(255, 227, 106, .8); transform: scale(1.06); } }
-#touch-buttons .act.locked { opacity: .28; }
-#touch-buttons .act.hot { animation: hot .7s ease-in-out infinite; }
+@keyframes okglow { 50% { filter: brightness(1.15) drop-shadow(0 3px 0 rgba(0, 0, 0, .45)) drop-shadow(0 0 10px rgba(255, 227, 106, .9)); transform: scale(1.06); } }
+#touch-buttons .act.locked { opacity: .85; }
+#touch-buttons .act.hot { animation: hotglow .7s ease-in-out infinite; }
+@keyframes hotglow { 50% { filter: brightness(1.2) drop-shadow(0 3px 0 rgba(0, 0, 0, .45)) drop-shadow(0 0 8px var(--ring)); } }
 #touch-buttons .act::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--ring); opacity: 0; pointer-events: none; }
 #touch-buttons .act.ripple::after { animation: ripple .38s ease-out; }
-#touch-buttons .talk { right: 40px; bottom: 174px; width: 112px; height: 34px; border-radius: 15px 15px 15px 4px; background: #fff6d6; box-shadow: inset 0 0 0 2px #1b1420, inset 0 -4px 0 #e6d2a0, 0 3px 0 rgba(0, 0, 0, .4); opacity: 0; transform: scale(.4) translateY(20px); pointer-events: none; transition: transform .18s cubic-bezier(.3, 1.8, .5, 1), opacity .12s; }
-#touch-buttons .talk canvas { width: 96px; height: 28px; }
+#touch-buttons .talk { right: 40px; bottom: 174px; width: 120px; height: 44px; border-radius: 15px 15px 15px 4px; background: #fff6d6; box-shadow: inset 0 0 0 2px #1b1420, inset 0 -4px 0 #e6d2a0, 0 3px 0 rgba(0, 0, 0, .4); opacity: 0; transform: scale(.4) translateY(20px); pointer-events: none; transition: transform .18s cubic-bezier(.3, 1.8, .5, 1), opacity .12s; }
+#touch-buttons .talk canvas { width: 112px; height: 40px; }
 #touch-buttons .talk.show { opacity: 1; transform: none; pointer-events: auto; animation: bob 1s ease-in-out infinite .2s; }
 #touch-buttons .talk.held { transform: scale(.9); animation: none; }
 @keyframes ripple { from { opacity: .9; transform: scale(.9); } to { opacity: 0; transform: scale(1.45); } }

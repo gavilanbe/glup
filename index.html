@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GLUP">
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
 <main id="shell" aria-label="GLUP">
@@ -33,16 +33,16 @@
     <div id="stick"><canvas class="base" width="66" height="66"></canvas><canvas class="knob" width="31" height="31"></canvas></div>
   </div>
   <div id="touch-buttons" class="touch-only" aria-label="Acciones">
-    <button type="button" data-act="up" class="talk" aria-label="Hablar"><canvas width="48" height="14"></canvas></button>
-    <button type="button" data-act="puff" class="act puff" aria-label="Soplo"><canvas width="24" height="24"></canvas></button>
-    <button type="button" data-act="fish" class="act fish" aria-label="Bigotes: mantén para sorber, suelta para escupir"><canvas width="36" height="36"></canvas></button>
-    <button type="button" data-act="jump" class="act jump" aria-label="Salto"><canvas width="36" height="36"></canvas></button>
+    <button type="button" data-act="up" class="talk" aria-label="Hablar"><canvas width="56" height="20"></canvas></button>
+    <button type="button" data-act="puff" class="act puff" aria-label="Soplo"><canvas width="31" height="31"></canvas></button>
+    <button type="button" data-act="fish" class="act fish" aria-label="Bigotes: mantén para sorber, suelta para escupir"><canvas width="42" height="42"></canvas></button>
+    <button type="button" data-act="jump" class="act jump" aria-label="Salto"><canvas width="42" height="42"></canvas></button>
   </div>
 </main>
 <div id="hint" hidden>Flechas o WASD · Z salta (otra vez en el aire: aleteo) · X: mantén para sorber, pulsa para escupir · C: soplar · ↑ apunta arriba · ↓ agacha, desliza, suelta; ↓ y Z: planchazo · Esc pausa · M sonido</div>
 <script>
 (function () {
-  const version = location.protocol === 'file:' ? Date.now() : '44';
+  const version = location.protocol === 'file:' ? Date.now() : '45';
   const niveles = ['01-embarcadero', '02-juncos', '03-raices', '04-molino', '05-muelle', '06-turbera', '07-cueva', '08-rio', '09-nido'].map(n => 'niveles/' + n + '.js');
   // The songs: one file each in musica/ (see musica/LEEME.md); add new ones here and in sw.js.
   const musica = ['marsh', 'dock', 'omen', 'sad', 'march', 'victoria', 'alba', 'creditos', 'heron', 'heron2', 'heron3', 'turbera', 'cueva', 'rio', 'juncos', 'raices', 'molino', 'muelle'].map(n => 'musica/' + n + '.js');

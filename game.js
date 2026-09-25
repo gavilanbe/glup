@@ -191,42 +191,92 @@ const Touch = {
     g.fillStyle = '#ffffff'; g.fillRect(9, 7, 4, 2); g.fillRect(8, 9, 2, 2); g.fillStyle = '#5a9ab0'; for (let k = 0; k < 9; k++) g.fillRect(Math.round(15 + Math.cos(.3 + k * .18) * 12), Math.round(15 + Math.sin(.3 + k * .18) * 12), 1, 1);
   },
   label(g, text, x, y, col) { ART.text(g, text, x, y, col, 'center', '#120c18'); },
+  // ---- The buttons are bubbles of the swamp (like the ones the crías sleep in and the stick's knob), drawn in the
+  // game's pixels: a dark outline, a coloured rim lit from the top left, a translucent inside the game shows through,
+  // a glossy crescent and a tuft of moss. Colour = who acts: raincoat yellow (jump), Bigotes green (suck/spit), air
+  // blue (blow), gold (ok). Each one shows what is going on inside it (see drawFish/drawJump/drawPuff).
+  PAL: { jump: { r: '#f2c43d', l: '#fff3b8', d: '#a8741a', i: 'rgba(70,46,14,.78)', il: 'rgba(130,92,30,.7)' },
+    fish: { r: '#7fb040', l: '#d0f09a', d: '#3f6a28', i: 'rgba(18,44,30,.78)', il: 'rgba(44,90,56,.7)' },
+    puff: { r: '#a8d8f0', l: '#ffffff', d: '#5a8aa8', i: 'rgba(22,40,64,.78)', il: 'rgba(52,86,120,.7)' },
+    ok: { r: '#ffe36a', l: '#fffbe0', d: '#c8961a', i: 'rgba(96,66,12,.82)', il: 'rgba(160,116,30,.75)' },
+    lock: { r: '#8a8f9a', l: '#c8ccd4', d: '#4a4e58', i: 'rgba(30,30,40,.8)', il: 'rgba(60,60,72,.7)' },
+    hot: { r: '#f28b3a', l: '#fff0c0', d: '#a8481a', i: 'rgba(96,36,12,.82)', il: 'rgba(170,80,30,.75)' } },
+  bubbles: {},
+  bubble(key, S) {
+    const id = key + S; if (Touch.bubbles[id]) return Touch.bubbles[id];
+    const P = Touch.PAL[key], c = document.createElement('canvas'); c.width = S; c.height = S; const g = c.getContext('2d'), m = (S - 1) / 2, R = S / 2 - .6;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const dx = x - m, dy = y - m, d = Math.hypot(dx, dy); if (d > R + .35) continue;
+      const lit = -dx * .55 - dy * .85;   // light from the top left
+      if (d > R - .75) g.fillStyle = '#1a1420';
+      else if (d > R - 2.75) g.fillStyle = lit > R * .35 ? P.l : lit < -R * .4 ? P.d : P.r;
+      else g.fillStyle = dy < -R * .2 ? P.il : P.i;
+      g.fillRect(x, y, 1, 1);
+    }
+    // Glossy crescent top left, a small glint, a reflected arc at the bottom right.
+    for (let a = 3.5; a < 4.55; a += .04) { const r = R - 4.2; g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(Math.round(m + Math.cos(a) * r), Math.round(m + Math.sin(a) * r), 2, 1); }
+    g.fillStyle = '#ffffff'; g.fillRect(Math.round(m - R * .52), Math.round(m - R * .6), 2, 2);
+    for (let a = .35; a < 1.2; a += .06) { const r = R - 3.6; g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(Math.round(m + Math.cos(a) * r), Math.round(m + Math.sin(a) * r), 1, 1); }
+    // A tuft of moss on the rim (the swamp), top right.
+    const mx = Math.round(m + R * .62), my = Math.round(m - R * .72); g.fillStyle = '#1a1420'; g.fillRect(mx - 2, my, 6, 3); g.fillStyle = '#3f7a2a'; g.fillRect(mx - 1, my, 4, 2); g.fillStyle = '#8fbf4a'; g.fillRect(mx, my, 1, 1); g.fillRect(mx + 2, my - 1, 1, 1);
+    return Touch.bubbles[id] = c;
+  },
+  // A ring of pixels round the rim, filled a fraction k (charge, inhale steps).
+  rimArc(g, S, k, col) { const m = (S - 1) / 2, R = S / 2 - 1.7; for (let a = 0; a < k * 6.283; a += .09) { g.fillStyle = col; g.fillRect(Math.round(m + Math.cos(a - Math.PI / 2) * R), Math.round(m + Math.sin(a - Math.PI / 2) * R), 1, 1); } },
+  inner(g, S, fn) { const m = (S - 1) / 2; g.save(); g.beginPath(); g.arc(m + .5, m + .5, S / 2 - 3, 0, 7); g.clip(); fn(); g.restore(); },
   drawFish(g, t) {
-    const p = Player, held = p.held, full = p.charge >= CHARGE_FULL; g.clearRect(0, 0, 36, 36);
-    const face = p.spitT > 6 ? ART.fish.spit : full ? ART.fish.squint : held ? ART.fish.full : p.sucking ? ART.fish.open : (t % 200) < 6 ? ART.fish.blink : ART.fish.closed;
-    const jit = p.sucking ? ((t >> 1) & 1) * (p.suckLv || 1) * .5 : full ? ((t >> 1) & 1) : 0, fx = Math.round(5 + jit), fy = 5 + (held ? 0 : Math.round(Math.sin(t / 20)));
-    g.drawImage(face, fx, fy); Player.fishOverlay(g, face, fx, fy, t, { noWhiskers: true, mood: p.sucking || p.charge > 8 ? 'mad' : null, lx: 1 });
-    if (p.sucking) { g.fillStyle = p.suckLv === 3 ? '#fff6d6' : '#cfe8f0'; for (let i = 0; i < 2 + p.suckLv; i++) { const k = (t * (.1 + p.suckLv * .04) + i / (2 + p.suckLv)) % 1; g.fillRect(Math.round(34 - k * 7), 7 + i * 2, 2, 1); } }
+    const p = Player, held = p.held, full = p.charge >= CHARGE_FULL, S = 42; g.clearRect(0, 0, S, S);
     const lab = full ? '¡zas!' : held ? (held.kind === 'agua' && !p.onGround ? 'flota' : 'escupe') : p.grapple ? 'suelta' : p.target && ((!p.onGround && p.airT > 3) || Input.held.up) ? 'pica' : 'sorbe';
     Touch.labPop(Touch.btn && Touch.btn.fish, 'fish', lab, '#7fd0a0');
-    Touch.label(g, lab, 18, 21, full ? '#f2c46a' : p.sucking ? '#fff6d6' : held ? '#bdf0d0' : '#e8fbff');
+    const hot = p.charge > 8 ? Math.min(1, p.charge / CHARGE_FULL) : 0;
+    g.drawImage(Touch.bubble(hot >= 1 ? 'hot' : 'fish', S), 0, 0);
+    Touch.inner(g, S, () => {
+      // Water in the mouth: the bubble fills to what is left, with a wave.
+      if (held && held.kind === 'agua') { const lv = S - 4 - Math.round((held.amount || 0) * 26); g.fillStyle = 'rgba(80,190,200,.55)'; for (let x = 0; x < S; x++) g.fillRect(x, lv + Math.round(Math.sin(x / 4 + t / 6)), 1, S); g.fillStyle = '#bdf0e4'; for (let x = 0; x < S; x += 2) g.fillRect(x, lv - 1 + Math.round(Math.sin(x / 4 + t / 6)), 1, 1); }
+      if (hot > 0 && hot < 1) { g.fillStyle = 'rgba(242,139,58,' + (hot * .35).toFixed(2) + ')'; g.fillRect(0, 0, S, S); }
+    });
+    // Bigotes' face, big, and what he is holding in a little bubble of its own.
+    const face = p.spitT > 6 ? ART.fish.spit : full ? ART.fish.squint : held ? ART.fish.full : p.sucking ? ART.fish.open : (t % 200) < 6 ? ART.fish.blink : ART.fish.closed;
+    const jit = p.sucking ? ((t >> 1) & 1) * (p.suckLv || 1) * .5 : full ? ((t >> 1) & 1) : 0, fx = Math.round(9 + jit + (held && held.kind !== 'agua' ? -4 : 0)), fy = 9 + (held ? 0 : Math.round(Math.sin(t / 20)));
+    g.drawImage(face, fx, fy); Player.fishOverlay(g, face, fx, fy, t, { noWhiskers: true, mood: p.sucking || p.charge > 8 ? 'mad' : held ? null : 'happy', lx: 1 });
+    if (held && held.kind !== 'agua' && held.sprite) { const sp = held.sprite, sc = Math.min(1, 11 / Math.max(sp.width, sp.height)), w = Math.round(sp.width * sc), h = Math.round(sp.height * sc), bx = 27, by = 12; g.fillStyle = 'rgba(232,251,255,.35)'; g.beginPath(); g.arc(bx + 1, by + 5, 8, 0, 7); g.fill(); g.drawImage(sp, bx + 1 - w / 2, by + 5 - h / 2, w, h); g.fillStyle = '#ffffff'; g.fillRect(bx - 4, by, 2, 1); }
+    if (p.sucking) { const lv = p.suckLv || 1; g.fillStyle = lv === 3 ? '#fff6d6' : '#cfe8f0'; for (let i = 0; i < 2 + lv; i++) { const k = (t * (.1 + lv * .04) + i / (2 + lv)) % 1; g.fillRect(Math.round(38 - k * 8), 10 + i * 2, 2, 1); } for (let i = 0; i < 3; i++) { g.fillStyle = i < lv ? (lv === 3 ? '#ffe36a' : '#8fe0f0') : 'rgba(255,255,255,.2)'; g.fillRect(16 + i * 4, 6, 2, 2); } }
+    if (hot > 0) Touch.rimArc(g, S, hot, hot >= 1 ? ((t >> 2) & 1 ? '#ffffff' : '#ffe36a') : '#f2c46a');
+    Touch.label(g, lab, 21, 27, full ? '#ffe36a' : p.sucking ? '#fff6d6' : held ? '#d0f09a' : '#e8fbff');
   },
   drawJump(g, t) {
-    const p = Player; g.clearRect(0, 0, 36, 36);
+    const p = Player, S = 42; g.clearRect(0, 0, S, S);
     const air = !p.onGround && !p.grapple, lab = p.hanging || p.grapple ? 'suelta' : air && Input.held.down && Game.has('panzazo') ? 'panzazo' : air && p.airJumps > 0 && Game.has('aleteo') ? 'aletea' : 'salta';
     Touch.labPop(Touch.btn && Touch.btn.jump, 'jump', lab, '#f2c43d');
-    const N = ART.nila, spr = lab === 'panzazo' ? N.fall : lab === 'aletea' ? N.jump : N.jump, bob = lab === 'salta' ? Math.round(Math.abs(Math.sin(t / 14)) * -2) : 0;
-    g.drawImage(spr, 10, 0 + bob);
-    if (lab === 'aletea') { g.fillStyle = '#e8fbff'; const f = (t >> 3) & 1; g.fillRect(6, 10 + f, 3, 1); g.fillRect(27, 10 + f, 3, 1); g.fillRect(5, 12 - f, 2, 1); g.fillRect(29, 12 - f, 2, 1); }
-    if (lab === 'panzazo') { g.fillStyle = '#f2c46a'; for (let i = 0; i < 3; i++) g.fillRect(12 + i * 5, 2 + ((t + i * 3) % 6), 1, 3); }
-    Touch.label(g, lab, 18, 23, lab === 'salta' ? '#fff6d6' : '#f2c46a');
+    g.drawImage(Touch.bubble('jump', S), 0, 0);
+    const N = ART.nila, spr = lab === 'panzazo' ? (N.tuck || N.fall) : lab === 'suelta' ? (N.launch || N.jump) : N.jump, bob = lab === 'salta' ? Math.round(Math.abs(Math.sin(t / 14)) * -3) : Math.round(Math.sin(t / 6));
+    Touch.inner(g, S, () => { g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(15, 24, 12, 2); if (lab === 'salta') { g.fillStyle = 'rgba(255,243,184,.5)'; for (let i = 0; i < 3; i++) g.fillRect(13 + i * 6, 23 - ((t >> 2) + i * 2) % 6, 1, 2); } });
+    g.drawImage(spr, 13, 3 + bob);
+    if (lab === 'aletea') { g.fillStyle = '#e8fbff'; const f = (t >> 3) & 1; g.fillRect(9, 11 + f, 3, 1); g.fillRect(30, 11 + f, 3, 1); g.fillRect(8, 13 - f, 2, 1); g.fillRect(32, 13 - f, 2, 1); }
+    if (lab === 'panzazo') { g.fillStyle = '#f2c46a'; for (let i = 0; i < 3; i++) g.fillRect(14 + i * 6, 2 + ((t + i * 3) % 7), 1, 3); }
+    // Air jumps left: a feather each (the flap).
+    if (Game.has('aleteo')) { const n = p.onGround || p.hanging ? 1 : p.airJumps; for (let i = 0; i < 1; i++) { const on = i < n, x = 30, y = 20; g.fillStyle = '#1a1420'; g.fillRect(x - 1, y - 1, 4, 5); g.fillStyle = on ? '#e8fbff' : '#5a5a66'; g.fillRect(x, y, 2, 3); g.fillStyle = on ? '#9fc0cc' : '#3a3a44'; g.fillRect(x + 2, y + 1, 1, 2); } }
+    Touch.label(g, lab, 21, 27, lab === 'salta' ? '#fff6d6' : '#ffe36a');
   },
   drawPuff(g, t) {
-    // Swirling gust lines; crouched with the slide learnt, a sled arrow instead.
-    const p = Player; g.clearRect(0, 0, 24, 24);
-    if (!Game.has('soplido')) { g.fillStyle = '#1b1420'; g.fillRect(7, 11, 10, 8); g.fillStyle = '#9fa8b0'; g.fillRect(8, 12, 8, 6); g.fillRect(9, 6, 1, 6); g.fillRect(14, 6, 1, 6); g.fillRect(9, 5, 6, 1); g.fillStyle = '#1b1420'; g.fillRect(11, 14, 2, 2); return; }
-    if (p.crouch && p.onGround && Game.has('resbalon') && !p.held) {
-      const k = (t >> 2) % 4; g.fillStyle = '#1b1420'; g.fillRect(3, 15, 18, 3); g.fillStyle = '#e8b878'; g.fillRect(4, 15, 16, 2); g.fillStyle = '#fff6d6';
-      for (let i = 0; i < 3; i++) g.fillRect(2 + ((i * 6 + k * 2) % 14), 9 + i * 2, 5, 1); g.fillRect(17, 9, 1, 5); g.fillRect(18, 10, 1, 3); g.fillRect(19, 11, 1, 1); return;
-    }
+    // Swirling gusts; crouched with the slide learnt, a sled; not learnt yet, chains and a padlock.
+    const p = Player, S = 31, have = Game.has('soplido'), slide = p.crouch && p.onGround && Game.has('resbalon') && !p.held; g.clearRect(0, 0, S, S);
+    g.drawImage(Touch.bubble(have ? 'puff' : 'lock', S), 0, 0);
+    if (!have) { g.fillStyle = '#1a1420'; g.fillRect(10, 14, 11, 9); g.fillStyle = '#c8ccd4'; g.fillRect(11, 15, 9, 7); g.fillStyle = '#8a8f9a'; g.fillRect(11, 20, 9, 2); g.fillStyle = '#1a1420'; g.fillRect(12, 8, 2, 7); g.fillRect(17, 8, 2, 7); g.fillRect(12, 7, 7, 2); g.fillRect(15, 17, 1, 3); for (let i = 0; i < 6; i++) { g.fillStyle = i % 2 ? '#6a6e78' : '#9aa0aa'; g.fillRect(3 + i * 2, 23 - i, 2, 2); g.fillRect(26 - i * 2, 23 - i, 2, 2); } return; }
+    if (slide) { const k = (t >> 2) % 4; g.fillStyle = '#1a1420'; g.fillRect(6, 19, 19, 3); g.fillStyle = '#e8b878'; g.fillRect(7, 19, 17, 2); g.fillStyle = '#fff6d6'; for (let i = 0; i < 3; i++) g.fillRect(5 + ((i * 6 + k * 2) % 14), 12 + i * 2, 5, 1); g.fillRect(21, 12, 1, 5); g.fillRect(22, 13, 1, 3); g.fillRect(23, 14, 1, 1); return; }
+    // A spiral gust: three curls that travel outward.
     const k = t * .12;
     for (let i = 0; i < 3; i++) {
-      const y = 7 + i * 5, len = 14 - i * 2, off = Math.round(((k + i * .7) % 1) * 3);
-      g.fillStyle = '#1b1420'; g.fillRect(3 + off, y + 1, len, 1);
-      g.fillStyle = i === 1 ? '#ffffff' : '#bfe6f5'; g.fillRect(3 + off, y, len, 1); g.fillRect(3 + off + len, y - 1, 2, 1); g.fillRect(3 + off + len + 2, y, 1, 2);
+      const y = 9 + i * 5, len = 13 - i * 2, off = Math.round(((k + i * .7) % 1) * 3);
+      g.fillStyle = '#1a1420'; g.fillRect(6 + off, y + 1, len, 1);
+      g.fillStyle = i === 1 ? '#ffffff' : '#d8f0fb'; g.fillRect(6 + off, y, len, 1); g.fillRect(6 + off + len, y - 1, 2, 1); g.fillRect(6 + off + len + 2, y, 1, 2); g.fillRect(6 + off + len + 1, y + 2, 1, 1);
     }
   },
-  drawTalk(g, t) { g.clearRect(0, 0, 48, 14); g.fillStyle = '#1b1420'; const ax = 5, ay = 3 + ((t >> 4) & 1); g.fillRect(ax, ay, 1, 1); g.fillRect(ax - 1, ay + 1, 3, 1); g.fillRect(ax - 2, ay + 2, 5, 1); ART.text(g, 'hablar', 27, 1, '#1b1420', 'center'); },
+  drawTalk(g, t) {
+    // A paper speech bubble with the portrait of whoever is near, and "hablar".
+    g.clearRect(0, 0, 56, 20); const who = Touch.talkWho; if (who && typeof Maestros !== 'undefined') { g.fillStyle = '#1a1420'; g.fillRect(2, 2, 16, 16); g.fillStyle = who.fondo || '#2e4a3a'; g.fillRect(3, 3, 14, 14); g.save(); g.beginPath(); g.rect(3, 3, 14, 14); g.clip(); Maestros.portrait(g, who, 3, 3, 14, 14, (t >> 3) & 1, t); g.restore(); }
+    const ax = 23, ay = 7 + ((t >> 4) & 1); g.fillStyle = '#1b1420'; g.fillRect(ax, ay, 1, 1); g.fillRect(ax - 1, ay + 1, 3, 1); g.fillRect(ax - 2, ay + 2, 5, 1); ART.text(g, 'hablar', 39, 5, '#1b1420', 'center');
+  },
   // Called every frame: redraw a face only when what it says changes (and animate the busy ones).
   // ---- Held upright: a full-screen card that asks, with some juice, to turn the phone. A phone tips over
   // (bouncing) with the swamp and Nila running inside it, a curved arrow pulses, the title wobbles in GLUP
@@ -346,6 +396,13 @@ const Touch = {
   // ---- The big portrait 'play' button: Bigotes bouncing next to the word, in GLUP letters.
   drawEmpezar(t) {
     const b = $('empezar'); if (!b || !Touch.portrait) return; const g = b.querySelector('canvas').getContext('2d'); g.clearRect(0, 0, 112, 40);
+    // A long golden bubble (the 'ok' bubble stretched): outline, lit rim, translucent inside, gloss and moss.
+    if (!Touch.capsule) { const c = document.createElement('canvas'); c.width = 112; c.height = 40; const q = c.getContext('2d'), P = Touch.PAL.ok, R = 19.4, m = 19.5;
+      for (let y = 0; y < 40; y++) for (let x = 0; x < 112; x++) { const cx = Math.max(m, Math.min(111 - m, x)), dx = x - cx, dy = y - m, d = Math.hypot(dx, dy); if (d > R + .35) continue; const lit = -dx * .4 - dy * .9;
+        q.fillStyle = d > R - .75 ? '#1a1420' : d > R - 2.75 ? (lit > R * .3 ? P.l : lit < -R * .4 ? P.d : P.r) : dy < -R * .2 ? P.il : P.i; q.fillRect(x, y, 1, 1); }
+      q.fillStyle = 'rgba(255,255,255,.5)'; q.fillRect(14, 6, 70, 2); q.fillStyle = '#ffffff'; q.fillRect(10, 8, 3, 2); q.fillStyle = '#1a1420'; q.fillRect(88, 2, 8, 3); q.fillStyle = '#3f7a2a'; q.fillRect(89, 2, 6, 2); q.fillStyle = '#8fbf4a'; q.fillRect(90, 1, 1, 1); q.fillRect(93, 1, 1, 1);
+      Touch.capsule = c; }
+    g.drawImage(Touch.capsule, 0, 0);
     const lab = Game.state === 'select' ? 'ENTRAR' : Game.state === 'clear' || Game.state === 'ending' ? 'SEGUIR' : Game.state === 'cine' ? 'SALTAR' : '¡A JUGAR!';
     const fsh = ART.fish.closed, hop = Math.round(Math.abs(Math.sin(t / 10)) * -5), sq = hop === 0 ? 1.15 : 1;
     g.save(); g.translate(19, 31); g.scale(1.4 * sq, 1.4 * (2 - sq)); g.drawImage(fsh, -11, -12 + hop); if (Player.fishOverlay) Player.fishOverlay(g, fsh, -11, -12 + hop, t, { mood: 'happy', noWhiskers: true, lx: 1 }); g.restore();
@@ -360,16 +417,17 @@ const Touch = {
   },
   // Outside a level the jump button is the "ok": what it does, on a bouncing tag.
   drawOk(g, t, lab) {
-    // A golden arrow that hops forward with a trail, a shine sweeping over it, and the word underneath.
-    g.clearRect(0, 0, 36, 36); const k = (t % 40) / 40, hop = Math.round(Math.sin(Math.min(1, k * 2) * Math.PI) * 3), x0 = 11 + hop;
-    // A proper arrow pointing right: tall at the back, a point at the front (column heights 11, 9, 7...).
-    const col = (x, h, c) => { g.fillStyle = c; g.fillRect(x, 10 - (h >> 1), 1, h); };
-    for (let tr = 3; tr >= 1; tr--) { g.globalAlpha = .18 * (4 - tr); for (let i = 0; i < 6; i++) col(x0 - tr * 3 + i, 11 - i * 2, '#ffe36a'); } g.globalAlpha = 1;
+    // The golden bubble: an arrow that hops forward with a trail, a shine sweeping over it, the word underneath.
+    const S = 42; g.clearRect(0, 0, S, S); g.drawImage(Touch.bubble('ok', S), 0, 0);
+    const k = (t % 40) / 40, hop = Math.round(Math.sin(Math.min(1, k * 2) * Math.PI) * 3), x0 = 16 + hop, cy = 14;
+    const col = (x, h, c) => { g.fillStyle = c; g.fillRect(x, cy - (h >> 1), 1, h); };
+    for (let tr = 3; tr >= 1; tr--) { g.globalAlpha = .2 * (4 - tr); for (let i = 0; i < 6; i++) col(x0 - tr * 3 + i, 11 - i * 2, '#fff3b8'); } g.globalAlpha = 1;
     for (let i = -1; i < 7; i++) col(x0 + i, 13 - (i + 1) * 2, '#1b1420');
-    for (let i = 0; i < 6; i++) col(x0 + i, 11 - i * 2, i < 1 ? '#fff6d6' : i < 3 ? '#ffe36a' : '#e79b3f');
-    const sh = (t % 70) - 10; if (sh >= 0 && sh < 7) { g.fillStyle = '#ffffff'; const hh = Math.max(1, 11 - sh * 2); g.fillRect(x0 + sh, 10 - (hh >> 1), 1, hh); }
-    Touch.label(g, lab, 18, 21, '#fff6d6');
+    for (let i = 0; i < 6; i++) col(x0 + i, 11 - i * 2, i < 1 ? '#ffffff' : i < 3 ? '#fff3b8' : '#ffe36a');
+    const sh = (t % 70) - 10; if (sh >= 0 && sh < 6) { g.fillStyle = '#ffffff'; col(x0 + sh, Math.max(1, 11 - sh * 2), '#ffffff'); }
+    Touch.label(g, lab, 21, 27, '#fffbe0');
   },
+
   updateButtons() {
     if (Touch.enabled) { Touch.fxDraw(Game.t); Touch.drawTop(Game.t); Touch.drawBanda(Game.t); if (Touch.portrait && document.body.classList.contains('in-menu') && !Game.paused) Touch.drawEmpezar(Game.t); }
     Touch.girarShow(!!(Touch.enabled && Touch.portrait && !Touch.girar.no && $('girar')));
@@ -382,9 +440,10 @@ const Touch = {
     if (!Touch.enabled || !Touch.btn || Game.state !== 'play' || !L.def) return;
     const p = Player, t = Game.t, B = Touch.btn, K = Touch.keys;
     const talk = !Charla.active() && !Game.learning && !Maestros.busy() && !p.dead && !!((L.maestro && L.maestro.near) || L.ents.some(e => e.kind === 'ruca' && e.near));
+    Touch.talkWho = talk ? (L.maestro && L.maestro.near ? L.maestro.who : Maestros.QUIEN.ruca) : null;
     if (talk && !B.talk.classList.contains('show')) { const c = Touch.center(B.talk); for (let i = 0; i < 14; i++) { const a = i / 14 * 6.28; Touch.spark(c.x, c.y, Math.cos(a) * 1.6, Math.sin(a) * 1.1, i % 2 ? '#fff6d6' : '#f2c46a', 18, { g: .02, star: i % 3 === 0 }); } }
     B.talk.classList.toggle('show', talk); if (talk && K.talk !== (t >> 4)) { K.talk = t >> 4; Touch.drawTalk(Touch.ctx.talk, t); }
-    const fk = [!!p.grapple, !!p.target, p.held ? p.held.kind : '', p.sucking ? p.suckLv : 0, p.charge >= CHARGE_FULL, p.spitT > 6, p.onGround, p.sucking || p.charge >= CHARGE_FULL ? t >> 1 : t >> 3].join();
+    const fk = [p.held && p.held.kind === 'agua' ? Math.round(p.held.amount * 20) : 0, Math.round((p.charge || 0) / 4), !!p.grapple, !!p.target, p.held ? p.held.kind : '', p.sucking ? p.suckLv : 0, p.charge >= CHARGE_FULL, p.spitT > 6, p.onGround, p.sucking || p.charge >= CHARGE_FULL ? t >> 1 : t >> 3].join();
     if (K.fish !== fk) { K.fish = fk; Touch.drawFish(Touch.ctx.fish, t); }
     const ring = p.sucking ? (p.suckLv || 1) / 3 : p.charge > 8 ? Math.min(1, p.charge / CHARGE_FULL) : 0;
     B.fish.style.setProperty('--charge', ring.toFixed(3)); B.fish.style.setProperty('--charge-col', p.sucking ? (p.suckLv === 3 ? '#fff6d6' : '#8fe0f0') : '#f2c46a');
