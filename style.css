@@ -20,8 +20,22 @@ body.touch #hint { display: none; }
 .touch-only button:focus-visible { outline: 2px solid #e79b3f; outline-offset: 3px; }
 
 #touch-top { position: absolute; top: max(6px, env(safe-area-inset-top)); right: max(6px, env(safe-area-inset-right)); gap: 6px; z-index: 4; }
-#touch-top button { width: 38px; height: 38px; font: 700 14px/1 system-ui, sans-serif; border-radius: 10px; background: rgba(18, 12, 24, .55); border: 2px solid rgba(242, 196, 106, .45); box-shadow: 0 2px 0 rgba(0, 0, 0, .35); display: flex; align-items: center; justify-content: center; }
-#touch-top button:active { transform: translateY(1px) scale(.94); background: rgba(231, 155, 63, .8); color: #1b1420; }
+/* The little wooden tags up top: pause, music, fullscreen — pixel icons that move (see Touch.drawTop). */
+#touch-top button { width: 40px; height: 40px; border-radius: 9px; background: #8a5a34; box-shadow: inset 0 0 0 2px #1a1420, inset 0 3px 0 #b07848, inset 0 -4px 0 #5a3a24, 0 3px 0 rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; transition: transform .08s; }
+#touch-top button canvas { width: 32px; height: 32px; }
+#touch-top button:active, #touch-top button.held { transform: translateY(2px) scale(.9); box-shadow: inset 0 0 0 2px #1a1420, inset 0 3px 0 #c99058, inset 0 -2px 0 #5a3a24, 0 1px 0 rgba(0, 0, 0, .45); }
+body.in-menu:not(.paused) #touch-top [data-act=pause] { display: none; }
+/* Portrait: under the picture, the water of the swamp (Touch.drawBanda), and in menus one big "play" button. */
+#banda { display: none; }
+body.portrait #banda { display: block; position: absolute; left: 0; top: calc(56.25vw + max(0px, env(safe-area-inset-top)) + 6px); width: 100%; height: calc(100% - 56.25vw - max(0px, env(safe-area-inset-top)) - 6px); image-rendering: pixelated; image-rendering: crisp-edges; background: none; z-index: 0; pointer-events: none; }
+#empezar { display: none; }
+body.touch.portrait.in-menu:not(.paused) #empezar { display: flex; position: absolute; left: 50%; top: calc(56.25vw + (100% - 56.25vw) * .5); transform: translate(-50%, -50%); z-index: 3; width: 236px; height: 92px; border-radius: 22px; background: #8a5a34; box-shadow: inset 0 0 0 3px #1a1420, inset 0 5px 0 #b07848, inset 0 -7px 0 #5a3a24, 0 5px 0 rgba(0, 0, 0, .5), 0 0 30px rgba(242, 196, 106, .25); align-items: center; justify-content: center; animation: latido 1.3s ease-in-out infinite; }
+#empezar canvas { width: 224px; height: 80px; image-rendering: pixelated; background: none; }
+#empezar.held { animation: none; transform: translate(-50%, -46%) scale(.92); }
+#empezar.ripple::after { content: ""; position: absolute; inset: -4px; border-radius: 24px; border: 3px solid #f2c46a; animation: ripple .4s ease-out; pointer-events: none; }
+@keyframes latido { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 12% { transform: translate(-50%, -50%) scale(1.05); } 24% { transform: translate(-50%, -50%) scale(.98); } 36% { transform: translate(-50%, -50%) scale(1.03); } }
+body.touch.portrait.in-menu:not(.paused) #touch-buttons .jump { opacity: 0; pointer-events: none; }
+#touch-top button:focus-visible, #empezar:focus-visible { outline: 2px solid #e79b3f; outline-offset: 3px; }
 #touch-sound.off { opacity: .55; }
 
 /* Left: the floating stick. Touch anywhere in the zone and the pad jumps under the thumb. */

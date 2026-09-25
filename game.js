@@ -83,6 +83,12 @@ const Touch = {
     Touch.ctx = {}; for (const k in Touch.btn) Touch.ctx[k] = Touch.btn[k].querySelector('canvas').getContext('2d');
     Touch.drawBase(); Touch.drawKnob();
     if ($('girar')) Touch.girarInit();
+    // The big portrait 'play' button: it counts as a tap on the screen (start, enter the level, go on).
+    const emp = $('empezar'); if (emp) {
+      emp.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); Sound.init(); Input.mode = 'touch'; Touch.buzz(16); Touch.ripple(emp); emp.classList.add('held'); Game.tapped = true; if (Game.state === 'title' || Game.state === 'gate') Input.press('confirm'); });
+      const up = () => emp.classList.remove('held'); emp.addEventListener('pointerup', up); emp.addEventListener('pointercancel', up); emp.addEventListener('pointerleave', up);
+    }
+    for (const b of document.querySelectorAll('#touch-top button')) b.addEventListener('pointerdown', () => { Touch.buzz(8); b.animT = 12; });
     Touch.layout(); addEventListener('resize', Touch.layout);
   },
   stickMove(cx, cy) {
@@ -238,6 +244,58 @@ const Touch = {
       ART.text(g, b.lab, b.x + b.w / 2, b.y + 8 + dy, '#1b1420', 'center');
     }
   },
+  // ---- The wooden tags up top, as moving pixel icons: pause (bars, or a play arrow while paused), music (a note
+  // dancing to the beat; muted, grey with a cross), fullscreen (corners breathing out, or in when already full).
+  drawTop(t) {
+    const pb = document.querySelector('#touch-top [data-act=pause]'), sb = $('touch-sound'), fb = $('touch-fs'); if (!pb) return;
+    const O = '#1a1420', C = '#fff3d6', Y = '#f2c46a';
+    const px = (g, x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+    const bounce = b => { const k = b.animT > 0 ? b.animT-- : 0; return k ? Math.round(Math.sin(k / 12 * Math.PI) * -2) : 0; };
+    { const g = pb.querySelector('canvas').getContext('2d'), d = bounce(pb); g.clearRect(0, 0, 16, 16);
+      if (Game.paused) { for (let i = 0; i < 9; i++) { const h = 9 - Math.abs(i - 4) * 2; px(g, 4 + i, 4 + (9 - h) / 2 - 1 + d, 1, h + 2, O); } for (let i = 0; i < 8; i++) { const h = 8 - Math.abs(i - 4) * 2; px(g, 5 + i, 4 + (9 - h) / 2 + d, 1, Math.max(1, h), i < 2 ? '#ffffff' : C); } }
+      else { const b = Math.round(Math.sin(t / 20) * .6); for (const x of [4, 9]) { px(g, x - 1, 3 + d + b, 5, 11, O); px(g, x, 4 + d + b, 3, 9, C); px(g, x, 4 + d + b, 3, 1, '#ffffff'); } } }
+    { const g = sb.querySelector('canvas').getContext('2d'), d = bounce(sb), m = Sound.isMuted(), beat = m ? 0 : Math.round(Math.abs(Math.sin(t / 9)) * -2), tilt = m ? 0 : Math.round(Math.sin(t / 18)); g.clearRect(0, 0, 16, 16);
+      const c = m ? '#8a8a96' : C, y = 2 + d + beat;
+      px(g, 8 + tilt, y, 3, 10, O); px(g, 9 + tilt, y + 1, 1, 9, c); px(g, 9 + tilt, y, 5, 3, O); px(g, 10 + tilt, y + 1, 3, 1, c); px(g, 12 + tilt, y + 2, 1, 2, c);
+      px(g, 4 + tilt, y + 8, 6, 5, O); px(g, 5 + tilt, y + 9, 4, 3, c); px(g, 5 + tilt, y + 9, 2, 1, '#ffffff');
+      if (m) { for (let i = 0; i < 9; i++) { px(g, 3 + i, 3 + i, 2, 2, O); px(g, 12 - i, 3 + i, 2, 2, O); } for (let i = 0; i < 9; i++) { px(g, 4 + i, 4 + i, 1, 1, '#e2445a'); px(g, 12 - i, 4 + i, 1, 1, '#e2445a'); } }
+      else if ((t >> 4) % 3 === 0) { const k = (t % 16) / 16; px(g, 13, Math.round(6 - k * 5), 1, 1, Y); } }
+    { const g = fb.querySelector('canvas').getContext('2d'), d = bounce(fb), full = !!(document.fullscreenElement || document.webkitFullscreenElement), o = Math.round((Math.sin(t / 14) + 1) * .8) * (full ? -1 : 1); g.clearRect(0, 0, 16, 16);
+      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const cx = 8 + sx * (full ? 2 : 4) + sx * o, cy = 8 + sy * (full ? 2 : 4) + sy * o + d, hx = sx < 0 ? cx - 1 : cx - 3, vy = sy < 0 ? cy - 1 : cy - 3;
+        px(g, hx - 1, cy - 2 + (sy < 0 ? 0 : 1), 6, 3, O); px(g, cx - 2 + (sx < 0 ? 0 : 1), vy - 1, 3, 6, O);
+        px(g, hx, cy - 1 + (sy < 0 ? 0 : 1), 4, 1, C); px(g, cx - 1 + (sx < 0 ? 0 : 1), vy, 1, 4, C);
+      } }
+  },
+  // ---- Portrait, below the picture: the water of the swamp, as if looking under the jetty. Light shafts from the
+  // surface, lily pads on top, bubbles, swaying weed on the bottom and crías swimming about. Cheap: 1 in 2 frames.
+  drawBanda(t) {
+    const c = $('banda'); if (!c || !Touch.portrait) return;
+    const r = c.getBoundingClientRect(), w = Math.max(40, Math.round(r.width / 3)), h = Math.max(40, Math.round(r.height / 3));
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    if (t % 2) return;
+    const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+    const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#24505a'); gr.addColorStop(.35, '#173840'); gr.addColorStop(1, '#0b161c'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    // Light shafts drifting.
+    for (let i = 0; i < 5; i++) { const x0 = ((i * 37 + t * .12) % (w + 40)) - 20, sw = 6 + (i % 3) * 3; g.globalAlpha = .06 + .03 * Math.sin(t / 40 + i); g.fillStyle = '#bdf0e4'; g.beginPath(); g.moveTo(x0, 0); g.lineTo(x0 + sw, 0); g.lineTo(x0 + sw + h * .35, h); g.lineTo(x0 + h * .35, h); g.fill(); } g.globalAlpha = 1;
+    // The surface: a bright rippling line with lily pads and reed stems going down.
+    g.fillStyle = '#8fd9d0'; for (let x = 0; x < w; x++) g.fillRect(x, Math.round(1 + Math.sin(x / 5 + t / 20)), 1, 1);
+    for (let i = 0; i < 4; i++) { const x = (i * 41 + 12) % w; g.fillStyle = '#1d3a24'; g.fillRect(x - 5, 1, 11, 2); g.fillStyle = '#3f8a44'; g.fillRect(x - 4, 0, 9, 2); g.fillStyle = '#6fb04a'; g.fillRect(x - 3, 0, 3, 1); g.fillStyle = '#2a5a30'; g.fillRect(x, 3, 1, 8 + (i % 2) * 5); }
+    // Weed on the bottom, swaying.
+    for (let i = 0; i < w; i += 5) { const hh = 10 + ((i * 13) % 14); for (let y = 0; y < hh; y++) { const sx = Math.round(Math.sin(t / 30 + i + y / 5) * (y / hh) * 3); g.fillStyle = y % 4 ? '#2a5a30' : '#3f7a3a'; g.fillRect(i + sx, h - y, 2, 1); } }
+    g.fillStyle = '#3a2a22'; g.fillRect(0, h - 3, w, 3); g.fillStyle = '#5a4432'; for (let i = 0; i < w; i += 7) g.fillRect(i + (i % 3), h - 3, 2, 1);
+    // Crías swimming about, and bubbles.
+    const F = ART.criaFree; if (F) for (let i = 0; i < 4; i++) { const sp = .25 + i * .07, span = w + 30, x = ((t * sp + i * 57) % span) - 15, dir = i % 2 ? -1 : 1, fx = dir > 0 ? x : w - x, y = h * (.35 + i * .13) + Math.sin(t / 18 + i) * 4, s = F[((t >> 3) + i) % F.length]; g.save(); g.translate(Math.round(fx), Math.round(y)); if (dir < 0) g.scale(-1, 1); g.drawImage(s, -Math.round(s.width / 2), -Math.round(s.height / 2)); g.restore(); }
+    for (let i = 0; i < 10; i++) { const x = (i * 29 + Math.sin(t / 25 + i) * 3) % w, y = h - ((t * (.3 + (i % 3) * .1) + i * 37) % h); g.fillStyle = '#cfeef8'; g.fillRect(Math.round(x), Math.round(y), 1, 1); if (i % 3 === 0) { g.fillStyle = '#8fd9d0'; g.fillRect(Math.round(x) + 1, Math.round(y) + 1, 1, 1); } }
+  },
+  // ---- The big portrait 'play' button: Bigotes bouncing next to the word, in GLUP letters.
+  drawEmpezar(t) {
+    const b = $('empezar'); if (!b || !Touch.portrait) return; const g = b.querySelector('canvas').getContext('2d'); g.clearRect(0, 0, 112, 40);
+    const lab = Game.state === 'select' ? 'ENTRAR' : Game.state === 'clear' || Game.state === 'ending' ? 'SEGUIR' : Game.state === 'cine' ? 'SALTAR' : '¡A JUGAR!';
+    const fsh = ART.fish.closed, hop = Math.round(Math.abs(Math.sin(t / 10)) * -5), sq = hop === 0 ? 1.15 : 1;
+    g.save(); g.translate(19, 31); g.scale(1.4 * sq, 1.4 * (2 - sq)); g.drawImage(fsh, -11, -12 + hop); if (Player.fishOverlay) Player.fishOverlay(g, fsh, -11, -12 + hop, t, { mood: 'happy', noWhiskers: true, lx: 1 }); g.restore();
+    ART.glup(g, lab, 74, 14, { size: lab.length > 7 ? 'small' : 'mid', align: 'center', shadow: true, each: i => ({ y: Math.round(Math.sin(t / 8 + i * .7) * 1.5), sx: 1 + Math.sin(t / 6 + i) * .03, sy: 1 - Math.sin(t / 6 + i) * .03 }) });
+  },
   // Portrait: a little phone that tips over, "gira el móvil", in the game's own letters.
   drawHint(t) {
     const c = $('rotate-hint'), g = c.getContext('2d'), k = (t % 180) / 180, a = k < .35 ? 0 : k < .55 ? (k - .35) / .2 : k < .85 ? 1 : 1 - (k - .85) / .15; g.clearRect(0, 0, 104, 18);
@@ -248,6 +306,7 @@ const Touch = {
   // Outside a level the jump button is the "ok": what it does, on a bouncing tag.
   drawOk(g, t, lab) { g.clearRect(0, 0, 36, 36); const bob = Math.round(Math.abs(Math.sin(t / 12)) * -2); g.fillStyle = '#1b1420'; g.fillRect(12, 5 + bob, 13, 11); g.fillStyle = '#f2c43d'; g.fillRect(13, 6 + bob, 11, 9); g.fillStyle = '#1b1420'; g.fillRect(16, 8 + bob, 1, 5); g.fillRect(17, 9 + bob, 1, 3); g.fillRect(18, 9 + bob, 1, 3); g.fillRect(19, 10 + bob, 1, 1); g.fillRect(17, 8 + bob, 1, 5); Touch.label(g, lab, 18, 21, '#fff6d6'); },
   updateButtons() {
+    if (Touch.enabled) { Touch.drawTop(Game.t); Touch.drawBanda(Game.t); if (Touch.portrait && document.body.classList.contains('in-menu') && !Game.paused) Touch.drawEmpezar(Game.t); }
     Touch.girarShow(!!(Touch.enabled && Touch.portrait && !Touch.girar.no && $('girar')));
     if (Touch.girar.on) Touch.girarDraw();
     if (Touch.enabled && Touch.portrait && Game.t % 3 === 0 && $('rotate-hint')) Touch.drawHint(Game.t);
@@ -1822,6 +1881,7 @@ const Game = {
     const inPlay = Game.state === 'play' && !Game.paused;
     document.body.classList.toggle('in-play', inPlay);
     document.body.classList.toggle('in-menu', !inPlay);
+    document.body.classList.toggle('paused', !!Game.paused);
     document.body.classList.toggle('in-talk', inPlay && (Charla.active() || !!Game.learning));
     $('hint').hidden = Touch.enabled || Game.state !== 'title';
   },
@@ -2013,7 +2073,7 @@ const Game = {
     }
   },
   toggleMute() { Sound.setMuted(!Sound.isMuted()); Save.data.mute = Sound.isMuted(); Save.write(); Game.updateSoundButton(); if (!Sound.isMuted()) Sound.play('select'); },
-  updateSoundButton() { const b = $('touch-sound'); b.setAttribute('aria-pressed', String(Sound.isMuted())); b.textContent = Sound.isMuted() ? '♪ off' : '♪'; b.classList.toggle('off', Sound.isMuted()); },
+  updateSoundButton() { const b = $('touch-sound'); b.setAttribute('aria-pressed', String(Sound.isMuted())); b.classList.toggle('off', Sound.isMuted()); },
   fullscreen() { const el = document.documentElement; if (document.fullscreenElement || document.webkitFullscreenElement) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } else { (el.requestFullscreen || el.webkitRequestFullscreen).call(el).catch(() => { }); } },
   stop(n) { Game.hitStop = Math.max(Game.hitStop, n); },
   toast(text, t) { Game.toastText = text; Game.toastT = t; },
