@@ -185,8 +185,8 @@ const Touch = {
   drawOk(g, t, lab) { g.clearRect(0, 0, 36, 36); const bob = Math.round(Math.abs(Math.sin(t / 12)) * -2); g.fillStyle = '#1b1420'; g.fillRect(12, 5 + bob, 13, 11); g.fillStyle = '#f2c43d'; g.fillRect(13, 6 + bob, 11, 9); g.fillStyle = '#1b1420'; g.fillRect(16, 8 + bob, 1, 5); g.fillRect(17, 9 + bob, 1, 3); g.fillRect(18, 9 + bob, 1, 3); g.fillRect(19, 10 + bob, 1, 1); g.fillRect(17, 8 + bob, 1, 5); Touch.label(g, lab, 18, 21, '#fff6d6'); },
   updateButtons() {
     if (Touch.enabled && Touch.portrait && Game.t % 3 === 0 && $('rotate-hint')) Touch.drawHint(Game.t);
-    if (Touch.enabled && Touch.btn && (Game.state !== 'play' || Game.paused)) {
-      const lab = Game.paused ? 'vale' : Game.state === 'title' || Game.state === 'gate' ? 'jugar' : Game.state === 'select' ? 'entrar' : 'sigue', k = lab + (Game.t >> 2);
+    if (Touch.enabled && Touch.btn && (Game.state !== 'play' || Game.paused || Charla.active() || Game.learning)) {
+      const lab = Game.paused ? 'vale' : Game.state === 'play' ? 'sigue' : Game.state === 'title' || Game.state === 'gate' ? 'jugar' : Game.state === 'select' ? 'entrar' : 'sigue', k = lab + (Game.t >> 2);
       if (Touch.keys.ok !== k) { Touch.keys.ok = k; Touch.keys.jump = null; Touch.drawOk(Touch.ctx.jump, Game.t, lab); }
       return;
     }
@@ -1756,6 +1756,7 @@ const Game = {
     const inPlay = Game.state === 'play' && !Game.paused;
     document.body.classList.toggle('in-play', inPlay);
     document.body.classList.toggle('in-menu', !inPlay);
+    document.body.classList.toggle('in-talk', inPlay && (Charla.active() || !!Game.learning));
     $('hint').hidden = Touch.enabled || Game.state !== 'title';
   },
   transition(f) { if (Game.fadeTo) return; Game.fadeTo = f; Game.fade = 0; },
@@ -1976,7 +1977,7 @@ const Game = {
   noteRaw(e) { return (e.kind === 'ruca' ? L.def.ruca : L.def.signs)[e.idx] || ''; },
   signText(idx, rawText) {
     const def = L.def; const raw = rawText !== undefined && rawText !== null ? rawText : (def.signs[idx] || ''); const m = Input.mode;
-    const map = m === 'touch' ? { move: 'La cruceta', jump: 'SALTO', fish: 'BIGOTES', puff: 'SOPLO', up: '▲', down: '▼' } : m === 'pad' ? { move: 'El stick', jump: 'A', fish: 'X', puff: 'B', up: 'arriba', down: 'abajo' } : { move: 'Flechas', jump: 'Z o espacio', fish: 'X', puff: 'C', up: '↑', down: '↓' };
+    const map = m === 'touch' ? { move: 'El nenúfar', jump: '«salta»', fish: '«sorbe»', puff: 'el soplo', up: '▲', down: '▼' } : m === 'pad' ? { move: 'El stick', jump: 'A', fish: 'X', puff: 'B', up: 'arriba', down: 'abajo' } : { move: 'Flechas', jump: 'Z o espacio', fish: 'X', puff: 'C', up: '↑', down: '↓' };
     return raw.replace(/\{(\w+)\}/g, (_, k) => map[k] || k).replace('▲', '↑').replace('▼', '↓');
   },
   // ---------------------------------------------------------------- Dibujo
@@ -2195,17 +2196,17 @@ const Game = {
     }
   },
   drawHud(g) {
-    Hud.draw(g);
+    if (!Charla.active()) Hud.draw(g);   // while someone talks the HUD steps aside for the bubble
     Maestros.drawOverlay(g);
     if (Game.hurtFlash > 0) { g.fillStyle = 'rgba(220,60,60,' + (Game.hurtFlash / 14 * .28) + ')'; g.fillRect(0, 0, W, H); }
-    if (Game.banner > 0 && !Game.capture) {
+    if (Game.banner > 0 && !Game.capture && !Charla.active()) {
       const t = Game.banner; const a = t > 170 ? (190 - t) / 20 : t < 30 ? t / 30 : 1;
       const lines = ART.wrap(L.def.intro || (L.def.boss ? 'Devuélvele las piedras' : 'Llega a la barca'), W - 60), bh = 20 + lines.length * 10, by = 84 - bh / 2;
       g.globalAlpha = a; g.fillStyle = '#1b2430'; g.fillRect(0, by, W, bh); g.fillStyle = '#e79b3f'; g.fillRect(0, by, W, 1); g.fillRect(0, by + bh - 1, W, 1);
       ART.title(g, (Game.level + 1) + ' · ' + L.def.name, W / 2, by + 5, '#fff6d6', 'center'); lines.forEach((l, k) => ART.text(g, l, W / 2, by + 18 + k * 10, '#9fc0cc', 'center')); g.globalAlpha = 1;
     }
     if (Game.toastT > 0) { const a = Math.min(1, Game.toastT / 20); g.globalAlpha = a; ART.title(g, Game.toastText, W / 2, 28, '#fff6d6', 'center'); g.globalAlpha = 1; }
-    if (Player.nearSign && !Player.dead && !Maestros.busy() && !Game.learning) {
+    if (Player.nearSign && !Player.dead && !Maestros.busy() && !Game.learning && !Charla.active()) {
       // The sign's words on a wooden board above the sign, in the Glup letters; it pops up when you arrive.
       const e = Player.nearSign; if (Game.signFor !== e) { Game.signFor = e; Game.signT = 0; } Game.signT++;
       const str = Game.signText(null, Game.noteRaw(e)), lines = Letra.wrap(str, 210), tw = Math.max(...lines.map(Letra.width)), w = tw + 20, h = lines.length * Letra.LINE + 10;

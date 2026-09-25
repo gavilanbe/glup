@@ -28,7 +28,10 @@ const Charla = (() => {
   const SPEED = 1.2;
   function start(o) {
     const who = typeof o.quien === 'string' ? Maestros.QUIEN[o.quien] : o.quien;
-    S = { who, ent: o.ent || null, lines: o.lines.filter(Boolean), i: 0, t: 0, alFinal: o.alFinal || null, wait: 8, shown: 0 };
+    // Long speeches are cut into pages of three lines, so the bubble stays small and never swallows the scene.
+    const pages = [];
+    for (const raw of o.lines.filter(Boolean)) { const ls = Letra.wrap(Game.signText(null, raw), 190); for (let i = 0; i < ls.length; i += 3) pages.push(ls.slice(i, i + 3).join(' ')); }
+    S = { who, ent: o.ent || null, lines: pages, i: 0, t: 0, alFinal: o.alFinal || null, wait: 8, shown: 0 };
     Input.release();
   }
   function stop() { S = null; }
@@ -59,7 +62,10 @@ const Charla = (() => {
     // Where the speaker is on screen (or a spot at the bottom when nobody is in the scene).
     const e = S.ent, ax = e ? Math.round(e.x + e.w / 2 - Cam.x) : W / 2, ay = e ? Math.round(e.y - Cam.y + (e.fy || 0)) : H;
     let bx = Math.max(6, Math.min(W - w - 6, ax - Math.round(w * .35))), by = ay - h - 16, below = false;
-    if (!e) by = H - h - 8; else if (by < 20) { by = ay + (e.h || 16) + 16; below = true; }
+    // Above the speaker whenever it fits (below only as a last resort), and never on top of Nila.
+    const ny0 = Math.round(Player.y - Cam.y) - 6, nx0 = Math.round(Player.x - Cam.x) - 4;
+    if (e && e !== Player && by + h + 10 > ny0 && bx < nx0 + 18 && bx + w > nx0) by = Math.min(by, ny0 - h - 10);
+    if (!e) by = H - h - 8; else if (by < 4) { by = ay + (e.h || 16) + 16; below = true; }
     by = Math.max(4, Math.min(H - h - 4, by));
     // Pop in from the speaker's mouth, with a little overshoot; a squash on each new line.
     const k = Math.min(1, S.t / 9), sc = k < 1 ? .3 + .7 * (1 - Math.pow(1 - k, 3)) + Math.sin(k * Math.PI) * .12 : 1 + (S.lineT < 6 ? Math.sin(S.lineT / 6 * Math.PI) * .03 : 0);

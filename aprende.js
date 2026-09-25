@@ -226,7 +226,7 @@ const Aprende = (() => {
 
   // ---------------------------------------------------------------- Dibujo
   function keycaps(g, text, cx, y) {
-    const m = Input.mode, map = m === 'touch' ? { jump: 'SALTO', fish: 'BIGOTES', puff: 'SOPLO', up: '▲', down: '▼' } : m === 'pad' ? { jump: 'A', fish: 'X', puff: 'B', up: '↑', down: '↓' } : { jump: 'Z', fish: 'X', puff: 'C', up: '↑', down: '↓' };
+    const m = Input.mode, map = m === 'touch' ? { jump: 'salta', fish: 'sorbe', puff: 'soplo', up: '▲', down: '▼' } : m === 'pad' ? { jump: 'A', fish: 'X', puff: 'B', up: '↑', down: '↓' } : { jump: 'Z', fish: 'X', puff: 'C', up: '↑', down: '↓' };
     const parts = text.split(/(\{\w+\})/).filter(Boolean).map(s => { const k = /^\{(\w+)\}$/.exec(s); return k ? { cap: map[k[1]] || k[1] } : { txt: s }; });
     const wOf = p => p.cap ? ART.textWidth(p.cap) + 8 : ART.textWidth(p.txt);
     let x = Math.round(cx - parts.reduce((a, p) => a + wOf(p), 0) / 2);

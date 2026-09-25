@@ -60,7 +60,9 @@ body.touch #hint { display: none; }
 /* Outside the level (title, map, tallies, cinematics) the pads step aside: the screen is tapped instead. */
 /* In menus and scenes the stick and the fish step aside, but the jump button stays as the "ok" button
    (jugar, entrar, sigue); tapping anywhere on the screen works too. */
-body.in-menu #stick-zone { opacity: 0; pointer-events: none; transition: opacity .2s; }
+body.in-menu #stick-zone, body.in-talk #stick-zone { opacity: 0; pointer-events: none; transition: opacity .2s; }
+body.in-talk #touch-buttons .fish, body.in-talk #touch-buttons .puff, body.in-talk #touch-buttons .talk { opacity: 0; pointer-events: none; }
+body.in-talk #touch-buttons .jump { animation: hot 1.2s ease-in-out infinite; }
 body.in-menu #touch-buttons .fish, body.in-menu #touch-buttons .puff, body.in-menu #touch-buttons .talk { opacity: 0; pointer-events: none; }
 body.in-menu #touch-buttons .jump { animation: hot 1.2s ease-in-out infinite; }
 /* A new version is ready: a wooden tag at the top; a tap reloads into it. */
