@@ -429,6 +429,10 @@ const Touch = {
   },
 
   updateButtons() {
+    // Where the HUD goes: outside the picture when there is room for it (portrait band / landscape side columns).
+    const wide = Touch.enabled && !Touch.portrait && matchMedia('(orientation: landscape) and (min-aspect-ratio: 39/20)').matches, ext = Touch.enabled && (Touch.portrait || wide) ? (Touch.portrait ? 'abajo' : 'lado') : null;
+    Hud.ext = ext; document.body.classList.toggle('hud-ext', !!ext);
+    if (ext && Game.state === 'play' && L.def && $('hud-ext')) Hud.drawExt($('hud-ext'));
     if (Touch.enabled) { Touch.fxDraw(Game.t); Touch.drawTop(Game.t); Touch.drawBanda(Game.t); if (Touch.portrait && document.body.classList.contains('in-menu') && !Game.paused) Touch.drawEmpezar(Game.t); }
     Touch.girarShow(!!(Touch.enabled && Touch.portrait && !Touch.girar.no && $('girar')));
     if (Touch.girar.on) Touch.girarDraw();

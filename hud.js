@@ -45,7 +45,10 @@ const Hud = (() => {
 
   // ---------------------------------------------------------------- Dibujo
   const BUBBLE = { x: 44, y: 32, r: 11 }, MED = { x: 17, y: 32, r: 11 };
-  function counterPos() { return { x: (Touch.enabled && !Touch.portrait ? W - 108 : W - 44), y: 5 }; }
+  // On phones with room outside the picture (portrait band, landscape side columns) the HUD lives outside it, on its
+  // own little canvas (drawExt): the picture stays clean and the flying items head for the screen edge it sits on.
+  let EXT = false, ext = null;
+  function counterPos() { return EXT ? { x: 7, y: 50 } : { x: (Touch.enabled && !Touch.portrait ? W - 108 : W - 44), y: 5 }; }
   function circle(g, cx, cy, r, col) { g.fillStyle = col; for (let dy = -r; dy <= r; dy++) { const hw = Math.round(Math.sqrt(r * r - dy * dy)); g.fillRect(cx - hw, cy + dy, hw * 2 + 1, 1); } }
   function ring(g, cx, cy, r, col, from = 0, to = 1, step = 1) { g.fillStyle = col; const n = Math.ceil(r * 7); for (let i = 0; i < n; i++) { const u = i / n; if (u < from || u > to) continue; if (step > 1 && i % step) continue; const a = -Math.PI / 2 + u * Math.PI * 2; g.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1); } }
   function sprIn(g, spr, cx, cy, maxS, rot = 0, sx = 1, sy = 1) {
@@ -131,7 +134,7 @@ const Hud = (() => {
       if (full) { g.fillStyle = '#fff6d6'; for (let i = 0; i < 3; i++) { const a = Math.random() * 6.28; g.fillRect(Math.round(bx + Math.cos(a) * (br + 5)), Math.round(by + Math.sin(a) * (br + 5)), 1, 1); } }
     } else ring(g, bx, by, br + 1, held ? '#8fd9d0' : '#3a4a5a');
     // The name of the load on a small tag.
-    if (held) { const nm = AMMO_NAMES[held.kind] || held.kind, tw = ART.textWidth(nm), tx = bx + br + 5, ty = by - 4, pop = S.heldT < 10 ? Math.round((1 - S.heldT / 10) * -3) : 0; g.fillStyle = 'rgba(18,12,24,.75)'; g.fillRect(tx - 2, ty - 2 + pop, tw + 4, 11); g.fillStyle = full ? '#f2c46a' : '#2a8a90'; g.fillRect(tx - 2, ty + 8 + pop, tw + 4, 1); ART.text(g, nm, tx, ty + pop, full ? '#fff6d6' : '#e8fbff', 'left'); if (full) ART.text(g, '¡LISTO!', tx, ty + 12, (t >> 2) % 2 ? '#f2c46a' : '#e79b3f', 'left', '#1b2430'); }
+    if (held && !EXT) { const nm = AMMO_NAMES[held.kind] || held.kind, tw = ART.textWidth(nm), tx = bx + br + 5, ty = by - 4, pop = S.heldT < 10 ? Math.round((1 - S.heldT / 10) * -3) : 0; g.fillStyle = 'rgba(18,12,24,.75)'; g.fillRect(tx - 2, ty - 2 + pop, tw + 4, 11); g.fillStyle = full ? '#f2c46a' : '#2a8a90'; g.fillRect(tx - 2, ty + 8 + pop, tw + 4, 1); ART.text(g, nm, tx, ty + pop, full ? '#fff6d6' : '#e8fbff', 'left'); if (full) ART.text(g, '¡LISTO!', tx, ty + 12, (t >> 2) % 2 ? '#f2c46a' : '#e79b3f', 'left', '#1b2430'); }
     // Spat out: the icon shoots away from the bubble.
     if (out && out.kind !== 'agua') { g.globalAlpha = 1 - outK; sprIn(g, out.sprite, bx + outK * 30 * (Player.dir || 1), by - Math.sin(outK * Math.PI) * 8, 15, outK * 6); g.globalAlpha = 1; }
   }
@@ -178,7 +181,7 @@ const Hud = (() => {
   }
   function drawFly(g, t) {
     for (const f of S.fly) {
-      if (f.t < 0) continue; const k = ease(Math.min(1, f.t / 22)), c = counterPos(), tx = f.to === 'crias' ? c.x + 4 : BUBBLE.x, ty = f.to === 'crias' ? c.y + 4 : BUBBLE.y;
+      if (f.t < 0) continue; const k = ease(Math.min(1, f.t / 22)), c = counterPos(), out = ext ? (ext === 'abajo' ? { x: 30, y: H + 12 } : { x: -12, y: 40 }) : null, tx = out ? out.x : f.to === 'crias' ? c.x + 4 : BUBBLE.x, ty = out ? out.y : f.to === 'crias' ? c.y + 4 : BUBBLE.y;
       const x = f.x + (tx - f.x) * k, y = f.y + (ty - f.y) * k - Math.sin(k * Math.PI) * 24, s = 1 + Math.sin(k * Math.PI) * .6;
       g.globalAlpha = .4; sprIn(g, f.sprite, x - (tx - f.x) * .04, y + 3, 14 * s); g.globalAlpha = 1;
       sprIn(g, f.sprite, x, y, 14 * s, f.t * .3);
@@ -188,9 +191,24 @@ const Hud = (() => {
     const t = Game.t;
     // Low health: the edges of the screen pulse red with the heartbeat.
     if (Player.hp === 1 && !Player.dead) { const b = t % 40, a = b < 6 ? .22 * (1 - b / 6) : b > 10 && b < 16 ? .12 * (1 - (b - 10) / 6) : 0; if (a > 0) { g.fillStyle = 'rgba(200,40,60,' + a + ')'; g.fillRect(0, 0, W, 6); g.fillRect(0, H - 6, W, 6); g.fillRect(0, 0, 6, H); g.fillRect(W - 6, 0, 6, H); } }
-    g.save(); if (S.shake) g.translate(Math.round((Math.random() - .5) * S.shake * .5), Math.round((Math.random() - .5) * S.shake * .3));
-    drawHearts(g, t); drawMouth(g, t); g.restore();
-    drawCrias(g, t); drawBoss(g, t); drawFly(g, t);
+    if (!ext) { g.save(); if (S.shake) g.translate(Math.round((Math.random() - .5) * S.shake * .5), Math.round((Math.random() - .5) * S.shake * .3));
+      drawHearts(g, t); drawMouth(g, t); g.restore(); drawCrias(g, t); }
+    drawBoss(g, t); drawFly(g, t);
   }
-  return { update, draw, reset };
+  // The HUD on its own canvas (64×60): a little wooden plaque with moss, the hearts, Bigotes' medallion and mouth
+  // bubble, and the crías counter; it shakes and pops exactly like the one in the picture.
+  let plaque = null;
+  function drawExt(c) {
+    const g = c.getContext('2d'), t = Game.t; g.imageSmoothingEnabled = false; g.clearRect(0, 0, c.width, c.height);
+    if (!plaque) { plaque = document.createElement('canvas'); plaque.width = 64; plaque.height = 60; const q = plaque.getContext('2d');
+      q.fillStyle = '#1a1420'; q.fillRect(1, 0, 62, 60); q.fillRect(0, 1, 64, 58); q.fillStyle = '#6b4a30'; q.fillRect(1, 1, 62, 58); q.fillStyle = '#8a5a34'; q.fillRect(2, 2, 60, 55);
+      q.fillStyle = '#a56f38'; q.fillRect(2, 2, 60, 2); for (let y = 12; y < 56; y += 11) { q.fillStyle = '#7a4e2c'; q.fillRect(2, y, 60, 1); }
+      q.fillStyle = 'rgba(18,12,24,.55)'; q.fillRect(3, 17, 58, 29); q.fillRect(3, 47, 58, 11);
+      q.fillStyle = '#c9b08a'; q.fillRect(4, 3, 1, 1); q.fillRect(59, 3, 1, 1); q.fillRect(4, 56, 1, 1); q.fillRect(59, 56, 1, 1);
+      q.fillStyle = '#1a1420'; q.fillRect(44, 0, 12, 3); q.fillStyle = '#3f7a2a'; q.fillRect(45, 0, 10, 2); q.fillStyle = '#8fbf4a'; q.fillRect(46, 0, 1, 1); q.fillRect(50, 0, 2, 1); q.fillRect(53, 1, 1, 1); }
+    const sh = S.shake ? [Math.round((Math.random() - .5) * S.shake * .5), Math.round((Math.random() - .5) * S.shake * .3)] : [0, 0];
+    g.save(); g.translate(sh[0], sh[1]); g.drawImage(plaque, 0, 0);
+    EXT = true; drawHearts(g, t); drawMouth(g, t); drawCrias(g, t); EXT = false; g.restore();
+  }
+  return { update, draw, reset, drawExt, set ext(v) { ext = v; }, get ext() { return ext; } };
 })();

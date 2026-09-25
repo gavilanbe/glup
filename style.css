@@ -26,6 +26,10 @@ body.touch #hint { display: none; }
 #touch-top button:active, #touch-top button.held { transform: translateY(2px) scale(.9); box-shadow: inset 0 0 0 2px #1a1420, inset 0 3px 0 #c99058, inset 0 -2px 0 #5a3a24, 0 1px 0 rgba(0, 0, 0, .45); }
 body.in-menu:not(.paused) #touch-top [data-act=pause] { display: none; }
 /* Portrait: under the picture, the water of the swamp (Touch.drawBanda), and in menus one big "play" button. */
+/* The HUD outside the picture (Hud.drawExt): under it in portrait, in the left column in wide landscape. */
+#hud-ext { display: none; }
+body.hud-ext.in-play #hud-ext { display: block; position: absolute; z-index: 4; image-rendering: pixelated; image-rendering: crisp-edges; background: none; pointer-events: none; width: 128px; height: 120px; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .45)); }
+body.portrait.hud-ext #hud-ext { left: 10px; top: calc(56.25vw + max(0px, env(safe-area-inset-top)) + 10px); }
 #banda { display: none; }
 body.portrait #banda { display: block; position: absolute; left: 0; top: calc(56.25vw + max(0px, env(safe-area-inset-top))); width: 100%; height: calc(100% - 56.25vw - max(0px, env(safe-area-inset-top))); image-rendering: pixelated; image-rendering: crisp-edges; background: none; z-index: 0; pointer-events: none; }
 #empezar { display: none; }
@@ -125,6 +129,7 @@ body.portrait.in-play #rotate-hint { display: none; position: absolute; left: 14
   body.touch #touch-buttons .talk { right: calc(var(--gut) - 40px); bottom: 190px; }
   body.touch #touch-top { right: auto; left: calc(env(safe-area-inset-left) + (var(--gut) - 114px) / 2); top: max(8px, env(safe-area-inset-top)); }
   body.touch #touch-top button { width: 34px; height: 34px; }
+  body.touch.hud-ext #hud-ext { left: calc(env(safe-area-inset-left) + (var(--gut) - 108px) / 2); top: 52px; width: 108px; height: 101px; }
 }
 @media (orientation: landscape) and (min-aspect-ratio: 39/20) and (max-height: 330px) {
   body.touch #touch-buttons { transform: scale(.86); transform-origin: 100% 100%; }
