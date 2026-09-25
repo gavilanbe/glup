@@ -267,26 +267,34 @@ const Touch = {
         px(g, hx, cy - 1 + (sy < 0 ? 0 : 1), 4, 1, C); px(g, cx - 1 + (sx < 0 ? 0 : 1), vy, 1, 4, C);
       } }
   },
-  // ---- Portrait, below the picture: the water of the swamp, as if looking under the jetty. Light shafts from the
-  // surface, lily pads on top, bubbles, swaying weed on the bottom and crías swimming about. Cheap: 1 in 2 frames.
+  // ---- Portrait, below the picture: the game reflected in the swamp's water, at the game's own pixel size and
+  // colours, rippling and darkening with depth; the surface glints, weed sways at the bottom. 1 in 2 frames.
   drawBanda(t) {
     const c = $('banda'); if (!c || !Touch.portrait) return;
-    const r = c.getBoundingClientRect(), w = Math.max(40, Math.round(r.width / 3)), h = Math.max(40, Math.round(r.height / 3));
+    const r = c.getBoundingClientRect(), sc = Math.max(.5, r.width / W), w = W, h = Math.max(20, Math.round(r.height / sc));
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
     if (t % 2) return;
-    const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
-    const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#24505a'); gr.addColorStop(.35, '#173840'); gr.addColorStop(1, '#0b161c'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
-    // Light shafts drifting.
-    for (let i = 0; i < 5; i++) { const x0 = ((i * 37 + t * .12) % (w + 40)) - 20, sw = 6 + (i % 3) * 3; g.globalAlpha = .06 + .03 * Math.sin(t / 40 + i); g.fillStyle = '#bdf0e4'; g.beginPath(); g.moveTo(x0, 0); g.lineTo(x0 + sw, 0); g.lineTo(x0 + sw + h * .35, h); g.lineTo(x0 + h * .35, h); g.fill(); } g.globalAlpha = 1;
-    // The surface: a bright rippling line with lily pads and reed stems going down.
-    g.fillStyle = '#8fd9d0'; for (let x = 0; x < w; x++) g.fillRect(x, Math.round(1 + Math.sin(x / 5 + t / 20)), 1, 1);
-    for (let i = 0; i < 4; i++) { const x = (i * 41 + 12) % w; g.fillStyle = '#1d3a24'; g.fillRect(x - 5, 1, 11, 2); g.fillStyle = '#3f8a44'; g.fillRect(x - 4, 0, 9, 2); g.fillStyle = '#6fb04a'; g.fillRect(x - 3, 0, 3, 1); g.fillStyle = '#2a5a30'; g.fillRect(x, 3, 1, 8 + (i % 2) * 5); }
-    // Weed on the bottom, swaying.
-    for (let i = 0; i < w; i += 5) { const hh = 10 + ((i * 13) % 14); for (let y = 0; y < hh; y++) { const sx = Math.round(Math.sin(t / 30 + i + y / 5) * (y / hh) * 3); g.fillStyle = y % 4 ? '#2a5a30' : '#3f7a3a'; g.fillRect(i + sx, h - y, 2, 1); } }
-    g.fillStyle = '#3a2a22'; g.fillRect(0, h - 3, w, 3); g.fillStyle = '#5a4432'; for (let i = 0; i < w; i += 7) g.fillRect(i + (i % 3), h - 3, 2, 1);
-    // Crías swimming about, and bubbles.
-    const F = ART.criaFree; if (F) for (let i = 0; i < 4; i++) { const sp = .25 + i * .07, span = w + 30, x = ((t * sp + i * 57) % span) - 15, dir = i % 2 ? -1 : 1, fx = dir > 0 ? x : w - x, y = h * (.35 + i * .13) + Math.sin(t / 18 + i) * 4, s = F[((t >> 3) + i) % F.length]; g.save(); g.translate(Math.round(fx), Math.round(y)); if (dir < 0) g.scale(-1, 1); g.drawImage(s, -Math.round(s.width / 2), -Math.round(s.height / 2)); g.restore(); }
-    for (let i = 0; i < 10; i++) { const x = (i * 29 + Math.sin(t / 25 + i) * 3) % w, y = h - ((t * (.3 + (i % 3) * .1) + i * 37) % h); g.fillStyle = '#cfeef8'; g.fillRect(Math.round(x), Math.round(y), 1, 1); if (i % 3 === 0) { g.fillStyle = '#8fd9d0'; g.fillRect(Math.round(x) + 1, Math.round(y) + 1, 1, 1); } }
+    const g = c.getContext('2d'), buf = Screen.buf; g.imageSmoothingEnabled = false;
+    g.fillStyle = '#0b1218'; g.fillRect(0, 0, w, h);
+    // The reflection: rows of the picture, upside down, swaying more the deeper they are.
+    const depth = Math.min(h, H);
+    for (let y = 0; y < depth; y++) { const sy = H - 1 - Math.floor(y * .92), dx = Math.round(Math.sin(y * .23 + t * .07) * (.6 + y * .025)), f = y / depth; g.globalAlpha = 1 - f * f * f; g.drawImage(buf, 0, sy, W, 1, dx, y, W, 1); }
+    g.globalAlpha = 1;
+    // Water colour over it, darker with depth, and a fade into the deep.
+    const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(20,48,58,.35)'); gr.addColorStop(Math.min(.95, depth / h * .8), 'rgba(12,28,36,.72)'); gr.addColorStop(1, 'rgba(8,14,20,.96)'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    // The surface: a bright line of ripples and glints drifting along.
+    for (let x = 0; x < w; x++) { const k = Math.sin(x / 7 + t / 18) + Math.sin(x / 3.3 - t / 11) * .5; if (k > .9) { g.fillStyle = k > 1.3 ? '#ffffff' : '#bdf0e4'; g.fillRect(x, 0, 1, 1); } }
+    for (let i = 0; i < 14; i++) { const x = (i * 23 + t * .2) % w, y = 3 + (i * 17) % Math.max(4, depth * .6), a = Math.max(0, Math.sin(t / 12 + i * 1.7)); if (a > .6) { g.globalAlpha = a; g.fillStyle = '#fff6d6'; g.fillRect(Math.round(x), Math.round(y), 2, 1); } } g.globalAlpha = 1;
+    // Deeper down, under the reflection: shafts of light, crías swimming about, weed and the muddy bed.
+    const d0 = Math.round(depth * .75);
+    if (h > d0 + 20) {
+      for (let i = 0; i < 4; i++) { const x0 = ((i * 83 + t * .1) % (w + 60)) - 30; g.globalAlpha = .05 + .025 * Math.sin(t / 50 + i); g.fillStyle = '#8fd9d0'; g.beginPath(); g.moveTo(x0, d0); g.lineTo(x0 + 14, d0); g.lineTo(x0 + 44, h); g.lineTo(x0 + 30, h); g.fill(); } g.globalAlpha = 1;
+      const F = ART.criaFree, span = w + 40;
+      if (F) for (let i = 0; i < 5; i++) { const sp = .18 + i * .05, dir = i % 2 ? -1 : 1, x = ((t * sp + i * 71) % span) - 20, fx = dir > 0 ? x : w - x, y = d0 + 16 + ((i * 37) % Math.max(10, h - d0 - 50)) + Math.sin(t / 20 + i) * 3, s = F[((t >> 3) + i) % F.length]; g.save(); g.translate(Math.round(fx), Math.round(y)); if (dir < 0) g.scale(-1, 1); g.drawImage(s, -Math.round(s.width / 2), -Math.round(s.height / 2)); g.restore(); }
+    }
+    for (let i = 0; i < w; i += 5) { const hh = 14 + ((i * 13) % 22); for (let y = 0; y < hh; y++) { const sx = Math.round(Math.sin(t / 30 + i + y / 6) * (y / hh) * 3); g.fillStyle = y % 5 ? '#1f3f26' : '#2f5a30'; g.fillRect(i + sx, h - 4 - y, 2, 1); } }
+    g.fillStyle = '#2a2018'; g.fillRect(0, h - 4, w, 4); g.fillStyle = '#4a3a2a'; for (let i = 0; i < w; i += 9) g.fillRect(i + (i % 4), h - 4, 3, 1);
+    for (let i = 0; i < 12; i++) { const x = (i * 29 + Math.sin(t / 25 + i) * 2) % w, y = h - ((t * (.25 + (i % 3) * .08) + i * 53) % h); g.fillStyle = i % 3 ? '#8fd9d0' : '#cfeef8'; g.fillRect(Math.round(x), Math.round(y), 1, 1); }
   },
   // ---- The big portrait 'play' button: Bigotes bouncing next to the word, in GLUP letters.
   drawEmpezar(t) {
@@ -309,7 +317,6 @@ const Touch = {
     if (Touch.enabled) { Touch.drawTop(Game.t); Touch.drawBanda(Game.t); if (Touch.portrait && document.body.classList.contains('in-menu') && !Game.paused) Touch.drawEmpezar(Game.t); }
     Touch.girarShow(!!(Touch.enabled && Touch.portrait && !Touch.girar.no && $('girar')));
     if (Touch.girar.on) Touch.girarDraw();
-    if (Touch.enabled && Touch.portrait && Game.t % 3 === 0 && $('rotate-hint')) Touch.drawHint(Game.t);
     if (Touch.enabled && Touch.btn && (Game.state !== 'play' || Game.paused || Charla.active() || Game.learning)) {
       const lab = Game.paused ? 'vale' : Game.state === 'play' ? 'sigue' : Game.state === 'title' || Game.state === 'gate' ? 'jugar' : Game.state === 'select' ? 'entrar' : 'sigue', k = lab + (Game.t >> 2);
       if (Touch.keys.ok !== k) { Touch.keys.ok = k; Touch.keys.jump = null; Touch.drawOk(Touch.ctx.jump, Game.t, lab); }

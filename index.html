@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GLUP">
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
 <main id="shell" aria-label="GLUP">
@@ -41,7 +41,7 @@
 <div id="hint" hidden>Flechas o WASD · Z salta (otra vez en el aire: aleteo) · X: mantén para sorber, pulsa para escupir · C: soplar · ↑ apunta arriba · ↓ agacha, desliza, suelta; ↓ y Z: planchazo · Esc pausa · M sonido</div>
 <script>
 (function () {
-  const version = location.protocol === 'file:' ? Date.now() : '42';
+  const version = location.protocol === 'file:' ? Date.now() : '43';
   const niveles = ['01-embarcadero', '02-juncos', '03-raices', '04-molino', '05-muelle', '06-turbera', '07-cueva', '08-rio', '09-nido'].map(n => 'niveles/' + n + '.js');
   // The songs: one file each in musica/ (see musica/LEEME.md); add new ones here and in sw.js.
   const musica = ['marsh', 'dock', 'omen', 'sad', 'march', 'victoria', 'alba', 'creditos', 'heron', 'heron2', 'heron3', 'turbera', 'cueva', 'rio', 'juncos', 'raices', 'molino', 'muelle'].map(n => 'musica/' + n + '.js');

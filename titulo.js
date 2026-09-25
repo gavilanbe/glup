@@ -310,7 +310,7 @@ const Title = (() => {
     for (const p of S.parts) { g.fillStyle = p.col; g.fillRect(Math.round(p.x), Math.round(p.y + (p.col === '#c9b08a' || p.col === '#a08a6a' || p.col === '#e0c8a0' ? cy : 0)), 1, 1); }
     // The sign drops in on its ropes once the letters are home.
     if (S.sign) drawSign(g, t, S.sign);
-    if (t > INTRO) {
+    if (t > INTRO && !(Touch.enabled && Touch.portrait)) {   // upright on a phone, the big button below says it
       const msg = Touch.enabled ? 'Toca para empezar' : 'Pulsa Z o espacio', a = .55 + Math.sin(t / 14) * .45;
       const mw = ART.textWidth(msg) + 24, mx = Math.round((W - mw) / 2);
       g.fillStyle = 'rgba(16,12,24,.72)'; g.fillRect(mx, 157, mw, 13); g.fillRect(mx + 1, 156, mw - 2, 15);
