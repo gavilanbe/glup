@@ -226,7 +226,7 @@ const Touch = {
   inner(g, S, fn) { const m = (S - 1) / 2; g.save(); g.beginPath(); g.arc(m + .5, m + .5, S / 2 - 3, 0, 7); g.clip(); fn(); g.restore(); },
   drawFish(g, t) {
     const p = Player, held = p.held, full = p.charge >= CHARGE_FULL, S = 42; g.clearRect(0, 0, S, S);
-    const lab = full ? '¡zas!' : held ? (held.kind === 'agua' && !p.onGround ? 'flota' : 'escupe') : p.grapple ? 'suelta' : p.target && ((!p.onGround && p.airT > 3) || Input.held.up) ? 'pica' : 'sorbe';
+    const lab = full ? '¡zas!' : held ? (held.kind === 'agua' && !p.onGround ? 'flota' : held.kind !== 'agua' && p.onGround && (Input.held.down || p.downT === 8) ? 'deja' : 'escupe') : p.grapple ? 'suelta' : p.target && ((!p.onGround && p.airT > 3) || Input.held.up) ? 'pica' : 'sorbe';
     Touch.labPop(Touch.btn && Touch.btn.fish, 'fish', lab, '#7fd0a0');
     const hot = p.charge > 8 ? Math.min(1, p.charge / CHARGE_FULL) : 0;
     g.drawImage(Touch.bubble(hot >= 1 ? 'hot' : 'fish', S), 0, 0);
@@ -447,7 +447,7 @@ const Touch = {
     Touch.talkWho = talk ? (L.maestro && L.maestro.near ? L.maestro.who : Maestros.QUIEN.ruca) : null;
     if (talk && !B.talk.classList.contains('show')) { const c = Touch.center(B.talk); for (let i = 0; i < 14; i++) { const a = i / 14 * 6.28; Touch.spark(c.x, c.y, Math.cos(a) * 1.6, Math.sin(a) * 1.1, i % 2 ? '#fff6d6' : '#f2c46a', 18, { g: .02, star: i % 3 === 0 }); } }
     B.talk.classList.toggle('show', talk); if (talk && K.talk !== (t >> 4)) { K.talk = t >> 4; Touch.drawTalk(Touch.ctx.talk, t); }
-    const fk = [p.held && p.held.kind === 'agua' ? Math.round(p.held.amount * 20) : 0, Math.round((p.charge || 0) / 4), !!p.grapple, !!p.target, p.held ? p.held.kind : '', p.sucking ? p.suckLv : 0, p.charge >= CHARGE_FULL, p.spitT > 6, p.onGround, p.sucking || p.charge >= CHARGE_FULL ? t >> 1 : t >> 3].join();
+    const fk = [p.held && p.held.kind === 'agua' ? Math.round(p.held.amount * 20) : 0, Math.round((p.charge || 0) / 4), !!p.grapple, !!p.target, p.held ? p.held.kind : '', p.sucking ? p.suckLv : 0, p.charge >= CHARGE_FULL, p.spitT > 6, p.onGround, !!Input.held.down || p.downT === 8, p.sucking || p.charge >= CHARGE_FULL ? t >> 1 : t >> 3].join();
     if (K.fish !== fk) { K.fish = fk; Touch.drawFish(Touch.ctx.fish, t); }
     const ring = p.sucking ? (p.suckLv || 1) / 3 : p.charge > 8 ? Math.min(1, p.charge / CHARGE_FULL) : 0;
     B.fish.style.setProperty('--charge', ring.toFixed(3)); B.fish.style.setProperty('--charge-col', p.sucking ? (p.suckLv === 3 ? '#fff6d6' : '#8fe0f0') : '#f2c46a');
@@ -580,7 +580,7 @@ function loadLevel(index) {
   L.def = def; L.index = index; L.rows = def.rows; L.h = def.rows.length; L.w = def.rows[0].length;
   L.t = def.rows.map(r => r.split(''));
   L.ents = []; L.projs = []; L.parts = []; L.solids = []; L.signs = []; L.broken = new Set(); L.targets = new Map(); L.gates = []; L.gateOpen = new Set();
-  L.lit = new Set(); L.taken = new Set(); L.pearlsTotal = 0; L.pearls = 0; L.time = 0; L.boss = null; L.breakQueue = []; L.gateQueue = []; L.mush = new Map(); L.hitTargets = new Set(); L.boatSpawned = false; L.exit = null; L.words = []; L.ghosts = []; L.lily = new Map(); L.triggerIdx = new Map(); L.gusts = []; L.bossCk = 0; L.bossFreed = 0; L.bossSlow = 0; L.bossGustHint = false; L.bossDodgeHint = false;
+  L.lit = new Set(); L.taken = new Set(); L.pearlsTotal = 0; L.pearls = 0; L.time = 0; L.boss = null; L.breakQueue = []; L.gateQueue = []; L.mush = new Map(); L.hitTargets = new Set(); L.hitAt = new Map(); L.links = []; L.boatSpawned = false; L.exit = null; L.words = []; L.ghosts = []; L.lily = new Map(); L.triggerIdx = new Map(); L.gusts = []; L.bossCk = 0; L.bossFreed = 0; L.bossSlow = 0; L.bossGustHint = false; L.bossDodgeHint = false;
   L.bg = ART.background(def.theme); L.spawn = [];
   // Gates are grouped by adjacency and paired with targets in reading order.
   const targets = [], gateTiles = [], seen = new Set();
@@ -810,7 +810,7 @@ const Player = {
     p.fishLagV += -dvy * .9; p.fishLagHV += dvx * p.dir * 1.3;
     p.fishLagV -= p.fishLag * .22; p.fishLagV *= .8; p.fishLag = clamp(p.fishLag + p.fishLagV, -5, 5);
     p.fishLagHV -= p.fishLagH * .22; p.fishLagHV *= .8; p.fishLagH = clamp(p.fishLagH + p.fishLagHV, -3, 3);
-    if (p.spitT > 0) p.spitT--; if (p.swallowT > 0) p.swallowT--; if (p.inv > 0) p.inv--; if (p.hurtT > 0) p.hurtT--; if (p.puffCd > 0) p.puffCd--; if (p.puffT > 0) p.puffT--; if (p.puffWind > 0 && --p.puffWind === 0) Player.puff(); if (p.dropT > 0) p.dropT--;
+    if (p.spitT > 0) p.spitT--; if (p.swallowT > 0) p.swallowT--; if (p.inv > 0) p.inv--; if (p.hurtT > 0) p.hurtT--; if (p.puffCd > 0) p.puffCd--; if (p.puffT > 0) p.puffT--; if (p.puffWind > 0 && --p.puffWind === 0) Player.puff(); if (p.dropT > 0) p.dropT--; if (p.reliefT > 0) p.reliefT--;
     p.sx += (1 - p.sx) * .18; p.sy += (1 - p.sy) * .18;
     p.animT++;
     // The gait: its frame advances with the distance covered (8 frames a stride, longer strides when running,
@@ -1080,14 +1080,67 @@ const Player = {
     const m = p.mouth(); Game.word(w >= 1.3 ? '¡GLUP!' : 'GLUP', m.x - p.dir * 6, m.y - 12, '#e8fbff', w >= 1.3); spawnParts(4 + Math.round(w * 4), m.x, m.y, { color: ['#cfe0e8', '#e8f2f6'], speed: [.5, 1.5], life: [8, 14], g: 0 });
   },
   // Down + Bigotes on the ground sets the load down gently at Nila's feet.
+  // The load is there at once (same place and timing as ever); only its picture slides out of Bigotes' mouth
+  // and lands with a bounce (Player.dropFx), so the moment reads.
+  dropSpot(h) {
+    const p = Player, s = { x: p.x + 5 - h.w / 2, y: p.y + p.h - h.h, w: h.w, h: h.h };
+    for (let n = 0; n < 16 && rectSolid(s.x, s.y, s.w, s.h, s); n++) s.y--;
+    return s;
+  },
   drop() {
     const p = Player, h = p.held; p.held = null; p.spitT = 6; p.dropT = 10;
     const e = Item.fromHeld(h, p.x + 5 - h.w / 2, p.y + p.h - h.h); if (!e) return;
     for (let n = 0; n < 16 && rectSolid(e.x, e.y, e.w, e.h, e); n++) e.y--;
     e.ghost = true;
     if (e.enemy) e.stun = 40;
-    L.ents.push(e); Sound.play('thud'); p.sx = 1.1; p.sy = .9; Game.word('plof', e.x + e.w / 2, e.y - 6, '#c9b08a', false);
-    spawnParts(4, e.x + e.w / 2, e.y + e.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.4, speed: [.3, 1], life: [8, 14], g: .04 });
+    L.ents.push(e); Sound.play('blub'); p.sx = 1.1; p.sy = .9;
+    Player.dropFx(e, p.mouth());
+  },
+  DROP_T: 9,
+  dropFx(e, m) {
+    e.inFront = L.time || 1; const upd = e.update, drw = e.draw, T = Player.DROP_T, fx = { t0: L.time, x: m.x - (e.x + e.w / 2), y: m.y + 3 - (e.y + e.h) };
+    e.update = o => {
+      upd(o); const f = L.time - fx.t0;
+      if (f === T) {
+        // Touchdown: a wooden thud, puffs of dust both ways, a small shake, and Bigotes sighs with relief.
+        const heavy = o.kind === 'crate' ? 1 : .5, bx = o.x + o.w / 2, by = o.y + o.h;
+        Sound.play('thud', null, { x: o.x }); Cam.shake(heavy > .5 ? 2 : 1, 5); Input.rumble(60, .4 * heavy, .2);
+        for (const s of [-1, 1]) spawnParts(4, bx + s * o.w / 2, by - 1, { color: ['#c9b08a', '#a08a6a', '#e0d0b0'], angle: s > 0 ? -.25 : Math.PI + .25, spread: .35, speed: [.5, 1.4], life: [12, 22], g: -.01, jitter: 1, size: 2 });
+        const p = Player; p.reliefT = 34; const mm = p.mouth(); Game.word('pff', mm.x + p.dir * 6, mm.y - 10, '#cfe8f0', false); spawnParts(3, mm.x + p.dir * 2, mm.y - 2, { color: ['#e8f2f6', '#cfe0e8'], angle: -Math.PI / 2 + p.dir * .5, spread: .4, speed: [.3, .7], life: [14, 24], g: -.02, jitter: 1 });
+      }
+      if (f > T + 10) { o.update = upd; o.draw = drw; }
+    };
+    e.draw = (o, g) => {
+      const f = L.time - fx.t0; if (f > T + 10) return drw(o, g);
+      // Out of the mouth small, stretched as it drops, squashed flat on landing, one little rebound.
+      let ox = 0, oy = 0, sx = 1, sy = 1;
+      if (f < T) { const u = Math.max(0, f) / T, grow = Math.min(1, .35 + u * .95); ox = fx.x * (1 - u * u * (3 - 2 * u)); oy = fx.y * (1 - u * u); sx = grow * (u > .3 ? .88 : 1); sy = grow * (u > .3 ? 1.16 : 1); }
+      else { const k = f - T; sx = k < 2 ? 1.3 : k < 4 ? .9 : k < 6 ? 1.08 : 1; sy = k < 2 ? .72 : k < 4 ? 1.12 : k < 6 ? .95 : 1; oy = k >= 3 && k < 6 ? -1 : 0; }
+      const ax = Math.round(o.x + o.w / 2 - Cam.x), ay = Math.round(o.y + o.h - Cam.y);
+      g.save(); g.translate(ax + Math.round(ox), ay + Math.round(oy)); g.scale(sx, sy); g.translate(-ax, -ay); drw(o, g); g.restore();
+    };
+  },
+  // A load just set down stands at her feet: it is drawn in front of her until she steps off it, or it would
+  // vanish behind her raincoat.
+  drawLoadsInFront(g) {
+    for (const e of L.ents) if (e.inFront && !e.dead) { if (L.time - e.inFront > 20 && !overlap(e, Player.rect())) e.inFront = 0; else e.draw(e, g); }
+    Player.drawDropPreview(g);
+  },
+  // While she holds ↓ with a load on the ground, a pale ghost of it inside marching ants, with an arrow,
+  // shows where it will be set down.
+  drawDropPreview(g) {
+    const p = Player, h = p.held;
+    if (!h || h.kind === 'agua' || !p.onGround || p.downT !== 8 || p.dead || p.win || p.grapple || Game.state !== 'play') return;
+    const s = Player.dropSpot(h), x = Math.round(s.x - Cam.x), y = Math.round(s.y - Cam.y), w = Math.round(s.w), hh = Math.round(s.h), t = Game.t;
+    if (h.sprite) { g.globalAlpha = .3 + Math.sin(t / 6) * .08; g.drawImage(ART.tint(h.sprite, '#e8f4ff'), Math.round(x + (w - h.sprite.width) / 2), y + hh - h.sprite.height); }
+    g.globalAlpha = .9;
+    for (let i = 0; i < 2 * (w + hh); i++) { const on = ((i + (t >> 2)) & 3) > 1; const q = i < w ? [x + i, y] : i < w + hh ? [x + w - 1, y + i - w] : i < 2 * w + hh ? [x + w - 1 - (i - w - hh), y + hh - 1] : [x, y + hh - 1 - (i - 2 * w - hh)]; g.fillStyle = on ? '#ffffff' : '#1a1420'; g.fillRect(q[0], q[1], 1, 1); }
+    g.fillStyle = '#fff6d6'; for (const [cx, cy, dx, dy] of [[x, y, 1, 1], [x + w - 1, y, -1, 1], [x, y + hh - 1, 1, -1], [x + w - 1, y + hh - 1, -1, -1]]) { g.fillRect(cx, cy, 1, 1); g.fillRect(cx + dx, cy, 1, 1); g.fillRect(cx, cy + dy, 1, 1); }
+    // A little arrow bobbing down onto it.
+    const ay = y - 8 + ((t >> 3) & 1), ax = x + (w >> 1);
+    g.globalAlpha = 1; g.fillStyle = '#1a1420'; g.fillRect(ax - 1, ay - 1, 3, 5); g.fillRect(ax - 3, ay + 2, 7, 3); g.fillRect(ax - 2, ay + 5, 5, 1); g.fillRect(ax - 1, ay + 6, 3, 1);
+    g.fillStyle = '#fff6d6'; g.fillRect(ax, ay, 1, 4); g.fillRect(ax - 2, ay + 3, 5, 1); g.fillRect(ax - 1, ay + 4, 3, 1); g.fillRect(ax, ay + 5, 1, 1);
+    g.globalAlpha = 1;
   },
   spit(charged) {
     const p = Player, m = p.mouth(), h = p.held; p.held = null; p.spitT = 12;
@@ -1242,7 +1295,7 @@ const Player = {
   drawFish(g, fx, fy) {
     const p = Player, t = p.animT, ease = u => u * u * (3 - 2 * u);
     let fs = ART.fish.closed;
-    if (p.puffWind > 0) fs = ART.fish.full; else if (p.swallowT > 0) fs = ART.fish.swallow; else if (p.spitT > 6) fs = ART.fish.spit; else if (p.charge >= CHARGE_FULL) fs = ART.fish.squint; else if (p.held) fs = ART.fish.full; else if (p.sucking) fs = ART.fish.open;
+    if (p.puffWind > 0) fs = ART.fish.full; else if (p.dropT > 3 && !p.held) fs = ART.fish.open; else if (p.swallowT > 0) fs = ART.fish.swallow; else if (p.spitT > 6) fs = ART.fish.spit; else if (p.charge >= CHARGE_FULL) fs = ART.fish.squint; else if (p.held) fs = ART.fish.full; else if (p.sucking) fs = ART.fish.open;
     const n = fs.width, h = fs.height, PIV = 7, MID = 6;
     // Her arm rides the body's bob in each pose (the gait's dips, a landing squat...).
     const bob = p.onGround && !p.crouch && !(p.slide > 0) && p.pose ? p.pose.bob || 0 : 0;
@@ -1260,7 +1313,8 @@ const Player = {
     if (p.puffWind > 0) { const k = (5 - p.puffWind) / 5; lunge = -k * 2; headStretch = 1 + k * .12; bend -= k * .15; wave = .2; }
     if (p.puffT > 0) { lunge = -3 + p.puffT * .5; headStretch = 1.15; }
     if (p.hurtT > 0 || p.dead) { bend += .7; wave = 2.5; waveSpeed = .6; }
-    if (p.dropT > 0) { bend += .5 * (p.dropT / 10); }
+    if (p.dropT > 0) { bend += p.dropT > 5 ? 1.25 : 1.25 * p.dropT / 5; headStretch = p.dropT > 4 ? 1.18 : 1; wave = 0; lunge = 0; }
+    if (p.reliefT > 0 && !p.held) { bend -= .12 * Math.min(1, p.reliefT / 12); wave = .3; }
     if (p.flap > 0) { const k = (14 - p.flap) / 14; bend += Math.sin(k * Math.PI) * 1.1; tailBend += -Math.sin(k * Math.PI * 2) * 1.3; headStretch = 1.1; wave = 0; }
     if (p.pound) { bend = p.poundT > 0 ? -.4 : Math.PI / 2 * .8; hx = fx + 5 + p.dir * 3; hy = fy + 8; wave = .2; }
     if (p.onWall) { bend += .35; hx = fx + 5 + p.dir * 6; }
@@ -1386,7 +1440,7 @@ const Player = {
         if (best) { const dx = best.x + best.w / 2 - (e.x + Cam.x), dy = best.y + best.h / 2 - (e.y + Cam.y), dd = Math.hypot(dx, dy) || 1; lx = dx / dd; ly = dy / dd; }
         else if (p.idleT > 60) { const ph = Math.floor(t / 90) % 4; lx = [p.dir, -p.dir, 0, p.dir][ph]; ly = [0, -1, -1, 0][ph]; }
       }
-      Player.drawEye(g, ex, ey, lx, ly, { happy: p.happyT > 0, happyK: (70 - p.happyT) / 50, sleep: p.idleT > 900, shock: !p.onGround && p.vy > 4.5 || p.hurtT > 10, blink: (t % 230) < 5, mad: p.sucking || p.charge > 8, sad: p.hurtT > 0 || p.dizzyT > 40 || p.dead, dizzy: p.dizzyT > 0, dir: p.dir }, t);
+      Player.drawEye(g, ex, ey, lx, ly, { happy: p.happyT > 0, happyK: (70 - p.happyT) / 50, sleep: p.idleT > 900, shock: !p.onGround && p.vy > 4.5 || p.hurtT > 10, blink: (t % 230) < 5 || (p.reliefT > 6 && !p.held), mad: p.sucking || p.charge > 8, sad: p.hurtT > 0 || p.dizzyT > 40 || p.dead, dizzy: p.dizzyT > 0, dir: p.dir }, t);
     }
     // Bored: he blows a bubble that grows at his lips and pops.
     if (p.idleT > 150 && p.idleT < 900) { const k = (p.idleT - 150) % 160; if (k < 60) { const m = at(21.5, 7), r = k / 60 * 3.5; g.globalAlpha = .85; g.strokeStyle = '#cfeef8'; g.beginPath(); g.arc(m.x + p.dir * (r + 1), m.y - r * .3, Math.max(.8, r), 0, 7); g.stroke(); g.fillStyle = '#ffffff'; g.fillRect(Math.round(m.x + p.dir * (r + 1) - r * .4), Math.round(m.y - r * .3 - r * .5), 1, 1); g.globalAlpha = 1; } if (k === 60) { const m = at(21.5, 7); Sound.play('pop'); for (let i = 0; i < 6; i++) L.parts.push({ x: m.x + Cam.x + p.dir * 4, y: m.y + Cam.y - 1, vx: Math.cos(i) * .8, vy: Math.sin(i) * .8, life: 10, color: '#cfeef8', size: 1, g: 0 }); } }
@@ -1578,10 +1632,10 @@ const Item = {
       e.t++; let on = false; const top = { x: e.x + 1, y: e.y, w: 14, h: 7 };
       if (!Player.dead && overlap(top, { x: Player.x, y: Player.y + Player.h - 2, w: Player.w, h: 3 })) on = true;
       for (const o of L.ents) if (!o.dead && (o.kind === 'crate' || o.kind === 'rock') && o.resting && overlap(top, { x: o.x, y: o.y + o.h - 2, w: o.w, h: 3 })) on = true;
-      if (on !== e.pressed) { e.pressed = on; Sound.play(on ? 'switch' : 'thud'); if (on) { Game.word('CLIC', e.x + 8, e.y - 6, '#d8f0b8', false); spawnParts(6, e.x + 8, e.y, { color: ['#a6abb8', '#d0d6da'], speed: [.3, 1.2], life: [8, 16], g: .05 }); } Game.setGate(e.idx, L.ents.some(o => o.kind === 'plate' && o.idx === e.idx && o.pressed)); }
+      if (on !== e.pressed) { e.pressed = on; Sound.play(on ? 'switch' : 'thud'); if (on) { Game.word('CLIC', e.x + 8, e.y - 6, '#d8f0b8', false); spawnParts(6, e.x + 8, e.y, { color: ['#a6abb8', '#d0d6da'], speed: [.3, 1.2], life: [8, 16], g: .05 }); } Game.setGate(e.idx, L.ents.some(o => o.kind === 'plate' && o.idx === e.idx && o.pressed), { x: e.x + 8, y: e.y }); }
     }, draw(e, g) { g.drawImage(e.pressed ? ART.plate.on : ART.plate.off, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y)); } }; },
   pinwheel(x, y, idx) { return { kind: 'pinwheel', x, y, w: 16, h: 16, idx, spin: 0, t: 0, open: false, ang: 0, vel: 0, update(e) {
-      e.t++; if (e.spin > 0) e.spin--; const open = e.spin > 0; if (open !== e.open) { e.open = open; Game.setGate(e.idx, open); if (!open) Game.word('...', e.x + 8, e.y - 4, '#9fc0cc', false); }
+      e.t++; if (e.spin > 0) e.spin--; const open = e.spin > 0; if (open !== e.open) { e.open = open; Game.setGate(e.idx, open, { x: e.x + 8, y: e.y + 2 }); if (!open) Game.word('...', e.x + 8, e.y - 4, '#9fc0cc', false); }
       // Spinning fast while blown, slowing down over the last second; idle it rocks in the breeze.
       const target = e.spin > 60 ? .42 : e.spin > 0 ? .42 * e.spin / 60 : Math.sin(e.t / 50) * .012;
       e.vel += (target - e.vel) * .08; e.ang += e.vel;
@@ -2114,7 +2168,10 @@ const Game = {
     updateParts();
     // Deferred tile breaks and gate openings for a staggered feel.
     for (let i = L.breakQueue.length - 1; i >= 0; i--) { const q = L.breakQueue[i]; if (--q.d <= 0) { L.breakQueue.splice(i, 1); setTile(q.x, q.y, '.'); spawnParts(7, q.x * TS + 8, q.y * TS + 8, { color: ['#8a8f94', '#4f545a', '#a9aeb3'], speed: [.8, 2.6], life: [16, 34], g: .18, bounce: .3 }); } }
-    for (let i = L.gateQueue.length - 1; i >= 0; i--) { const q = L.gateQueue[i]; if (--q.d <= 0) { L.gateQueue.splice(i, 1); setTile(q.x, q.y, '.'); spawnParts(6, q.x * TS + 8, q.y * TS + 8, { color: ['#c78d4e', '#a56f38', '#c9b08a'], speed: [.4, 1.6], life: [14, 30], g: .1 }); } }
+    for (let i = L.gateQueue.length - 1; i >= 0; i--) { const q = L.gateQueue[i]; if (--q.d <= 0) { L.gateQueue.splice(i, 1); setTile(q.x, q.y, '.');
+      // Each piece of the door goes down through the slot at its foot: mud and water squirt out of it.
+      const gt = L.gates.find(gg => gg.some(c => c.x === q.x && c.y === q.y)), low = gt ? gt.filter(c => c.x === q.x).reduce((a, b) => b.y > a.y ? b : a) : q;
+      spawnParts(6, q.x * TS + 8, (low.y + 1) * TS - 1, { color: ['#c9b08a', '#8fd9d0', '#a08a6a', '#c8f2ea'], angle: -Math.PI / 2, spread: 1.2, speed: [.6, 1.8], life: [10, 22], g: .14, jitter: 6 }); Cam.shake(1, 2); } }
     for (const [k, v] of L.mush) { if (v <= 1) L.mush.delete(k); else L.mush.set(k, v - 1); }
     for (const [k, v] of L.lily) { if (v <= 1) L.lily.delete(k); else L.lily.set(k, v - 1); }
     for (let i = L.words.length - 1; i >= 0; i--) { const w = L.words[i]; w.t++; if (w.t > w.life) L.words.splice(i, 1); }
@@ -2148,20 +2205,32 @@ const Game = {
     while (stack.length) { const [x, y] = stack.pop(); const k = key(x, y); if (seen.has(k) || tileAt(x, y) !== kind) continue; seen.add(k); L.breakQueue.push({ x, y, d: 1 + Math.abs(x - tx) * 3 + Math.abs(y - ty) * 3 }); n++; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) stack.push([x + dx, y + dy]); }
     setTile(tx, ty, '.'); spawnParts(8, tx * TS + 8, ty * TS + 8, { color: ['#8a8f94', '#4f545a', '#a9aeb3'], speed: [1, 3], life: [16, 34], g: .18, bounce: .3 });
   },
-  setGate(idx, open) {
+  setGate(idx, open, src) {
     const gate = L.gates[idx] || L.gates[0]; if (!gate || gate.open === open) return; gate.open = open;
-    if (open) { gate.forEach((g, i) => L.gateQueue.push({ x: g.x, y: g.y, d: 8 + i * 6 })); Sound.play('gate'); return; }
+    if (open) {
+      gate.forEach((g, i) => L.gateQueue.push({ x: g.x, y: g.y, d: 8 + i * 6 })); Sound.play('gate'); gate.t = L.time;
+      // Visual only: a spark flies from the trigger to the gate's lamp, and the beam sheds dust as it jolts.
+      const top = gate.reduce((a, b) => b.y < a.y || (b.y === a.y && b.x < a.x) ? b : a, gate[0]);
+      if (src && L.links) { L.links = L.links.filter(k => L.time - k.t0 < 20); const lp = gate.lamp || { x: top.x * TS + 8, y: (gate[gate.length - 1].y + 1) * TS - 28 }; L.links.push({ x0: src.x, y0: src.y, x1: lp.x, y1: lp.y, t0: L.time }); }
+      spawnParts(5, top.x * TS + 8, top.y * TS - 2, { color: ['#c9b08a', '#a08a6a', '#6a5a4a'], angle: Math.PI / 2, spread: 1.2, speed: [.2, .8], life: [14, 26], g: .08, jitter: 7 });
+      return;
+    }
     // Closing: the bars drop back unless someone is standing in the way (then they wait a moment).
     const blocked = gate.some(g => { const r = { x: g.x * TS, y: g.y * TS, w: TS, h: TS }; return overlap(r, Player.rect()) || L.ents.some(e => !e.dead && (e.kind === 'crate' || e.kind === 'rock' || e.enemy) && overlap(r, e)); });
     if (blocked) { gate.open = true; setTimeout(() => { if (Game.state === 'play') Game.setGate(idx, false); }, 400); return; }
     L.gateQueue = L.gateQueue.filter(q => !gate.some(g => g.x === q.x && g.y === q.y));
-    gate.forEach(g => setTile(g.x, g.y, 'G')); Sound.play('thud'); Cam.shake(1, 4);
-    spawnParts(6, gate[gate.length - 1].x * TS + 8, gate[gate.length - 1].y * TS + 14, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.4, speed: [.4, 1.2], life: [8, 14], g: .04 });
+    gate.forEach(g => setTile(g.x, g.y, 'G')); Sound.play('thud'); Cam.shake(1, 4); gate.shutT = L.time;
+    // It shoots back up and slams: dust from under the beam and out of the slot at its foot.
+    const low = gate[gate.length - 1], top = gate[0];
+    spawnParts(6, low.x * TS + 8, (low.y + 1) * TS, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2, spread: 1.4, speed: [.4, 1.2], life: [8, 14], g: .04, jitter: 6 });
+    spawnParts(4, top.x * TS + 8, top.y * TS - 1, { color: ['#c9b08a', '#6a5a4a'], angle: Math.PI / 2, spread: 1.2, speed: [.2, .8], life: [12, 22], g: .08, jitter: 8 });
   },
   hitTarget(tx, ty) {
-    const k = key(tx, ty); L.hitTargets.add(k); Sound.play('switch'); Cam.shake(2, 6); Game.word('¡DIANA!', tx * TS + 8, ty * TS - 6, '#6cbf4e', true);
-    spawnParts(10, tx * TS + 8, ty * TS + 8, { color: ['#6cbf4e', '#d8f0b8', '#ffffff'], speed: [.5, 2.5], life: [14, 28], g: .05 });
-    Game.setGate(L.targets.get(k), true);
+    const k = key(tx, ty); L.hitTargets.add(k); if (L.hitAt) L.hitAt.set(k, L.time); Sound.play('switch'); Sound.play('thud', null, { x: tx * TS }); Cam.shake(2, 6); Game.word('¡DIANA!', tx * TS + 8, ty * TS - 6, '#6cbf4e', true);
+    // Chips of paint and wood burst off the board (it spins round to its green back: see MUNDO drawTarget).
+    spawnParts(8, tx * TS + 8, ty * TS + 8, { color: ['#6cbf4e', '#d8f0b8', '#ffffff'], speed: [.5, 2.5], life: [14, 28], g: .05 });
+    spawnParts(8, tx * TS + 8, ty * TS + 8, { color: ['#d0443a', '#efe0c0', '#b8824e', '#744a32'], speed: [.8, 2.4], life: [16, 30], g: .15, bounce: .3 });
+    Game.setGate(L.targets.get(k), true, { x: tx * TS + 8, y: ty * TS + 8 });
   },
   levelClear(boat) {
     // The celebration (leap into the boat, crías, sailing off) lives in victoria.js.
@@ -2302,7 +2371,7 @@ const Game = {
     if (Player.sucking) Game.drawSuction(g);
     for (const e of ents) if (!e.dead && order(e) > 1) e.draw(e, g);
     for (const gh of L.ghosts) { const sx = 1 + (5 - gh.life) * gh.grow; g.save(); g.translate(Math.round(gh.x - Cam.x + gh.sprite.width / 2), Math.round(gh.y - Cam.y + gh.sprite.height / 2)); g.scale(sx, sx); g.globalAlpha = gh.life / 5; g.drawImage(ART.tint(gh.sprite, '#ffffff'), -gh.sprite.width / 2, -gh.sprite.height / 2); g.restore(); }
-    if (Game.arrival) Barca.drawFront(g); else Player.draw(g);
+    if (Game.arrival) Barca.drawFront(g); else { Player.draw(g); Player.drawLoadsInFront(g); }
     if (!Game.arrival) Game.drawHookAim(g);
     for (const p of L.projs) if (!p.dead) Proj.draw(p, g);
     Game.drawParts(g);
