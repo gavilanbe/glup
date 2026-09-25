@@ -4,6 +4,7 @@
 #   tools/captura.sh titulo [t] [out] 0 [x]      título tras t fotogramas (con x, la pulsación de empezar en el fotograma x)
 #   tools/captura.sh final [t]                   el final (cinemática, créditos y FIN) en el fotograma t
 #   tools/captura.sh nivel [t] [out] [n] [x]     nivel n, Nila en x píxeles, tras t fotogramas (FASE=2 empieza la Garza en esa fase)
+#   tools/captura.sh pausa [t] [out] [n] [x]     el menú de pausa: nivel n, t fotogramas de juego y x en pausa (GUION='down@5;confirm@9;right@20')
 #   WIN=844,390 TOUCH=1 tools/captura.sh nivel ...  como un móvil en horizontal, con los mandos táctiles
 cd "$(dirname "$0")/.." || exit 1
 NAME=${1:-sprites}; T=${2:-0}; OUT=${3:-artifacts/$NAME-$T.png}; N=${4:-0}; X=${5:--1}

@@ -84,6 +84,26 @@ step('mapa: muro abierto', () => {
   for (let n = 0; n < 40; n++) { g.frame(n === 20 ? { right: 1 } : {}); if (n % 5 === 0) draw(); }
   if (g.ev('Save.locked(8)')) throw new Error('sigue cerrado con todas las crías');
 });
+step('pausa: cartel, cursor, sonido, pistas, toques, seguir y salir al mapa', () => {
+  for (const still of [true, false]) {
+    g.start(3, g.NIVEL.poderesAntes(3)); g.ev('Game.still = ' + still); g.run({}, 5); g.setPrev({});
+    g.frame({ pause: 1 }); if (!g.Game.paused) throw new Error('no se pausó');
+    for (let n = 0; n < 90; n++) { g.frame({}); if (n % 3 === 0) draw(); }
+    g.frame({ down: 1 }); g.run({}, 12); draw(); if (g.Game.pauseSel !== 1) throw new Error('el cursor no bajó (' + g.Game.pauseSel + ')');
+    const muted = g.ev('Sound.isMuted()'); g.frame({ confirm: 1 }); g.run({}, 6); draw();
+    if (g.ev('Sound.isMuted()') === muted || !g.Game.paused) throw new Error('el sonido no cambió o se fue la pausa');
+    g.frame({ right: 1 }); g.frame({}); g.frame({ left: 1 }); g.run({}, 20); draw();
+    g.ev('Game.tap(Pausa.ROWS.map(y => ({ x: 110, y }))[2])'); g.frame({}); if (g.Game.pauseSel !== 2 && !g.Game.fadeTo) throw new Error('tocar la fila no la eligió');
+    if (g.Game.fadeTo) { for (let n = 0; n < 40 && g.Game.state !== 'select'; n++) { g.frame({}); draw(); } if (g.Game.state !== 'select') throw new Error('no salió al mapa'); }
+    g.start(3, g.NIVEL.poderesAntes(3)); g.ev('Game.still = ' + still); g.setPrev({}); g.frame({ pause: 1 }); g.run({}, 40);
+    g.frame({ up: 1 }); g.frame({}); g.frame({ up: 1 }); g.frame({}); if (g.Game.pauseSel !== 1) throw new Error('el cursor no da la vuelta (' + g.Game.pauseSel + ')');
+    g.run({}, 600); draw();   // Bigotes dozes off
+    g.frame({ pause: 1 }); if (g.Game.paused) throw new Error('Esc no reanuda');
+    for (let n = 0; n < 14; n++) { g.frame({ right: 1 }); draw(); }
+    if (g.ev('Pausa.showing()')) throw new Error('el cartel no se fue');
+  }
+  g.ev('Game.select()');
+});
 step('partida vieja (v1) migrada', () => {
   g.ev(`localStorage.setItem('glup.v1', JSON.stringify({ unlocked: 2, pearls: { 0: 6, 1: 10 }, totals: { 0: 11, 1: 10 }, best: { 0: 245 }, powers: { aleteo: true, soplido: true }, seen: { intro: true } })); Save.load();`);
   const d = g.Save.data;

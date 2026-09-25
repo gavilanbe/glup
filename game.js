@@ -1967,6 +1967,8 @@ const Game = {
     if (c.scene === 'titulo') { Game.title(); for (let i = 0; i < c.t; i++) { if (i === c.x) Title.press(Game.titleT); Game.updateTitle(); } Game.frozen = true; return; }
     if (c.scene === 'icono') { Game.state = 'icon'; return; }
     if (c.scene === 'gramola') { Gramola.start(); return; }
+    // The pause menu: t frames of play in level n, then pause and x frames of the menu (GUION's up/down/left/right move in it).
+    if (c.scene === 'pausa') { Game.startLevel(c.n); Game.banner = 0; L.pearls = Math.min(L.pearlsTotal, 5); Save.data.best[L.def.id] = 245; for (let i = 0; i < c.t; i++) { Input.pressed = {}; Game.updatePlay(); } Game.pause(); for (let i = 0; i < Math.max(0, c.x); i++) { Input.held = {}; Input.pressed = {}; for (const g of c.guion) if (i === g.f0) Input.pressed[g.a] = true; Game.updatePause(); Game.t++; } Input.pressed = {}; Game.frozen = true; return; }
     if (c.scene === 'victoria') { Victoria.capture(c); return; }
     if (c.scene === 'final') { Final.capture(c); return; }
     if (c.scene === 'nivel') { Game.startLevel(c.n); if (c.x >= 0) { Player.x = c.x; Player.y = 0; for (let i = 0; i < 60; i++) { Player.vy = Math.min(Player.vy + .28, 5.5); if (moveY(Player, Player.vy)) { Player.vy = 0; Player.onGround = true; break; } } Cam.snap(); } Game.banner = 0; for (let i = 0; i < c.t; i++) { Input.held = {}; Input.pressed = {}; for (const g of c.guion) if (i >= g.f0 && i <= g.f1) { Input.held[g.a] = true; if (i === g.f0) Input.pressed[g.a] = true; } Game.updatePlay(); } Input.held = {}; Input.pressed = {}; Game.frozen = true; if (params_debug()) console.log('ENTS', JSON.stringify(L.ents.map(e => [e.kind, Math.round(e.x), Math.round(e.y), e.dead ? 'dead' : ''])), 'PLAYER', Math.round(Player.x), Math.round(Player.y), Player.held ? Player.held.kind : '-', 'SUCK', Player.sucking, Player.waterT, Player.charge, Player.hover, Player.fishT, 'GRAP', !!Player.grapple, Player.hanging, Player.crouch, 'MOVE', Player.onWall, Player.airJumps, Player.pound, Player.slide, Player.mantleT, 'PEARLS', L.pearls, 'PROJS', JSON.stringify(L.projs.map(p => [p.kind, Math.round(p.x), Math.round(p.y)])), 'GATES', L.gates.map(g => g.map(t => tileAt(t.x, t.y)).join('')).join('|'), 'TARGETS', [...L.hitTargets].join(';')); return; }
@@ -1990,7 +1992,7 @@ const Game = {
     switch (Game.state) {
       case 'title': if (!Game.frozen) Game.updateTitle(); break;
       case 'select': if (!Game.frozen) Game.updateSelect(); break;
-      case 'play': if (Game.frozen) break; if (Game.paused) Game.updatePause(); else Game.updatePlay(); break;
+      case 'play': if (Game.frozen) break; if (Game.paused) Game.updatePause(); else { Pausa.update(); Game.updatePlay(); } break;
       case 'clear': Game.updateClear(); break;
       case 'ending': Game.updateEnding(); break;
       case 'gate': Cine.gateUpdate(); break;
@@ -2185,19 +2187,22 @@ const Game = {
   updateClear() { Victoria.updateClear(); },
   // The ending (the last level's tally leads here): the final cinematic and the credits live in final.js.
   updateEnding() { if (Game.frozen) return; if (!Game.endT++) Final.start(); Final.update(); },
-  pause() { if (Game.state !== 'play' || Game.paused) return; Game.paused = true; Game.pauseSel = 0; Sound.suck(false); Sound.jet(false); Sound.duck(true); Input.release(); },
-  resume() { Game.paused = false; Sound.duck(false); Sound.resume(); },
+  // The pause menu (the board, Bigotes as the cursor, the hints) is drawn and animated in pausa.js; here, what it does.
+  pause() { if (Game.state !== 'play' || Game.paused) return; Game.paused = true; Game.pauseSel = 0; Sound.suck(false); Sound.jet(false); Sound.duck(true); Input.release(); Pausa.open(); },
+  resume() { Game.paused = false; Sound.duck(false); Sound.resume(); Pausa.close(); },
   updatePause() {
-    const items = 3;
-    if (Input.pressed.up) { Game.pauseSel = (Game.pauseSel + items - 1) % items; Sound.play('select'); }
-    if (Input.pressed.down) { Game.pauseSel = (Game.pauseSel + 1) % items; Sound.play('select'); }
-    if (Game.tapSel !== undefined) { Game.pauseSel = Game.tapSel; Game.tapSel = undefined; Game.tapped = true; }
+    const items = 3; Pausa.update();
+    if (Input.pressed.up) { Game.pauseSel = (Game.pauseSel + items - 1) % items; Pausa.move(-1); }
+    if (Input.pressed.down) { Game.pauseSel = (Game.pauseSel + 1) % items; Pausa.move(1); }
+    if (Input.pressed.left || Input.pressed.right) Pausa.flip(Input.pressed.left ? -1 : 1);
+    if (Game.tapSel === 'tip') { Game.tapSel = undefined; Pausa.flip(1); }
+    if (Game.tapSel !== undefined) { if (Game.tapSel !== Game.pauseSel) Pausa.move(0); Game.pauseSel = Game.tapSel; Game.tapSel = undefined; Game.tapped = true; }
     if (Input.pressed.pause) { Game.resume(); return; }
     if (Input.pressed.jump || Input.pressed.fish || Input.pressed.confirm || Game.tapped) {
-      Game.tapped = false; Sound.play('confirm');
+      Game.tapped = false; Sound.play('confirm'); Pausa.press(Game.pauseSel);
       if (Game.pauseSel === 0) Game.resume();
       else if (Game.pauseSel === 1) Game.toggleMute();
-      else { Game.paused = false; Sound.duck(false); Sound.suck(false); Game.transition(() => Game.select()); }
+      else { Game.paused = false; Sound.duck(false); Sound.suck(false); Pausa.leave(); Game.transition(() => Game.select()); }
     }
   },
   toggleMute() { Sound.setMuted(!Sound.isMuted()); Save.data.mute = Sound.isMuted(); Save.write(); Game.updateSoundButton(); if (!Sound.isMuted()) Sound.play('select'); },
@@ -2225,7 +2230,7 @@ const Game = {
     if ((Game.state === 'select' || Game.state === 'play') && Charla.active()) { Game.tapped = true; return; }
     if (Game.state === 'select') { const h = Mapa.hit(pt); if (h === 'panel') Game.tapped = true; else if (h >= 0) Game.tapSel = h; return; }
     if (Game.state === 'play' && Game.learning) { Game.tapped = true; return; }
-    if (Game.state === 'play' && Game.paused) { const rows = Game.pauseRows(); for (let i = 0; i < rows.length; i++) if (pt.y >= rows[i] - 6 && pt.y < rows[i] + 12) { Game.tapSel = i; return; } return; }
+    if (Game.state === 'play' && Game.paused) { const h = Pausa.hit(pt); if (h === 'tip' || h >= 0) Game.tapSel = h; return; }
     if (Game.state === 'clear' || Game.state === 'ending') Game.tapped = true;
   },
   noteRaw(e) { return (e.kind === 'ruca' ? L.def.ruca : L.def.signs)[e.idx] || ''; },
@@ -2242,7 +2247,7 @@ const Game = {
       case 'select': Game.drawSelect(g); if (Charla.active()) Charla.draw(g); break;
       case 'gate': Cine.gateDraw(g); break;
       case 'cine': Cine.draw(g); break;
-      case 'play': Game.drawPlay(g); if (Game.learning) Aprende.draw(g); else if (Charla.active()) Charla.draw(g); if (Game.paused) Game.drawPause(g); break;
+      case 'play': Game.drawPlay(g); if (Game.learning) Aprende.draw(g); else if (Charla.active()) Charla.draw(g); if (Game.paused || Pausa.showing()) Game.drawPause(g); break;
       case 'clear': Game.drawClear(g); break;
       case 'ending': Game.drawEnding(g); break;
       case 'sprites': Game.drawSprites(g); break;
@@ -2480,15 +2485,9 @@ const Game = {
       g.restore();
     }
   },
-  pauseRows() { return [70, 88, 106]; },
-  drawPause(g) {
-    g.fillStyle = 'rgba(8,10,16,.72)'; g.fillRect(0, 0, W, H);
-    ART.title(g, 'Pausa', W / 2, 38, '#e79b3f', 'center');
-    const items = ['Seguir', 'Sonido: ' + (Sound.isMuted() ? 'no' : 'sí'), 'Salir al mapa'], rows = Game.pauseRows();
-    items.forEach((it, i) => { const sel = i === Game.pauseSel; ART.text(g, (sel ? '► ' : '') + it, W / 2, rows[i], sel ? '#fff6d6' : '#9fc0cc', 'center'); });
-    const known = POWER_ORDER.filter(Game.has); ART.wrap(known.length ? 'Bigotes sabe: ' + known.map(k => POWERS[k].name).join(', ') : 'Bigotes aún no sabe trucos', W - 40).slice(0, 2).forEach((ln, i) => ART.text(g, ln, W / 2, 122 + i * 9, '#9fc0cc', 'center'));
-    ART.text(g, Touch.enabled ? 'Toca una opción' : 'Flechas y Z', W / 2, 150, '#5f7899', 'center');
-  },
+  // The options' centre lines (taps go through Pausa.hit, which knows the planks and where the board hangs).
+  pauseRows() { return Pausa.ROWS; },
+  drawPause(g) { Pausa.draw(g); },
   // ---- title & menus
   drawScene(g, t, theme) {
     // A dock at dusk: reflections shimmer on the water and fireflies wander.
