@@ -6,6 +6,9 @@
 // chimenea de raíces, anzuelos sobre el agua, chorro sobre las espinas, pilares contra el reloj del
 // molinillo y el gran lago (chimenea, aleteo, anzuelos y chorro seguidos).
 // Secretos (resbalón): dos túneles bajos con molinillo, uno bajo la cocina y otro bajo los cangrejos.
+// Faroles: tras la chimenea, tras el chorro sobre las espinas (junto a Don Pinzas), al otro lado del muro de
+// piedra reforzada (empieza la segunda mitad: los cangrejos en fila), antes y después de los pilares del
+// molinillo y en el pilar del final del lago. El de pasada la seta, a un paso de la barca, sobraba.
 'use strict';
 (() => {
   const { screen, join } = NIVEL;
@@ -111,7 +114,7 @@
       '.X..................',
       '.X..................',
       '.X..................',
-      '.X.?.......f....r.r.',
+      '.X.?.L.....f....r.r.',
       '################==##',
       '.....*........G*..##',
       '####################'),
@@ -231,7 +234,7 @@
       '....................',
       '....................',
       '....................',
-      '........L.......V...',
+      '................V...',
       '############...#####',
       '...............#####',
       '####################'),

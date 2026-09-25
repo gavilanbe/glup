@@ -893,27 +893,30 @@ const MUNDO = (() => {
       '......oooooooooooooooooooo......'], Object.assign({ Y: '#fff2b8', y: '#ffc84a' }, WP), 'boat'),
     plate: { off: sprite(['..oooooooooooo..', '.oHLLLLLLLLLLSo.', '.oLSSrrrrrrSSso.', 'oossssssssssssoo', 'oooooooooooooooo'], { o: OUT, H: css(STONE[6]), L: css(STONE[5]), S: css(STONE[4]), s: css(STONE[2]), r: '#c8583e' }, 'plate'),
       on: sprite(['................', '................', '..oooooooooooo..', 'ooLLGGGGGGGGLLoo', 'oooooooooooooooo'], { o: OUT, L: css(STONE[5]), G: '#8ff0a0' }, 'plate-on') } };
+  // The lantern (the save point) as a small still, for icons and scenes: a paper lantern hanging from a
+  // crooked, mossy post. The one in the levels is drawn live by farol.js (it sways, glows and flickers).
   const lanternRows = [
-    '....oo....',
-    '...oIIo...',
-    '..oIIIio..',
-    '.oIIiiiio.',
-    '.oooooooo.',
-    '.oGgLLgGo.',
-    '.oGLWWLGo.',
-    '.oGLWWLgo.',
-    '.oGgLLggo.',
-    '.oooooooo.',
-    '..oIiiio..',
-    '...oHmo...',
-    '...oHmo...',
-    '...owmo...',
-    '...oHmo...',
-    '...oHmo...',
-    '..oowmoo..',
-    '.oooooooo.'];
-  props.lantern = { off: sprite(lanternRows, Object.assign({}, WP, { G: '#26303c', g: '#1e2632', L: '#34404e', W: '#44505e' }), 'lantern'),
-    on: sprite(lanternRows, Object.assign({}, WP, { G: '#f0a038', g: '#c87428', L: '#ffd868', W: '#fff8d8' }), 'lantern-on') };
+    '.oooooo...',
+    'oppppppo..',
+    'opnoooPo..',
+    'opPo..o...',
+    'opPo.oCo..',
+    'onPooCCCo.',
+    'opPoGLLLGo',
+    'opPoGLWLGo',
+    'opmoGLWLGo',
+    'opPoGLLLGo',
+    'opPoGGGGGo',
+    'opPooCCCo.',
+    'omPo.oRo..',
+    'opPo..R...',
+    'opPo......',
+    'npPmo.....',
+    'mnmnmo....',
+    'oooooo....'];
+  const LANT = { o: OUT, P: css(WOOD[3]), p: css(WOOD[5]), C: css(WOOD[1]), R: '#c0463a', m: '#5e8a2e', n: '#8cba48' };
+  props.lantern = { off: sprite(lanternRows, Object.assign({ G: '#2e2c3c', L: '#3c3a4c', W: '#c0603a' }, LANT), 'lantern'),
+    on: sprite(lanternRows, Object.assign({ G: '#f4a83c', L: '#ffe08a', W: '#fffbe0' }, LANT), 'lantern-on') };
 
   // ---------------------------------------------------------------- Fondos
   // Sky gradients run top to horizon; hills, far trees, bald cypresses and reeds get

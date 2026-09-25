@@ -6,6 +6,9 @@
 // el túnel de los cangrejos, la segunda balsa contra la compuerta del río y el último túnel.
 // Retos opcionales: el rincón del fuego en lo alto de la chimenea (subir con agua en la boca) y la seta del pozo
 // de Alga (panzazo sobre la seta).
+// Faroles: tras la balsa de las zarzas (antes, el primero estaba a noventa pasos, pasados los anzuelos), en la
+// repisa de los cangrejos, antes de Alga, tras el túnel del molinillo, antes de la segunda balsa y tras su
+// compuerta. El de al lado de la barca no guardaba nada: fuera.
 'use strict';
 (() => {
   const { screen, join } = NIVEL;
@@ -51,7 +54,7 @@
       '....................',
       '....................',
       '....................',
-      '....................',
+      '.........L..........',
       '~~~~~~#######~~~w~~~',
       '~~~~~~#######~~~~~~~',
       '####################'),
@@ -246,7 +249,7 @@
       '....................',
       '..............m.....',
       '....................',
-      '.........NL....E....',
+      '.........N.....E....',
       'w~~~~~~~####~~~~~~~~',
       '~~~~~~~~####~~~~~~~~',
       '####################'));

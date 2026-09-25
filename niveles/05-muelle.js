@@ -6,6 +6,9 @@
 // Escondidas: una pasarela en el cielo sobre la seta del hoyo (panzazo para rebotar muy alto), una
 // bodega bajo la piedra agrietada del pilote del caladero (panzazo), y dos huecos tras piedra reforzada
 // (guindilla): bajo la caseta y en el cobertizo.
+// Faroles: tras los primeros tablones (antes de los nenúfares), en el islote antes de la balsa, junto a Don
+// Anselmo (empieza el caladero), tras el caladero, en el cobertizo y antes de los nenúfares de las ranas. Se
+// quitaron el de antes del río (a trece pasos del islote) y el de al lado de la barca.
 'use strict';
 (() => {
   const { screen, join, G3 } = NIVEL;
@@ -51,11 +54,11 @@
       '....................',
       '........m...........',
       '....................',
-      '....................',
+      '.L..................',
       '####w~~w~~w~~w~~####',
       '####~~~~~~~~~~~~####',
       '####################'),
-    // 4 · El cangrejo, la seta del hoyo (y la pasarela del cielo), farol y el río que se cruza flotando.
+    // 4 · El cangrejo, la seta del hoyo (y la pasarela del cielo) y el río que se cruza flotando.
     screen(
       '................*...',
       '....=============...',
@@ -67,7 +70,7 @@
       '....................',
       '....................',
       '....................',
-      '.r...K....?.L.......',
+      '.r...K....?.........',
       '##..##########~~~~~~',
       '##..##########~~~~~~',
       '##%%################'),
@@ -91,7 +94,7 @@
     screen(
       '....................',
       '....................',
-      '.............Q...?..',
+      '.............Q.L.?..',
       '......M..M##########',
       '......M..M##########',
       '......M..M##########',
@@ -243,7 +246,7 @@
       '....................',
       '....................',
       '....................',
-      '..N...L.....E.......',
+      '..N.........E.......',
       '###########~~~~~~~~~',
       '###########~~~~~~~~~',
       '####################'));

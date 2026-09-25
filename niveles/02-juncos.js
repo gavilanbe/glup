@@ -10,6 +10,8 @@
   // Secretos: la chimenea de raíces de la salida (ventosa), la bodega de piedra rajada junto a Ruca
   // (panzazo), la cueva de la hoguera tras los pilotes (chorro) y el túnel del molinillo bajo la orilla
   // (resbalón).
+  // Faroles: los tres de Lumi (la orilla, el suyo y el de la bodega) y el de la compuerta, antes de los
+  // pilotes. El de junto a la barca sobraba: tras él no quedaba nada que guardar.
   const juncos = join(
     // 0 · la salida: una chimenea de raíces a la espalda y piedra rajada en el suelo.
     screen(
@@ -165,7 +167,7 @@
       '....################',
       'V...................',
       '####################'),
-    // 10 · el farol y la barca; al final del túnel, tras su compuerta, una cría.
+    // 10 · la barca; al final del túnel, tras su compuerta, una cría.
     screen(
       '....................',
       '....................',
@@ -177,7 +179,7 @@
       '....................',
       '....................',
       '....................',
-      '...L.......E........',
+      '...........E........',
       '#######==#~~~~~~~~~~',
       '......G.*#~~~~~~~~~~',
       '####################'));

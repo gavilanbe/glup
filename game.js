@@ -1271,6 +1271,7 @@ const Player = {
     const p = Player, cam = Cam, N = ART.nila;
     if (Aprende.posing()) return;
     if (Victoria.active()) { Victoria.drawWorld(g); return; }
+    if (Farol.hidden()) return;   // coming back out of a lantern's light
     if (p.inv > 0 && (p.inv >> 2) % 2 === 0 && !p.dead) return;
     const fx = Math.round(p.x - cam.x), fy = Math.round(p.y - cam.y);
     // Every pose is 16×22 with the boots on its last row: anchor it to the bottom of the hitbox.
@@ -1653,8 +1654,8 @@ const Item = {
   },
   pearlDraw(e, g) { const bob = e.resting ? 0 : Math.round(Math.sin(e.t / 18) * 2); g.drawImage(ART.cria[(e.t >> 4) % 3], Math.round(e.x - Cam.x), Math.round(e.y - Cam.y + bob)); },
   heart(x, y, id) { return { kind: 'heart', x, y, w: 9, h: 8, id, t: 0, update(e) { e.t++; if (overlap(e, Player.rect()) && !Player.dead) { e.dead = true; L.taken.add(e.id); Player.hp = Math.min(3, Player.hp + 1); Sound.play('heart'); spawnParts(12, e.x + 4, e.y + 4, { color: ['#e2445a', '#ffb0bd', '#ffffff'], speed: [.5, 2.2], life: [14, 28], g: -.02 }); } }, draw(e, g) { g.drawImage(ART.heart, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y + Math.sin(e.t / 15) * 2)); } }; },
-  lantern(x, y, id) { return { kind: 'lantern', x, y, w: 10, h: 18, id, t: 0, update(e) { e.t++; if (!L.lit.has(e.id) && overlap({ x: e.x - 4, y: e.y, w: 18, h: 18 }, Player.rect()) && !Player.dead) { L.lit.add(e.id); L.checkpoint = { x: e.x - 1, y: e.y }; Sound.play('lantern'); spawnParts(16, e.x + 5, e.y + 5, { color: ['#ffcf5a', '#fff2b8', '#ffffff'], speed: [.3, 1.8], life: [20, 40], g: -.03 }); Game.toast('Farol encendido', 90); Game.word('¡FAROL!', e.x + 5, e.y - 8, '#ffcf5a', true); Cam.punch(1.03); } if (L.lit.has(e.id) && e.t % 5 === 0) spawnParts(1, e.x + 5, e.y + 5, { color: ['#ffcf5a', '#fff2b8'], speed: [.1, .5], life: [16, 30], g: -.02 }); },
-    draw(e, g) { const lit = L.lit.has(e.id); if (lit) { g.globalAlpha = .18 + Math.sin(e.t / 9) * .04; g.fillStyle = '#ffcf5a'; const r = 18; g.beginPath(); g.arc(Math.round(e.x - Cam.x) + 5, Math.round(e.y - Cam.y) + 5, r, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; } g.drawImage(lit ? ART.lantern.on : ART.lantern.off, Math.round(e.x - Cam.x), Math.round(e.y - Cam.y)); } }; },
+  // The lantern, the save point: a paper lantern on a mossy post (farol.js draws it, lights it and brings Nila back out of its light).
+  lantern(x, y, id) { return Farol.make(x, y, id); },
   // Ruca, the old turtle: she talks when Nila asks (↑), in a real conversation that holds the world still.
   // The first time Nila meets her at the start of a level, she speaks up by herself (once).
   ruca(x, y, idx) { return { kind: 'ruca', x, y, w: 20, h: 11, fy: -7, idx, t: Math.random() * 100 | 0, near: false, update(e) {
@@ -2112,6 +2113,8 @@ const Game = {
     if (c.scene === 'pausa') { Game.startLevel(c.n); Game.banner = 0; L.pearls = Math.min(L.pearlsTotal, 5); Save.data.best[L.def.id] = 245; for (let i = 0; i < c.t; i++) { Input.pressed = {}; Game.updatePlay(); } Game.pause(); for (let i = 0; i < Math.max(0, c.x); i++) { Input.held = {}; Input.pressed = {}; for (const g of c.guion) if (i === g.f0) Input.pressed[g.a] = true; Game.updatePause(); Game.t++; } Input.pressed = {}; Game.frozen = true; return; }
     if (c.scene === 'victoria') { Victoria.capture(c); return; }
     if (c.scene === 'final') { Final.capture(c); return; }
+    // ?escena=renace&n=<level>&x=<px near a lantern>&t=<frames>: Nila lights the nearest lantern, walks off, falls and comes back out of its light (GUION acts after).
+    if (c.scene === 'renace') { Game.startLevel(c.n); Game.banner = 0; const lt = L.ents.filter(e => e.kind === 'lantern').sort((a, b) => Math.abs(a.x - c.x) - Math.abs(b.x - c.x))[0]; Player.x = lt.x - 1; Player.y = lt.y; Cam.snap(); for (let i = 0; i < 40; i++) { Input.held = {}; Input.pressed = {}; Game.updatePlay(); } Player.x += 40; Game.respawn(); const f = Game.fadeTo; Game.fadeTo = null; f(); Game.fade = 1; for (let i = 0; i < c.t; i++) { Input.held = {}; Input.pressed = {}; for (const q of c.guion) if (i >= q.f0 && i <= q.f1) { Input.held[q.a] = true; if (i === q.f0) Input.pressed[q.a] = true; } Game.fade = Math.max(0, Game.fade - .06); Game.updatePlay(); Game.t++; } Input.held = {}; Game.frozen = true; return; }
     if (c.scene === 'nivel') { Game.startLevel(c.n); if (c.x >= 0) { Player.x = c.x; Player.y = 0; for (let i = 0; i < 60; i++) { Player.vy = Math.min(Player.vy + .28, 5.5); if (moveY(Player, Player.vy)) { Player.vy = 0; Player.onGround = true; break; } } Cam.snap(); } Game.banner = 0; for (let i = 0; i < c.t; i++) { Input.held = {}; Input.pressed = {}; for (const g of c.guion) if (i >= g.f0 && i <= g.f1) { Input.held[g.a] = true; if (i === g.f0) Input.pressed[g.a] = true; } Game.updatePlay(); } Input.held = {}; Input.pressed = {}; Game.frozen = true; if (params_debug()) console.log('ENTS', JSON.stringify(L.ents.map(e => [e.kind, Math.round(e.x), Math.round(e.y), e.dead ? 'dead' : ''])), 'PLAYER', Math.round(Player.x), Math.round(Player.y), Player.held ? Player.held.kind : '-', 'SUCK', Player.sucking, Player.waterT, Player.charge, Player.hover, Player.fishT, 'GRAP', !!Player.grapple, Player.hanging, Player.crouch, 'MOVE', Player.onWall, Player.airJumps, Player.pound, Player.slide, Player.mantleT, 'PEARLS', L.pearls, 'PROJS', JSON.stringify(L.projs.map(p => [p.kind, Math.round(p.x), Math.round(p.y)])), 'GATES', L.gates.map(g => g.map(t => tileAt(t.x, t.y)).join('')).join('|'), 'TARGETS', [...L.hitTargets].join(';')); return; }
   },
   title() { Game.state = 'title'; Game.titleT = 0; Game.titleParts = []; Sound.playMusic('march'); Sound.ambiente('atardecer', { vol: .8 }); },
@@ -2206,7 +2209,7 @@ const Game = {
   },
   // ---- play
   startLevel(i, arrive) { Maestros.reset(); Game.level = i; Game.hitStop = 0; Game.heldPresses = {}; loadLevel(i); Game.state = 'play'; Game.paused = false; Game.banner = 190; Sound.playMusic(LEVELS[i].music); Sound.ambiente(LEVELS[i].ambiente || LEVELS[i].theme); Game.toastT = 0; Game.weather = { bolt: 0, next: 200, x: 0, seed: 1, thunder: 0 };  if (arrive) { Barca.start(); Game.banner = 0; } },
-  respawn() { Game.transition(() => { Player.reset(L.checkpoint.x, L.checkpoint.y, true); if (L.def.boss) { if (!Boss.restart()) { loadLevel(Game.level); Game.banner = 60; } } else { spawnEntities(); } Cam.snap(); Sound.playMusic(L.def.boss ? Boss.song() : L.def.music); }); },
+  respawn() { Game.transition(() => { Player.reset(L.checkpoint.x, L.checkpoint.y, true); if (L.def.boss) { if (!Boss.restart()) { loadLevel(Game.level); Game.banner = 60; } } else { spawnEntities(); Farol.arrive(); } Cam.snap(); Sound.playMusic(L.def.boss ? Boss.song() : L.def.music); }); },
   drown(fell) {
     const p = Player; if (p.dead) return;
     if (!fell) { Sound.play('splash'); spawnParts(14, p.x + 5, p.y + p.h, { color: ['#8fd9d0', '#c8f2ea', '#2f7f88'], angle: -Math.PI / 2, spread: 1.2, speed: [1, 3.5], life: [16, 30] }); for (let i = 0; i < 2; i++) L.parts.push({ x: p.x + 5, y: Math.floor((p.y + p.h) / TS) * TS + 2, vx: 0, vy: 0, life: 16 - i * 5, color: '#c8f2ea', size: 1, g: 0, kind: 'ripple' }); }
@@ -2218,7 +2221,7 @@ const Game = {
       Game.transition(() => { const hp = p.hp; Player.reset(safe.x, safe.y, false); p.hp = hp; p.inv = 60; p.lastSafe = safe; Cam.snap(); Game.restoreProps();
         if (carried) { const e = Item.fromHeld(carried, safe.x + 5 - carried.w / 2, safe.y + 18 - carried.h); if (e) { for (let n = 0; n < 16 && rectSolid(e.x, e.y, e.w, e.h, e); n++) e.y--; L.ents.push(e); } } });
     }
-    else { Game.transition(() => { const hp = p.hp; Player.reset(L.checkpoint.x, L.checkpoint.y, false); p.hp = hp; p.inv = 60; spawnEntities(); Cam.snap(); }); }
+    else { Game.transition(() => { const hp = p.hp; Player.reset(L.checkpoint.x, L.checkpoint.y, false); p.hp = hp; p.inv = 60; spawnEntities(); Farol.arrive(); Cam.snap(); }); }
   },
   // After a fall into the water the world is kept, but the rafts go back to their moorings and any crate
   // or rock that was lost (sunk, carried off) reappears where it started, so no puzzle is left without its piece.
@@ -2493,7 +2496,7 @@ const Game = {
     hole(Player.x + 5, Player.y + 9, 58 * fl);
     for (const e of L.ents) {
       if (e.dead) continue;
-      if (e.kind === 'lantern' && L.lit.has(e.id)) hole(e.x + 5, e.y + 5, 46 * fl);
+      if (e.kind === 'lantern') Farol.light(e, hole, fl);
       else if (e.kind === 'pearl') hole(e.x + 3, e.y + 3, 12);
       else if (e.kind === 'boat') hole(e.x + 14, e.y - 4, 34 * fl);
       else if (e.kind === 'anchor') hole(e.x + 5, e.y + 5, 10);
@@ -2518,6 +2521,7 @@ const Game = {
   },
   drawWords(g) {
     for (const w of L.words) {
+      if (w.draw) { w.draw(g, w); continue; }   // a word that draws itself (the lantern's ¡GUARDADO!)
       const t = w.t / w.life; const rise = w.big ? Math.min(6, w.t * .6) : Math.min(8, w.t * .5);
       const x = Math.round(w.x - Cam.x + (w.drift || 0) * w.t), y = Math.round(w.y - Cam.y - rise);
       g.globalAlpha = t > .7 ? (1 - t) / .3 : 1;

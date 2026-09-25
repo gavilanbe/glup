@@ -6,6 +6,9 @@
 // final, anzuelos sobre zarzas que acaban en la última costra, con un cangrejo encima.
 // Rincones: el túnel largo bajo el molinillo (resbalón: a gatas no da tiempo) y la cámara tapiada con
 // piedra reforzada (guindilla: la piedra de al lado, cargada).
+// Faroles: los tres de Canto (dos por el camino y el de lo alto de la seta), al fondo de la galería de los cangrejos, a la
+// salida de la galería, junto al molinillo y en lo alto del pilar, antes de los anzuelos sobre las zarzas
+// (estaba después, junto a la barca, y una caída en las zarzas devolvía al molinillo).
 'use strict';
 (() => {
   const { screen, join } = NIVEL;
@@ -208,7 +211,7 @@
     screen(
       '....................',
       '....................',
-      '....................',
+      '........L...........',
       '......######...O....',
       '......######......*.',
       '......X..###........',
@@ -246,7 +249,7 @@
       '....................',
       '....................',
       '....................',
-      'N..L..........E.....',
+      'N.............E.....',
       '###########~~~~~~~~~',
       '###########~~~~~~~~~',
       '####################'));

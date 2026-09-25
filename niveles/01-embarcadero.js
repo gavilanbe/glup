@@ -8,6 +8,8 @@
   // molinillos: el de su compuerta y el de la carrera sobre los nenúfares.
   // Secretos (para volver): la tabla alta de la salida (aleteo), la chimenea de raíces que cuelga sobre
   // la madriguera (ventosa), el anzuelo sobre los nenúfares (mordisco) y la cueva tapiada (guindilla).
+  // Faroles (guardado): antes de los primeros nenúfares, junto a Ruca y justo al salir de la carrera; el que
+  // había al lado de la barca no guardaba nada y ahora está tras la compuerta de la carrera.
   const embarcadero = join(
     // 0 · el embarcadero: Ruca, un escalón para saltar y, arriba, una cría en una tabla a la que aún no se llega.
     screen(
@@ -120,6 +122,7 @@
       '................G...',
       '.L...Q.....V....G.*.', ...G3),
     // 8 · la carrera: sopla al molinillo y cruza los nenúfares antes de que se pare. Un mosquito estorba.
+    //     Tras la compuerta, el farol: la carrera ya no se repite.
     screen(
       '................###.',
       '................###.',
@@ -131,7 +134,7 @@
       '..........m......G..',
       '.................G..',
       '.................G..',
-      '.?.V.............G..',
+      '.?.V.............G.L',
       '####~~w~~w~~w~~w~###',
       '####~~~~~~~~~~~~~###',
       '####################'),
@@ -164,7 +167,7 @@
       '####~~~###~~~#######',
       '####~~~###~~~#######',
       '####################'),
-    // 11 · el farol y la barca.
+    // 11 · la barca.
     screen(
       '....................',
       '....................',
@@ -176,7 +179,7 @@
       '....................',
       '....................',
       '....................',
-      '..,L........E.......',
+      '..,.........E.......',
       '##########~~~~~~~~~~',
       '##########~~~~~~~~~~',
       '####################'));

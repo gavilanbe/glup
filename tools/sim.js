@@ -8,7 +8,7 @@ const ROOT = path.join(__dirname, '..');
 const NIVELES = fs.readdirSync(path.join(ROOT, 'niveles')).filter(f => f.endsWith('.js')).sort().map(f => 'niveles/' + f);
 // The songs: every file in musica/ (they only register data; audio is inert without an AudioContext).
 const MUSICA = fs.readdirSync(path.join(ROOT, 'musica')).filter(f => f.endsWith('.js')).sort().map(f => 'musica/' + f);
-const FILES = ['art.js', 'mundo.js', 'audio.js', ...MUSICA, 'levels.js', ...NIVELES, 'cine.js', 'titulo.js', 'mapa.js', 'hud.js', 'aprende.js', 'letra.js', 'maestros.js', 'fx.js', 'barca.js', 'victoria.js', 'garza.js', 'final.js', 'gramola.js', 'pausa.js', 'game.js'].filter(f => fs.existsSync(path.join(ROOT, f)));
+const FILES = ['art.js', 'mundo.js', 'audio.js', ...MUSICA, 'levels.js', ...NIVELES, 'cine.js', 'titulo.js', 'mapa.js', 'hud.js', 'aprende.js', 'letra.js', 'maestros.js', 'fx.js', 'barca.js', 'victoria.js', 'garza.js', 'final.js', 'gramola.js', 'pausa.js', 'farol.js', 'game.js'].filter(f => fs.existsSync(path.join(ROOT, f)));
 
 function stubContext() {
   const noop = () => { };

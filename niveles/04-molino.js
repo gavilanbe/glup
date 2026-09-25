@@ -7,6 +7,9 @@
 // agua, soplido y agua otra vez desde el nenúfar del molinillo.
 // Secretos: el sótano del canal de fuego y la cámara del tejado (panzazo: suelo agrietado sin munición cerca),
 // la viga de los anzuelos (mordisco) y el nicho de piedra reforzada junto al farol del caz (guindilla).
+// Faroles: antes de la carrera del caz, junto a Olga, tras el primer río (antes de la cortina de fuego, en vez
+// de antes del río, donde un chapuzón ya devuelve a la orilla), al salir del canal de fuego, en el tejado antes
+// de la riada y en la viga, antes del último nenúfar. El de junto a la barca no guardaba nada: fuera.
 'use strict';
 (() => {
   const { screen, join, G3 } = NIVEL;
@@ -115,7 +118,7 @@
       '#####~~~############',
       '#####~~~############',
       '####################'),
-    // 8 · El primer río: flotar con el chorro.
+    // 8 · El primer río: flotar con el chorro. En la otra orilla, el farol, antes de la cortina de fuego.
     screen(
       '....................',
       '....................',
@@ -127,7 +130,7 @@
       '....................',
       '....................',
       '....................',
-      'L?..................',
+      '.?................L.',
       '####~~~~~~~~~~######',
       '####~~~~~~~~~~######',
       '####################'),
@@ -252,7 +255,7 @@
       '....................',
       '....................',
       '....................',
-      '.....N.....L.E......',
+      '.....N.......E......',
       '############~~~~~~~~',
       '############~~~~~~~~',
       '####################'));
