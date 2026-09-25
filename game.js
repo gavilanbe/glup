@@ -82,6 +82,7 @@ const Touch = {
     Touch.btn = { fish: btn('fish'), jump: btn('jump'), puff: btn('puff'), talk: btn('up') };
     Touch.ctx = {}; for (const k in Touch.btn) Touch.ctx[k] = Touch.btn[k].querySelector('canvas').getContext('2d');
     Touch.drawBase(); Touch.drawKnob();
+    if ($('girar')) Touch.girarInit();
     Touch.layout(); addEventListener('resize', Touch.layout);
   },
   stickMove(cx, cy) {
@@ -174,6 +175,69 @@ const Touch = {
   },
   drawTalk(g, t) { g.clearRect(0, 0, 48, 14); g.fillStyle = '#1b1420'; const ax = 5, ay = 3 + ((t >> 4) & 1); g.fillRect(ax, ay, 1, 1); g.fillRect(ax - 1, ay + 1, 3, 1); g.fillRect(ax - 2, ay + 2, 5, 1); ART.text(g, 'hablar', 27, 1, '#1b1420', 'center'); },
   // Called every frame: redraw a face only when what it says changes (and animate the busy ones).
+  // ---- Held upright: a full-screen card that asks, with some juice, to turn the phone. A phone tips over
+  // (bouncing) with the swamp and Nila running inside it, a curved arrow pulses, the title wobbles in GLUP
+  // letters. Two buttons: turn it for me (fullscreen + orientation lock, where the browser allows it) and
+  // stay upright (remembered for the session). It goes away on its own as soon as the phone is turned.
+  girar: { on: false, t: 0, no: false, lock: false },
+  girarInit() {
+    const G = Touch.girar, c = $('girar').querySelector('canvas');
+    try { G.no = sessionStorage.getItem('glup-vertical') === '1'; } catch (e) { /* private mode */ }
+    G.lock = !!(screen.orientation && screen.orientation.lock) && !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+    c.addEventListener('pointerdown', e => {
+      e.preventDefault(); e.stopPropagation(); Sound.init();
+      const r = c.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * 200, y = (e.clientY - r.top) / r.height * 260;
+      const b = Touch.girarButtons().find(b => x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h); if (!b) return;
+      b.press = 8; Touch.buzz(12);
+      if (b.id === 'si') { const el = document.documentElement, fs = el.requestFullscreen || el.webkitRequestFullscreen; try { Promise.resolve(fs && fs.call(el)).then(() => screen.orientation.lock('landscape')).catch(() => {}); } catch (err) { /* not here */ } }
+      else { G.no = true; try { sessionStorage.setItem('glup-vertical', '1'); } catch (err) { /* private mode */ } Touch.girarShow(false); }
+    });
+  },
+  girarButtons() { const G = Touch.girar; if (!G.btns) G.btns = G.lock ? [{ id: 'si', x: 20, y: 214, w: 76, h: 26, lab: '¡Gíralo!', col: '#7fd0a0' }, { id: 'no', x: 104, y: 214, w: 76, h: 26, lab: 'seguir así', col: '#9fc0cc' }] : [{ id: 'no', x: 50, y: 214, w: 100, h: 26, lab: 'seguir en vertical', col: '#9fc0cc' }]; return G.btns; },
+  girarShow(on) {
+    const G = Touch.girar; if (G.on === on) return; G.on = on; G.t = 0; $('girar').hidden = !on;
+    if (on && Game.state === 'play' && !Game.paused) Game.pause();
+  },
+  girarDraw() {
+    const G = Touch.girar, c = $('girar').querySelector('canvas'), g = c.getContext('2d'), t = ++G.t, W2 = 200, H2 = 260;
+    g.imageSmoothingEnabled = false; g.clearRect(0, 0, W2, H2);
+    // The night swamp behind: stars, a moon, reeds and fireflies.
+    for (let i = 0; i < 40; i++) { const x = (i * 53) % W2, y = (i * 29) % 150, tw = Math.sin(t / 14 + i * 1.7); if (tw > .2) { g.fillStyle = tw > .85 ? '#ffffff' : '#8a86a8'; g.fillRect(x, y, 1, 1); } }
+    g.fillStyle = '#e8d8a0'; g.beginPath(); g.arc(166, 34, 10, 0, 7); g.fill(); g.fillStyle = '#c9b880'; g.fillRect(162, 30, 3, 3); g.fillRect(168, 36, 2, 2);
+    g.fillStyle = '#16121e'; for (let x = 0; x < W2; x += 3) { const h = 14 + ((x * 37) % 13) + Math.sin(t / 30 + x) * 2; g.fillRect(x, H2 - h, 2, h); }
+    for (let i = 0; i < 8; i++) { const x = (i * 47 + Math.sin(t / 40 + i) * 12 + 400) % W2, y = 150 + (i * 23) % 60 + Math.sin(t / 25 + i * 2) * 6, a = Math.max(0, Math.sin(t / 10 + i * 3)); g.globalAlpha = a * .35; g.fillStyle = '#f2f5a0'; g.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 3); g.globalAlpha = a; g.fillStyle = '#ffffe0'; g.fillRect(Math.round(x), Math.round(y), 1, 1); } g.globalAlpha = 1;
+    // Title in GLUP letters, each wobbling like jelly.
+    for (const [line, y0, d] of [['¡GIRA', 12, 0], ['EL MÓVIL!', 40, 5]]) ART.glup(g, line, W2 / 2, y0, { size: 'mid', align: 'center', shadow: true, each: i => { const k = t - (i + d) * 3; if (k < 0) return false; const fall = Math.max(0, 12 - k), land = k >= 12 && k < 20 ? Math.sin((k - 12) / 8 * Math.PI) * .25 : 0; return { y: Math.round(-fall * fall * .25 + Math.sin(t / 9 + i) * 1.4), alpha: Math.min(1, k / 5), sx: 1 + land + Math.sin(t / 7 + i) * .04, sy: 1 - land + (fall ? .15 : 0) - Math.sin(t / 7 + i) * .04 }; } });
+    // The phone: tips from upright to lying down with an overshoot, holds, and comes back.
+    const cyc = t % 200, e = cyc < 40 ? 0 : cyc < 70 ? (cyc - 40) / 30 : cyc < 170 ? 1 : cyc < 190 ? 1 - (cyc - 170) / 20 : 0;
+    const k = e >= 1 ? 1 : e <= 0 ? 0 : 1 - Math.exp(-e * 6) * Math.cos(e * 9), ang = -Math.PI / 2 * k, cx = 100, cy = 138, pw = 46, ph = 82;
+    // A curved arrow showing the way, pulsing while the phone is upright.
+    const pulse = 1 + Math.sin(t / 5) * .08 * (1 - k); g.save(); g.translate(cx, cy); g.scale(pulse, pulse);
+    for (let i = 0; i < 26; i++) { const a = -Math.PI * .95 + i / 26 * Math.PI * .5, r = 60; g.fillStyle = '#1b1420'; g.fillRect(Math.round(Math.cos(a) * r) - 2, Math.round(Math.sin(a) * r) - 2, 5, 5); }
+    for (let i = 0; i < 26; i++) { const a = -Math.PI * .95 + i / 26 * Math.PI * .5, r = 60; g.fillStyle = (i + (t >> 2)) % 6 < 3 ? '#f2c46a' : '#ffe36a'; g.fillRect(Math.round(Math.cos(a) * r) - 1, Math.round(Math.sin(a) * r) - 1, 3, 3); }
+    const ea = -Math.PI * .45, ex = Math.cos(ea) * 60, ey = Math.sin(ea) * 60; g.fillStyle = '#1b1420'; g.beginPath(); g.moveTo(ex + 8, ey - 2); g.lineTo(ex - 5, ey - 8); g.lineTo(ex - 2, ey + 7); g.fill(); g.fillStyle = '#ffe36a'; g.beginPath(); g.moveTo(ex + 5, ey - 1); g.lineTo(ex - 3, ey - 5); g.lineTo(ex - 1, ey + 4); g.fill();
+    g.restore();
+    g.save(); g.translate(cx, cy); g.rotate(ang);
+    g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(-pw / 2 + 3, -ph / 2 + 4, pw, ph);
+    g.fillStyle = '#1b1420'; g.fillRect(-pw / 2 - 2, -ph / 2, pw + 4, ph); g.fillRect(-pw / 2, -ph / 2 - 2, pw, ph + 4);
+    g.fillStyle = '#e79b3f'; g.fillRect(-pw / 2, -ph / 2, pw, ph); g.fillStyle = '#f2c46a'; g.fillRect(-pw / 2, -ph / 2, pw, 2); g.fillStyle = '#b8782a'; g.fillRect(-pw / 2, ph / 2 - 2, pw, 2);
+    const sw = pw - 8, sh = ph - 16; g.fillStyle = '#10141c'; g.fillRect(-sw / 2, -sh / 2, sw, sh); g.fillStyle = '#1b1420'; g.fillRect(-3, ph / 2 - 7, 6, 3);
+    // Its screen, lit by the swamp; turned, it fills up and Nila runs across.
+    g.save(); g.beginPath(); g.rect(-sw / 2, -sh / 2, sw, sh); g.clip(); g.rotate(-ang);
+    const lw = k > .5 ? sh : sw, lh = k > .5 ? sw : sh, gr = g.createLinearGradient(0, -lh / 2, 0, lh / 2); gr.addColorStop(0, '#3a2a5a'); gr.addColorStop(.6, '#e2905c'); gr.addColorStop(1, '#2a3a2a');
+    g.fillStyle = gr; g.fillRect(-lw / 2, -lh / 2, lw, lh); g.fillStyle = '#2f4a1e'; g.fillRect(-lw / 2, lh / 2 - 8, lw, 8); g.fillStyle = '#7fb040'; g.fillRect(-lw / 2, lh / 2 - 8, lw, 1);
+    if (k < .5) { g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(-lw / 2, -lh / 2, lw, lh / 2 - 12); g.fillRect(-lw / 2, 12, lw, lh / 2); }
+    const N = ART.nila.run || ART.nila.idle, fr = N[(t >> 2) % N.length], nx = k > .9 ? ((t * .8) % (lw + 20)) - lw / 2 - 10 : -8; g.drawImage(fr, Math.round(nx), Math.round(lh / 2 - 8 - fr.height));
+    g.restore(); g.restore();
+    // Sparkles when it lands on its side.
+    if (cyc >= 70 && cyc < 90) for (let i = 0; i < 8; i++) { const a = i / 8 * 6.28, r = 30 + (cyc - 70) * 1.6; g.globalAlpha = 1 - (cyc - 70) / 20; g.fillStyle = i % 2 ? '#fff6d6' : '#f2c46a'; g.fillRect(Math.round(cx + Math.cos(a) * r * 1.3), Math.round(cy + Math.sin(a) * r * .8), 2, 2); } g.globalAlpha = 1;
+    ART.text(g, 'El pantano se juega en horizontal', W2 / 2, 194, '#cfe0e8', 'center', '#120c18');
+    for (const b of Touch.girarButtons()) {
+      const p = b.press > 0 ? b.press-- : 0, dy = p ? 2 : 0;
+      g.fillStyle = '#1b1420'; g.fillRect(b.x - 1, b.y - 1 + dy, b.w + 2, b.h + 2); g.fillStyle = b.col; g.fillRect(b.x, b.y + dy, b.w, b.h - 3); g.fillStyle = '#ffffff'; g.globalAlpha = .35; g.fillRect(b.x, b.y + dy, b.w, 2); g.globalAlpha = 1; g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(b.x, b.y + b.h - 3 + dy, b.w, 3);
+      ART.text(g, b.lab, b.x + b.w / 2, b.y + 8 + dy, '#1b1420', 'center');
+    }
+  },
   // Portrait: a little phone that tips over, "gira el móvil", in the game's own letters.
   drawHint(t) {
     const c = $('rotate-hint'), g = c.getContext('2d'), k = (t % 180) / 180, a = k < .35 ? 0 : k < .55 ? (k - .35) / .2 : k < .85 ? 1 : 1 - (k - .85) / .15; g.clearRect(0, 0, 104, 18);
@@ -184,6 +248,8 @@ const Touch = {
   // Outside a level the jump button is the "ok": what it does, on a bouncing tag.
   drawOk(g, t, lab) { g.clearRect(0, 0, 36, 36); const bob = Math.round(Math.abs(Math.sin(t / 12)) * -2); g.fillStyle = '#1b1420'; g.fillRect(12, 5 + bob, 13, 11); g.fillStyle = '#f2c43d'; g.fillRect(13, 6 + bob, 11, 9); g.fillStyle = '#1b1420'; g.fillRect(16, 8 + bob, 1, 5); g.fillRect(17, 9 + bob, 1, 3); g.fillRect(18, 9 + bob, 1, 3); g.fillRect(19, 10 + bob, 1, 1); g.fillRect(17, 8 + bob, 1, 5); Touch.label(g, lab, 18, 21, '#fff6d6'); },
   updateButtons() {
+    Touch.girarShow(!!(Touch.enabled && Touch.portrait && !Touch.girar.no && $('girar')));
+    if (Touch.girar.on) Touch.girarDraw();
     if (Touch.enabled && Touch.portrait && Game.t % 3 === 0 && $('rotate-hint')) Touch.drawHint(Game.t);
     if (Touch.enabled && Touch.btn && (Game.state !== 'play' || Game.paused || Charla.active() || Game.learning)) {
       const lab = Game.paused ? 'vale' : Game.state === 'play' ? 'sigue' : Game.state === 'title' || Game.state === 'gate' ? 'jugar' : Game.state === 'select' ? 'entrar' : 'sigue', k = lab + (Game.t >> 2);
