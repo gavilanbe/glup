@@ -16,7 +16,7 @@
 //               cumplido, dice `hecho` y da el bocado. Tipos:
 //                 entregar  { cosa: 'crate'|'rock'|…, radio: px }   algo de esa clase quieto a menos de radio px
 //                 faroles   { n }                                    n faroles encendidos (sin n: todos los del nivel)
-//                 apagar    { radio: celdas }                        ningún fuego fatuo (F) a menos de radio celdas
+//                 apagar    { radio: celdas }                        ninguna hoguera (F) a menos de radio celdas
 //                 dianas    { n }                                    n dianas acertadas
 // Se habla con {up} al lado del maestro (o tocando ▲); las frases avanzan con salto, Bigotes o tocando.
 'use strict';

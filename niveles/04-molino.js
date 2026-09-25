@@ -2,7 +2,7 @@
 // Tormenta. Se llega con soplido, aleteo y ventosa. Primera mitad: surcos anegados, la chimenea de raíces,
 // la carrera del molinillo por el túnel del caz, la esclusa de la placa y Olga, que pide que le desatasques
 // la compuerta del molino (encargo «dianas»: la diana está alta en la fachada, sobre el caz; hay que saltar y
-// escupir la piedra en el aire). Olga da el trago de agua (chorro). Segunda mitad: apagar fuegos fatuos, flotar sobre el río, la cortina
+// escupir la piedra en el aire). Olga da el trago de agua (chorro). Segunda mitad: apagar hogueras, flotar sobre el río, la cortina
 // de fuego desde el nenúfar, el canal de fuego, la seta y el tejado, la gran riada de nenúfares y, al final,
 // agua, soplido y agua otra vez desde el nenúfar del molinillo.
 // Secretos: el sótano del canal de fuego y la cámara del tejado (panzazo: suelo agrietado sin munición cerca),
@@ -40,7 +40,7 @@
       '##~~~#######~~~~~###',
       '##~~~#######~~~~~###',
       '####################'),
-    // 3 · La chimenea de raíces (ventosa) hasta el cantil; un fuego fatuo arriba.
+    // 3 · La chimenea de raíces (ventosa) hasta el cantil; una hoguera arriba.
     screen(
       '....................',
       '....................',
@@ -258,18 +258,18 @@
       '####################'));
   NIVEL.registrar({ id: 'molino', name: 'El molino anegado', theme: 'storm', music: 'molino', par: 330, rows: molino,
     intro: 'La tormenta obligó a la Garza a pasar la noche en el molino.',
-    ruca: ['Huele a pluma mojada: la Garza durmió en el molino. Y esos fuegos fatuos... el pantano está revuelto.',
+    ruca: ['Huele a pluma mojada: la Garza durmió en el molino. Y esas hogueras... alguien le ha prendido fuego al pantano.',
       'Cada cría que sueltas vuelve nadando a casa. La Garza ha seguido hacia el muelle del pescador.'],
     signs: [
       'Sopla al molinillo con {puff} y corre: la compuerta del caz se cierra enseguida.',
       'La compuerta sólo se abre mientras algo pese en la placa. Sube con la caja en la boca y déjala encima con {down} y {fish}.',
       'Bigotes también escupe en pleno salto: lo que escupe sale a la altura de su boca.',
-      'Bigotes ya sorbe agua: mantén {fish} de cara a la charca. Luego escúpela al fuego fatuo.',
+      'Bigotes ya sorbe agua: mantén {fish} de cara a la charca. Luego escúpela a la hoguera.',
       'El río es ancho. Con agua en la boca, salta y mantén {fish} en el aire: el chorro te sostiene.',
       'Con la boca llena no se sopla. Desde el nenúfar: agua al fuego, soplido al molinillo... y a beber otra vez.'],
     maestro: { quien: 'olga', poder: 'chorro',
       dialogo: ['¡Una visita con esta tormenta! Pasa, pasa, que te calas. Soy Olga, la molinera.',
-        'Esos fuegos fatuos me tienen el molino sitiado, y la riada se ha comido medio camino. Con agua se apagan... si alguien la llevara.'],
+        'Esas hogueras me tienen el molino sitiado, y la riada se ha comido medio camino. Con agua se apagan... si alguien la llevara.'],
       despedida: 'Sorbe agua de la charca y escúpela al fuego. Y si el río es ancho, ¡chorro y a flotar!',
       encargo: { tipo: 'dianas', n: 1,
         pide: 'Pero la riada me ha atascado la compuerta. ¿Ves la diana en la pared del molino, sobre el caz? Dale con una piedra... pero está alta: salta y escupe en el aire.',

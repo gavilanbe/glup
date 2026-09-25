@@ -4,7 +4,7 @@
 // faltan arriba se rellenan de aire.
 // Leyenda:
 //   #  barro sólido        =  tablón o rama (se atraviesa desde abajo)   w  nenúfar (igual, flota)
-//   ~  agua (te hundes)    ^  espinas            F  fuego fatuo (se apaga con agua)
+//   ~  agua (te hundes)    ^  espinas            F  hoguera (se apaga con agua)
 //   x  piedra agrietada (una pedrada o un panzazo rompe todo el bloque)   X  piedra reforzada (sólo el escupitajo picante)
 //   G  compuerta   T  diana (la abre para siempre)   P  placa (la abre mientras algo pese)   V  molinillo (la abre mientras gira con el soplido)
 //   O  anzuelo con su sedal: sorbe hacia él (arriba o de frente), Bigotes pica y el sedal iza a Nila      R  balsa: sopla hacia atrás para impulsarla

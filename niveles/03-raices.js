@@ -11,7 +11,7 @@
   // y dos tramos pelados), y la copa otra vez hasta la barca.
   // Secretos: la percha del anzuelo sobre el molinillo (mordisco), la cueva tapiada al pie de la primera
   // masa (guindilla), la cámara bajo la piedra rajada de lo alto de la segunda (panzazo) y la cueva del
-  // fuego fatuo a sus pies, con el charco al lado (chorro).
+  // una hoguera a sus pies, con el charco al lado (chorro).
   // (Pantallas generadas a partir de rectángulos; cada fila son 20 celdas.)
   const raices = join(
     screen(

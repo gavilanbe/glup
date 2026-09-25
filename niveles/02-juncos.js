@@ -8,7 +8,7 @@
   // encendidos (el tercero, bajo una trampilla que abre una diana en el techo). Con el aleteo: el muro de
   // cinco, el foso de zarzas con un cangrejo y una diana en lo alto, y los pilotes sobre el agua.
   // Secretos: la chimenea de raíces de la salida (ventosa), la bodega de piedra rajada junto a Ruca
-  // (panzazo), la cueva del fuego fatuo tras los pilotes (chorro) y el túnel del molinillo bajo la orilla
+  // (panzazo), la cueva de la hoguera tras los pilotes (chorro) y el túnel del molinillo bajo la orilla
   // (resbalón).
   const juncos = join(
     // 0 · la salida: una chimenea de raíces a la espalda y piedra rajada en el suelo.
@@ -133,7 +133,7 @@
       '#########~~~##~~~~##',
       '#########~~~##~~~~##',
       '####################'),
-    // 8 · el último pilote, la orilla y la cueva del fuego fatuo (chorro): agua del charco, al fuego.
+    // 8 · el último pilote, la orilla y la cueva de la hoguera (chorro): agua del charco, al fuego.
     screen(
       '....................',
       '....................',
