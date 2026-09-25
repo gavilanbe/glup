@@ -121,7 +121,7 @@ const Hud = (() => {
       g.fillStyle = Water.C.inner; g.fillRect(bx - br, lvl + 3, br * 2, 2);
       for (let i = 0; i < 3; i++) { const k = ((t * .02 + i * .33) % 1); g.fillStyle = Water.C.shine; g.fillRect(bx - 4 + i * 4, Math.round(by + br - k * (by + br - lvl)), 1, 1); }
       g.restore();
-      if (low && (t >> 3) % 2) ring(g, bx, by, br + 1, '#e2445a');
+      if (low && (t >> (p.hover ? 2 : 3)) % 2) ring(g, bx, by, br + 1, '#e2445a');   // faster while the jet is on
     } else if (held && !S.fly.some(f => f.to === 'bubble')) {
       // Bugs squirm inside; rocks and crates just sit and rattle when charged.
       const alive = ['snail', 'frog', 'mosquito', 'crab'].includes(held.kind), wig = alive ? Math.sin(t / 4) * .25 : 0, hop = alive ? Math.abs(Math.sin(t / 7)) * -2 : 0;

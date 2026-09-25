@@ -72,7 +72,7 @@ function load() {
   }
   S.prev = {};
   // Deep copy of the whole mutable world, keeping functions and canvases by reference.
-  const SHARED = new Set(['rows', 'def', 'bg', 'spawn', 'sprite', 'frames', 'terrain', 'lightMask', 'titleParts']), COSMETIC = new Set(['parts', 'words', 'ghosts']);
+  const SHARED = new Set(['rows', 'def', 'bg', 'spawn', 'sprite', 'frames', 'terrain', 'lightMask', 'titleParts']), COSMETIC = new Set(['parts', 'words', 'ghosts', 'jetDrops']);
   function cloneGraph(root) {
     const seen = new Map();
     const c = v => {

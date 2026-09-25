@@ -235,6 +235,8 @@ const Touch = {
       if (held && held.kind === 'agua') { const lv = S - 4 - Math.round((held.amount || 0) * 26); g.fillStyle = 'rgba(80,190,200,.55)'; for (let x = 0; x < S; x++) g.fillRect(x, lv + Math.round(Math.sin(x / 4 + t / 6)), 1, S); g.fillStyle = '#bdf0e4'; for (let x = 0; x < S; x += 2) g.fillRect(x, lv - 1 + Math.round(Math.sin(x / 4 + t / 6)), 1, 1); }
       if (hot > 0 && hot < 1) { g.fillStyle = 'rgba(242,139,58,' + (hot * .35).toFixed(2) + ')'; g.fillRect(0, 0, S, S); }
     });
+    // Running out of water: the rim flashes red, faster while the jet is on.
+    if (held && held.kind === 'agua' && held.amount < .25 && (t >> (p.hover ? 2 : 3)) % 2) { Touch.rimArc(g, S, 1, '#e2445a'); g.save(); g.translate(.5, .5); Touch.rimArc(g, S, 1, '#e2445a'); g.restore(); }
     // Bigotes' face, big, and what he is holding in a little bubble of its own.
     const face = p.spitT > 6 ? ART.fish.spit : full ? ART.fish.squint : held ? ART.fish.full : p.sucking ? ART.fish.open : (t % 200) < 6 ? ART.fish.blink : ART.fish.closed;
     const jit = p.sucking ? ((t >> 1) & 1) * (p.suckLv || 1) * .5 : full ? ((t >> 1) & 1) : 0, fx = Math.round(9 + jit + (held && held.kind !== 'agua' ? -4 : 0)), fy = 9 + (held ? 0 : Math.round(Math.sin(t / 20)));
@@ -448,7 +450,7 @@ const Touch = {
     Touch.talkWho = talk ? (L.maestro && L.maestro.near ? L.maestro.who : Maestros.QUIEN.ruca) : null;
     if (talk && !B.talk.classList.contains('show')) { const c = Touch.center(B.talk); for (let i = 0; i < 14; i++) { const a = i / 14 * 6.28; Touch.spark(c.x, c.y, Math.cos(a) * 1.6, Math.sin(a) * 1.1, i % 2 ? '#fff6d6' : '#f2c46a', 18, { g: .02, star: i % 3 === 0 }); } }
     B.talk.classList.toggle('show', talk); if (talk && K.talk !== (t >> 4)) { K.talk = t >> 4; Touch.drawTalk(Touch.ctx.talk, t); }
-    const fk = [p.held && p.held.kind === 'agua' ? Math.round(p.held.amount * 20) : 0, Math.round((p.charge || 0) / 4), !!p.grapple, !!p.target, p.held ? p.held.kind : '', p.sucking ? p.suckLv + ':' + (p.suckCap || 1) + (p.strainT > 0 ? 's' : '') : 0, p.charge >= CHARGE_FULL, p.spitT > 6, p.onGround, !!Input.held.down || p.downT === 8, p.sucking || p.charge >= CHARGE_FULL ? t >> 1 : t >> 3].join();
+    const fk = [p.held && p.held.kind === 'agua' ? Math.round(p.held.amount * 20) : 0, Math.round((p.charge || 0) / 4), !!p.grapple, !!p.target, p.held ? p.held.kind : '', p.sucking ? p.suckLv + ':' + (p.suckCap || 1) + (p.strainT > 0 ? 's' : '') : 0, p.charge >= CHARGE_FULL, p.spitT > 6, p.onGround, !!Input.held.down || p.downT === 8, p.sucking || p.charge >= CHARGE_FULL || p.hover ? t >> 1 : t >> 3].join();
     if (K.fish !== fk) { K.fish = fk; Touch.drawFish(Touch.ctx.fish, t); }
     const ring = p.sucking ? (p.suckLv || 1) / (p.suckCap || 1) : p.charge > 8 ? Math.min(1, p.charge / CHARGE_FULL) : 0;
     B.fish.style.setProperty('--charge', ring.toFixed(3)); B.fish.style.setProperty('--charge-col', p.sucking ? (p.suckLv === 3 ? '#fff6d6' : '#8fe0f0') : '#f2c46a');
@@ -613,7 +615,7 @@ function loadLevel(index) {
   Cam.snap();
 }
 function spawnEntities() {
-  L.ents = []; L.projs = []; L.parts = []; L.solids = []; L.signs = []; L.boss = null; let signIdx = 0, rucaIdx = 0;
+  L.ents = []; L.projs = []; L.parts = []; L.jetDrops = []; L.jetSplash = null; L.solids = []; L.signs = []; L.boss = null; let signIdx = 0, rucaIdx = 0;
   for (const s of L.spawn) {
     const px = s.x * TS, py = s.y * TS;
     switch (s.ch) {
@@ -690,7 +692,7 @@ const Player = {
   x: 0, y: 0, w: 10, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, coyote: 0, jumpBuf: 0, held: null, sucking: false, suckT: 0, hp: 3, inv: 0, animT: 0, sx: 1, sy: 1,
   dead: false, deadT: 0, spitT: 0, swallowT: 0, blink: 0, hurtT: 0, stepT: 0, dropping: false, win: false, nearSign: null, airT: 0, puffCd: 0, jumpCut: false,
   charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, prevVx: 0, prevVy: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0,
-  reset(x, y, full) { Object.assign(Player, { x, y, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, held: null, sucking: false, inv: 0, dead: false, deadT: 0, spitT: 0, swallowT: 0, sx: 1, sy: 1, win: false, airT: 0, charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0, lastSafe: null, rope: null, castTo: null, target: null, flingT: 0, gait: 0, moveT: 0, stopT: 0, landT: 0, fidget: null, pose: null, fj: null, strainT: 0 }); if (full) Player.hp = 3; Sound.suck(false); Sound.jet(false); },
+  reset(x, y, full) { Object.assign(Player, { x, y, h: 18, vx: 0, vy: 0, dir: 1, onGround: false, held: null, sucking: false, inv: 0, dead: false, deadT: 0, spitT: 0, swallowT: 0, sx: 1, sy: 1, win: false, airT: 0, charge: 0, fishDown: false, fishT: 0, hover: false, waterT: 0, puffT: 0, crouch: false, aimUp: false, grapple: null, hanging: false, carrier: null, dropT: 0, stuck: 0, airJumps: 1, onWall: 0, wallJumpT: 0, pound: false, poundT: 0, slide: 0, mantleT: 0, flap: 0, fishLag: 0, fishLagV: 0, fishLagH: 0, fishLagHV: 0, skidT: 0, wallCoyote: 0, wallSide: 0, upT: 0, downT: 0, grappleT: 0, lastSafe: null, rope: null, castTo: null, target: null, flingT: 0, gait: 0, moveT: 0, stopT: 0, landT: 0, fidget: null, pose: null, fj: null, strainT: 0, hoverT: 0, hoverY: null, hoverTop: null, airTop: null, hoverN: 0, coughT: 0, coughIn: 0 }); if (full) Player.hp = 3; Sound.suck(false); Sound.jet(false); },
   // Is there firm ground a knock-back could land on, that way? Water or a drop within reach says no.
   safeSide(dir) {
     const p = Player, fy = p.y + p.h;
@@ -727,7 +729,7 @@ const Player = {
     if (wantCrouch && !p.crouch) { p.crouch = true; p.y += 6; p.h = 12; p.sx = 1.15; }
     else if (!wantCrouch && p.crouch && !rectSolid(p.x, p.y - 6, p.w, 18, p)) { p.crouch = false; p.y -= 6; p.h = 18; p.sy = 1.1; }
     else if (!wantCrouch && p.crouch) p.slide = 0;
-    const left = Input.held.left, right = Input.held.right, ax = p.onGround ? .22 : .14;
+    const left = Input.held.left, right = Input.held.right, ax = p.onGround ? .22 : p.hover ? .2 : .14;   // on the jet she steers a little sharper
     const busy = p.sucking || p.charge > 8;
     let maxV = p.crouch ? 1.1 : busy ? (p.sucking && p.suckLv === 3 ? .45 : .7) : 1.7;
     // Thrown off a line, the swing's speed carries: it bleeds off slowly instead of being capped.
@@ -738,7 +740,7 @@ const Player = {
     else if (p.wallJumpT > 0) { /* the wall kick owns the first frames */ }
     else if (left && !right) { if (p.onGround && p.vx > 1 && !p.skidT) { p.skidT = 8; spawnParts(5, p.x + 8, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2 + .8, spread: .5, speed: [.5, 1.5], life: [10, 18], g: .03 }); } p.vx = Math.max(p.vx - ax, -maxV); if (!busy) p.dir = -1; }
     else if (right && !left) { if (p.onGround && p.vx < -1 && !p.skidT) { p.skidT = 8; spawnParts(5, p.x + 2, p.y + p.h, { color: ['#c9b08a', '#a08a6a'], angle: -Math.PI / 2 - .8, spread: .5, speed: [.5, 1.5], life: [10, 18], g: .03 }); } p.vx = Math.min(p.vx + ax, maxV); if (!busy) p.dir = 1; }
-    else { const f = p.onGround ? .3 : .06; if (Math.abs(p.vx) <= f) p.vx = 0; else p.vx -= Math.sign(p.vx) * f; }
+    else { const f = p.onGround ? .3 : p.hover ? .09 : .06; if (Math.abs(p.vx) <= f) p.vx = 0; else p.vx -= Math.sign(p.vx) * f; }
     if ((busy || (p.crouch && !(p.slide > 0))) && Math.abs(p.vx) > maxV) p.vx = Math.sign(p.vx) * maxV;
     // Jump: buffered, with coyote time and a variable height. Jumping lets go of an anchor.
     if (Input.pressed.jump) p.jumpBuf = 7; else if (p.jumpBuf > 0) p.jumpBuf--;
@@ -770,7 +772,7 @@ const Player = {
     if (p.vy >= 0) p.jumpCut = false;
     if (p.grapple) Player.pull();
     else if (p.pound) { if (p.poundT > 0) { p.poundT--; p.vy = -.4; } else p.vy = Math.min(p.vy + .7, 9); }
-    else if (p.hover) p.vy = Math.min(p.vy + .28, .45); else p.vy = Math.min(p.vy + .28, 5.5);
+    else if (p.hover) Player.hoverV(); else p.vy = Math.min(p.vy + .28, 5.5);
     const hitWall = moveX(p, p.vx); if (hitWall) { if (Player.mantle()) return; p.vx = 0; p.slide = 0; }
     const wasGround = p.onGround; p.onGround = false; p.carrier = null;
     const hit = p.grapple ? null : moveY(p, p.vy);
@@ -798,6 +800,8 @@ const Player = {
       if (d && Game.has('ventosa') && Player.wallAt(d)) { if (p.vy > 2) { spawnParts(3, p.x + (d > 0 ? p.w : 0), p.y + 4, { color: ['#5e8a2e', '#c9b08a'], speed: [.3, 1], life: [8, 14], g: .05 }); Sound.play('step'); } p.onWall = d; p.wallCoyote = 6; p.wallSide = d; p.dir = -d; p.vy = Math.min(p.vy, .75); p.airJumps = 1; if (p.animT % 5 === 0) spawnParts(1, p.x + (d > 0 ? p.w : 0), p.y + 4, { color: ['#5e8a2e', '#c9b08a'], speed: [.2, .6], life: [8, 14], g: .05 }); }
     }
     p.airT = p.onGround || p.hanging ? 0 : p.airT + 1;
+    // The top of this airtime reached by her own means (jumps, flaps, bounces, flings): the jet never lifts her above it.
+    if (p.onGround || p.hanging) { p.airTop = null; p.hoverTop = null; p.hoverN = 0; } else if (!p.hover || p.hoverY === null) p.airTop = p.airTop === null ? p.y : Math.min(p.airTop, p.y);
     if (p.onGround && p.vy === 0 && !groundBelow(p)) p.onGround = false;
     const feetY = p.y + p.h - 2;
     // Remember the last firm footing (both feet on solid ground or planks, nothing moving under her): a fall into
@@ -910,7 +914,7 @@ const Player = {
       if (p.sucking) { p.sucking = false; Sound.suck(false); }
       if (Input.pressed.fish && Input.held.down && p.onGround && p.held.kind !== 'agua') { Player.drop(); p.fishDown = false; return; }
       if (down && p.fishDown && p.fishT > 4) {
-        if (p.held.kind === 'agua' && !p.onGround) { p.hover = true; p.charge = 0; Player.jet(); }
+        if (p.held.kind === 'agua' && !p.onGround) { p.hover = true; p.charge = 0; if (!wasHover) Player.jetStart(); Player.jet(); }
         else if (!Game.has('guindilla')) { /* no charge yet: the spit waits for the release */ }
         else {
           const was = p.charge; p.charge = Math.min(p.charge + 1, CHARGE_FULL + 30);
@@ -928,7 +932,7 @@ const Player = {
       if (p.sucking) Player.suck();
     }
     if (wasHover && !p.hover) Sound.jet(false);
-    if (p.held && p.held.kind === 'agua' && p.held.amount <= 0) { const m = p.mouth(); p.held = null; Sound.play('puff'); Game.word('pff', m.x, m.y - 8, '#9fc0cc', false); spawnParts(6, m.x, m.y, { color: ['#8fd9d0', '#cfe0e8'], speed: [.5, 1.5], life: [8, 14], g: .05 }); }
+    if (p.held && p.held.kind === 'agua' && p.held.amount <= 0) { const m = p.mouth(); if (p.hover) Jet.spurt(); p.held = null; Sound.play('puff'); Game.word('pff', m.x, m.y - 8, '#9fc0cc', false); spawnParts(6, m.x, m.y, { color: ['#8fd9d0', '#cfe0e8'], speed: [.5, 1.5], life: [8, 14], g: .05 }); }
   },
   // How many steps of the inhale Bigotes has grown into: one more at the 3rd and at the 6th trick learnt.
   suckMax() { let n = 0; for (const q of POWER_ORDER) if (Game.has(q)) n++; return 1 + (n >= 3 ? 1 : 0) + (n >= 6 ? 1 : 0); },
@@ -1252,13 +1256,50 @@ const Player = {
     if (q.t % 2 === 0 && q.t < 12) { const fx = q.x0 + q.dir * reach; for (let dy = 0; dy < 40; dy += 4) if (rectSolid(fx, q.y + dy, 1, 1)) { const th = L.def.theme, cols = th === 'cave' ? ['#6b4a60', '#8a6a7a'] : th === 'storm' ? ['#6a7a5a', '#8a9a6a'] : ['#7fb040', '#a3cf52', '#c9b08a']; for (let i = 0; i < 3; i++) L.parts.push({ x: fx - q.dir * rnd(0, 10), y: q.y + dy - 1, vx: q.dir * rnd(.8, 2.2), vy: -rnd(.6, 1.8), life: rnd(20, 36) | 0, color: cols[i % cols.length], size: 1, g: .04, kind: 'leaf' }); break; } }
     if (q.t > 20) q.dead = true;
   },
+  // The jet catches her: from a fall a little kick up, then it holds; while she still rises from a jump it waits
+  // for the top. Lighting it again in the same airtime costs a gulp more (feathering can't beat holding).
+  jetStart() {
+    const p = Player; p.hoverT = 0; p.hoverN++; p.hoverY = p.vy < -.6 ? null : p.y - 3;
+    if (p.vy > .9) p.vy = .9;   // a fall is caught at once, as it always was
+    if (p.hoverN > 1) p.held.amount -= 8 / 95;
+    const m = Player.jetMouth(); for (let i = 0; i < 5; i++) L.parts.push({ x: m.x + rnd(-2, 2), y: m.y + rnd(0, 3), vx: rnd(-1.2, 1.2), vy: rnd(.5, 1.8), life: rnd(8, 14) | 0, color: Math.random() < .4 ? '#f2fffb' : '#8fd9d0', size: 1, g: .12, kind: 'spray' });
+    L.parts.push({ x: m.x, y: m.y + 2, vx: 0, vy: 0, life: 8, max: 8, color: '#dffcf6', size: 1, g: 0, kind: 'wring', ang: Math.PI / 2, big: .8 });
+  },
+  // Vertical motion on the jet. Rising from a jump or a flap the jet adds nothing (gravity takes her to the top as
+  // always); from there it holds the height it caught, with a small bob. {down} sinks faster on less thrust;
+  // {up} climbs back a little: at most 14 px over where the hover began and never above the top she reached by
+  // herself this airtime, so no ledge comes into reach that jumps and flaps couldn't reach. Running dry, it fades.
+  hoverV() {
+    const p = Player, amt = p.held && p.held.kind === 'agua' ? p.held.amount : 0; p.hoverT++;
+    if (p.hoverY === null) { p.vy = Math.min(p.vy + .28, .45); if (p.vy > -.6) { p.hoverY = p.y; p.hoverTop = p.hoverTop === null ? p.y : Math.min(p.hoverTop, p.y); } return; }
+    if (p.hoverTop === null) p.hoverTop = p.hoverY;
+    const cap = Math.max(p.airTop === null ? p.y : p.airTop, p.hoverTop - 14), ramp = Math.min(1, p.hoverT / 6), dn = Input.held.down, up = Input.held.up && !dn;
+    if (dn) p.hoverY = Math.max(p.hoverY, p.y);
+    else if (up && amt > .12) p.hoverY -= .6;
+    if (amt < .12) p.hoverY += (.12 - amt) * 5;
+    if (p.coughT > 0) p.hoverY += .25;
+    p.hoverY = Math.max(p.hoverY, cap);
+    const want = dn ? 1.7 : clamp((p.hoverY - p.y) * .16, -.95, .9) + Math.sin(p.hoverT * .11) * .1;
+    p.vy += clamp(want - p.vy, -(.1 + .22 * ramp), .28);
+    if (p.airTop !== null && p.y + p.vy < p.airTop) p.vy = Math.min(0, p.airTop - p.y);   // never above her own top
+  },
+  // Where the water leaves Bigotes' mouth (his head as last drawn, or where it hangs in the hover pose).
+  jetMouth() { const p = Player, hd = Player.fishHead; return hd && Player.fishHeadT >= Game.t - 5 ? { x: hd.x + Cam.x, y: hd.y + Cam.y + 3 } : { x: p.x + 5 + p.dir * 14, y: p.y + 19.5 }; },
   jet() {
-    const p = Player, h = p.held; const hd = Player.fishHead; const jx = hd ? hd.x + Cam.x : p.x + 5, jy = hd ? hd.y + Cam.y + 4 : p.y + 20; const was = h.amount; h.amount -= 1 / 95; Sound.jet(true);
-    // Running dry is announced: a word at a quarter left, then the jet coughs.
-    if (was >= .25 && h.amount < .25) Game.word('¡POCA!', p.x + 5, p.y - 10, '#8fd9d0', false);
-    if (h.amount < .25 && p.animT % 9 === 0) { Sound.play('sputter'); spawnParts(2, jx, jy, { color: ['#8fd9d0', '#e8fbff'], speed: [.5, 1.5], life: [6, 10], g: .1 }); }
-    if (p.animT % 2 === 0) spawnParts(2, jx + rnd(-3, 3), jy, { color: ['#8fd9d0', '#c8f2ea', '#e8fbff'], angle: Math.PI / 2, spread: .5, speed: [2, 3.5], life: [10, 18], g: .08 });
-    if (p.animT % 12 === 0) spawnParts(1, jx, jy + 2, { color: '#e8fbff', angle: Math.PI / 2, spread: .2, speed: [1, 2], life: [6, 10], g: 0, kind: 'puff' });
+    const p = Player, h = p.held, m = Player.jetMouth(), was = h.amount, dn = Input.held.down; Sound.jet(true);
+    h.amount -= (dn ? .7 : 1) / 95;   // sinking on purpose needs less water
+    if (p.coughT > 0) p.coughT--;
+    // Running dry is announced: a word at a quarter left, then the jet coughs (a gap in the stream, a spit of mist)
+    // more and more often; the HUD bubble flashes.
+    if (was >= .25 && h.amount < .25) { Game.word('¡POCA!', p.x + 5, p.y - 10, '#8fd9d0', false); Input.rumble(60, .2, .2); p.coughIn = 6; }
+    const low = h.amount < .25;
+    if (low && p.coughT === 0 && --p.coughIn <= 0) {
+      p.coughT = 3 + (h.amount < .12 ? 2 : 0); p.coughIn = Math.round(6 + h.amount * 40); Input.rumble(40, .3, .1); Sound.play('sputter'); Game.word('kof', m.x + p.dir * 8, m.y - 6, '#9fc0cc', false);
+      for (let i = 0; i < 4; i++) L.parts.push({ x: m.x + rnd(-2, 2), y: m.y + rnd(-1, 2), vx: rnd(-.8, .8) + p.vx * .5, vy: rnd(-.2, .6), life: rnd(12, 22) | 0, max: 22, color: '#e8fbff', size: 1, g: -.01, kind: 'mist' });
+      for (let i = 0; i < 3; i++) L.parts.push({ x: m.x, y: m.y, vx: rnd(-1.6, 1.6), vy: rnd(-1, .8), life: rnd(8, 14) | 0, color: '#8fd9d0', size: 1, g: .14, kind: 'spray' });
+    }
+    // The stream itself: one drop a frame (a stutter of gaps while coughing), thicker for {up}, thinner for {down}.
+    if (p.coughT === 0) Jet.emit(m.x, m.y, dn ? .75 : Input.held.up ? 1.2 : 1, Math.min(1, p.hoverT / 4), low ? .75 + h.amount : 1);
   },
   hurt(fromDir) {
     const p = Player; if (p.inv > 0 || p.dead || p.win) return;
@@ -1300,7 +1341,7 @@ const Player = {
     const cx = fx + 5;
     // Shear around the boots: positive leans her back (away from where she faces).
     let lean = p.sucking && !p.aimUp && !p.grapple ? p.dir * .05 : p.charge > 8 ? p.dir * .06 : 0;
-    if (p.grapple && p.rope) lean = clamp(p.rope.th * .8 + p.rope.w * 4, -.9, .9); else if (p.slide > 0) lean = p.dir * .18; else if (p.onWall) lean = p.onWall * -.12; else if (p.onGround && Math.abs(p.vx) > 1.2 && !p.sucking) lean = -p.dir * .06;
+    if (p.grapple && p.rope) lean = clamp(p.rope.th * .8 + p.rope.w * 4, -.9, .9); else if (p.slide > 0) lean = p.dir * .18; else if (p.onWall) lean = p.onWall * -.12; else if (p.hover) lean = clamp(-p.vx * .075, -.13, .13); else if (p.onGround && Math.abs(p.vx) > 1.2 && !p.sucking) lean = -p.dir * .06;
     const recoil = p.spitT > 8 ? -p.dir * 1 : 0;
     if (p.slide > 0) { Player.drawSled(g, cx, by, spr); return; }
     const fish = Player.drawFish(g, fx, fy); fish.back();
@@ -1341,7 +1382,7 @@ const Player = {
     const bob = p.onGround && !p.crouch && !(p.slide > 0) && p.pose ? p.pose.bob || 0 : 0;
     let hx = fx + 5 + p.dir * 7, hy = fy + (p.crouch ? 7 : 12) + bob;
     let bend = 0, tailBend = 0, wave = .6, waveSpeed = .12, spacing = 1, headStretch = 1, lunge = 0, jitter = 0, rot = 0;
-    if (p.hover) { hx = fx + 5 + p.dir * 5; hy = fy + 9; bend = Math.PI / 2 * .95; wave = .5; waveSpeed = .3; }
+    if (p.hover) { hx = fx + 5 + p.dir * 5; hy = fy + 9; bend = Math.PI / 2 * .95 + clamp(p.vx * p.dir * .12, -.25, .25); wave = .5 + (p.coughT > 0 ? 1.5 : 0); waveSpeed = .3; if (p.coughT > 0) jitter = .8; }   // the mouth tilts back against the motion
     else if (p.grapple) { const a = p.aim(); bend = p.hanging ? -Math.PI / 2 * .9 : Math.atan2(a.y, a.x * p.dir); hx = fx + 5 + p.dir * (p.hanging ? 1 : 3); hy = fy + (p.hanging ? 1 : 5); wave = .3; }
     else if (p.aimUp) { rot = -Math.PI / 2 * .8; bend = -Math.PI / 2 * .15; hx = fx + 5 + p.dir * 6; hy = fy + 9; }
     else if (!p.onGround && !p.sucking) bend = p.vy < -1 ? -.2 : p.vy > 2 ? .24 : 0;
@@ -1421,7 +1462,7 @@ const Player = {
       }
       g.restore();
     };
-    const head = cols[n - 1]; Player.fishHead = { x: HX + p.dir * (lunge + head.x), y: HY + head.y, a: head.a };
+    const head = cols[n - 1]; Player.fishHead = { x: HX + p.dir * (lunge + head.x), y: HY + head.y, a: head.a }; Player.fishHeadT = Game.t;
     return {
       back() { Player.drawBarbels(g, at, 'far'); if (tuck) slices(0, PIV); },
       front() {
@@ -1509,6 +1550,8 @@ const Player = {
     for (let i = 0; i < flen; i++) { const ang = Math.PI / 2 + fa + spread - p.dir * .6, fxp = fb.x + Math.cos(ang) * i * -p.dir * .8 - p.dir * i * .7, fyp = fb.y + Math.sin(ang) * i * .8; px(fxp, fyp, i < 2 ? '#c8944a' : '#7a5630'); }
     // Wet shine sliding along his back; more of it (and drips) after water.
     const wet = p.wetT > 0, per = wet ? 60 : 170, sk = (t % per) / 22; if (sk < 1) { const sh = at(6 + sk * 13, 4.2); px(sh.x, sh.y, '#fffbe0', 2, 1); }
+    // A mouthful of water leaks: a bead swells at the corner of his mouth and drops now and then.
+    if (p.held && p.held.kind === 'agua' && !p.hover && t % 29 === 0 && Math.random() < .7) { const d = at(fs.width - 3, 9.5); L.parts.push({ x: d.x + Cam.x, y: d.y + Cam.y, vx: p.vx * .5, vy: .2, life: 40, color: Math.random() < .5 ? '#8fd9d0' : '#bdf0e4', size: 1, g: .15, kind: 'drip' }); }
     if (wet && t % 7 === 0) { const d = at(8 + Math.random() * 10, 10.5); L.parts.push({ x: d.x + Cam.x, y: d.y + Cam.y, vx: 0, vy: .3, life: 24, color: '#8fd9d0', size: 1, g: .15, kind: 'drip' }); }
     // Charging: cheeks flush and pulse.
     if (p.charge > 8) { const k = Math.min(1, p.charge / CHARGE_FULL); g.globalAlpha = .35 + k * .45 * (.6 + .4 * Math.sin(t * .8)); const ck = at(16, 8.2); px(ck.x - 1, ck.y, '#f05060', 3, 1); g.globalAlpha = 1; }
@@ -1582,32 +1625,10 @@ const Player = {
     Player.fishOverlay(g, F, x + 5, fy, Game.t, Player.carryLook || {});
     g.drawImage(ART.hand, x + 9, y + 9 + bob);
   },
-  // Water in motion: the hover jet down to the ground and the thread of water climbing from a pool.
+  // Water in motion: the thread of water climbing from a pool (the hover jet is Jet's).
   drawWater(g) {
     const p = Player, t = Game.t; if (!Player.fishHead) return;
     const head = Player.fishHead;
-    if (p.hover) {
-      // The jet falls all the way down: a solid column near the mouth that breaks into ropes of drops as it drops.
-      const wx = head.x + Cam.x, wy = head.y + Cam.y, maxLen = Math.max(64, H - head.y + 24); let len = 0;
-      while (len < maxLen && !rectSolid(wx, wy + len, 1, 1) && !waterAt(wx, wy + len)) len += 2;
-      const hitGround = len < maxLen, body = Math.min(len, 56);
-      Game.drawStream(g, head.x, head.y, head.x, head.y + body, t, 1, 3.2);
-      if (len > body) {
-        const hx = Math.round(head.x);
-        for (let s = 0; s < 3; s++) for (let y = body - 2; y < len; y++) {
-          const f = (y - body) / Math.max(1, len - body), spread = 1 + f * 3, x = hx + Math.round((s - 1) * spread + Math.sin((y + s * 11) / 9 + t * .2) * f * 1.5);
-          const ph = (y + s * 5 - t * 6) % 14, on = ((ph + 14) % 14) < 11 - Math.round(f * 5);
-          if (!on) continue;
-          const lead = ((ph + 14) % 14) < 1.5;
-          g.fillStyle = '#1d4a55'; g.fillRect(x - 1, y, 1, 1); g.fillRect(x + 1, y, 1, 1);
-          g.fillStyle = lead ? '#f2fffb' : s === 1 ? '#c8f2ea' : '#8fd9d0'; g.fillRect(x, y, 1, 1);
-        }
-        if (t % 3 === 0) L.parts.push({ x: wx + rnd(-3, 3), y: wy + body + rnd(0, len - body), vx: rnd(-.3, .3), vy: 1.5, life: 10, color: Math.random() < .4 ? '#f2fffb' : '#8fd9d0', size: 1, g: .15, kind: 'spray' });
-      }
-      if (hitGround) {
-        if (t % 2 === 0) L.parts.push({ x: wx + rnd(-2, 2), y: wy + len - 1, vx: rnd(-1.4, 1.4), vy: rnd(-2.2, -.8), life: rnd(8, 14) | 0, color: Math.random() < .35 ? '#f2fffb' : '#8fd9d0', size: 1, g: .18, kind: 'spray' });
-        g.fillStyle = '#c8f2ea'; const cw = 3 + ((t >> 1) % 3); g.fillRect(Math.round(head.x) - cw, Math.round(head.y + len) - 2, cw * 2 + 1, 1); g.fillStyle = '#f2fffb'; g.fillRect(Math.round(head.x) - cw - 1, Math.round(head.y + len) - 3 - (t % 2), 1, 1); g.fillRect(Math.round(head.x) + cw + 1, Math.round(head.y + len) - 3 - ((t + 1) % 2), 1, 1); g.fillStyle = '#e8fbff'; for (let i = 0; i < 4; i++) g.fillRect(head.x - 4 + Math.round(Math.sin(t * .9 + i * 2) * 5), head.y + len - 1 - ((t + i * 3) % 4), 1, 1); if (t % 5 === 0) L.parts.push({ x: wx, y: wy + len, vx: 0, vy: 0, life: 14, color: '#c8f2ea', size: 1, g: 0, kind: 'ripple' }); }
-    }
     if (p.sucking && p.waterSrc) {
       const m = p.mouth(); const sx = p.waterSrc.x - Cam.x, sy = p.waterSrc.y - Cam.y, mx = m.x - Cam.x, my = m.y - Cam.y;
       const k = Math.max(.35, Math.min(1, p.waterT / 22));
@@ -1928,8 +1949,8 @@ const Water = {
     const big = v.charged ? 1.6 : 1, t = Game.t;
     chains.forEach((c, ci) => {
       const lead = c[0].q === v.projs.find(q => !q.dead && q.delay <= 0), tied = pouring && ci === chains.length - 1;
-      if (c.length > 1) Water.ribbon(g, c, t, { w0: (lead ? 7 : 4.5) * big, w1: tied ? 3.2 * big : 1.6, flow: 1, foam: v.charged });
-      const h = c[0]; if (lead || c.length === 1) Water.head(g, h.x, h.y, h.q.vx, h.q.vy, (lead ? 3.4 : 2.2) * big, t, v.charged);
+      if (c.length > 1) Water.ribbon(g, c, t, { w0: (lead ? 5.5 : 4) * big, w1: tied ? 2.6 * big : 1.2, flow: 1, foam: v.charged, wobble: .6 });
+      const h = c[0]; if (lead || c.length === 1) Water.head(g, h.x, h.y, h.q.vx, h.q.vy, (lead ? 3 : 2) * big, t, v.charged);
     });
   },
   muzzle(m, dir, up, down, charged) {
@@ -1945,6 +1966,138 @@ const Water = {
     L.parts.push({ x, y, vx: 0, vy: 0, life: 12, max: 12, color: '#dffcf6', size: 1, g: 0, kind: 'wring', ang: base + Math.PI / 2 * 0, big: strong ? 1.5 : 1, flat: true, nx, ny });
     for (let i = 0; i < (strong ? 7 : 3); i++) L.parts.push({ x: x + rnd(-4, 4), y: y + rnd(-4, 2), vx: nx * rnd(.1, .6) + rnd(-.3, .3), vy: ny * rnd(.1, .6) - rnd(.1, .4), life: rnd(16, 30) | 0, max: 30, color: '#e8fbff', size: 1, g: -.004, kind: 'mist' });
     if (wallX !== undefined) for (let i = 0; i < (strong ? 4 : 2); i++) L.parts.push({ x: wallX + (nx > 0 ? 0 : -1), y: y + rnd(-6, 6), y0: 0, vx: 0, vy: rnd(.12, .3), life: rnd(70, 120) | 0, max: 120, color: '#5cc4bc', size: 1, g: 0, kind: 'wetrun' });
+  }
+};
+
+// The hover jet as real water: a drop leaves Bigotes' mouth every frame with Nila's own speed plus the push of the
+// jet, loses a little sideways speed to the air and falls under gravity until it meets ground, water or fire, where
+// it splashes. So the stream bends back as she moves, sways with her bob and, from high up, takes its time to land.
+// It is drawn along that chain of drops: thick and glassy at the mouth, thinning, then breaking into drops.
+const Jet = {
+  seq: 0, cv: null,
+  emit(x, y, pow, ramp, k) {
+    const p = Player, D = L.jetDrops || (L.jetDrops = []); if (D.length > 110) D.shift();
+    const th = clamp(-p.vx * .12, -.25, .25), sp = (2 + .7 * ramp) * pow;   // the mouth tilts back against the motion
+    D.push({ x, y, vx: p.vx * .85 + Math.sin(th) * sp + rnd(-.04, .04), vy: Math.max(-.5, p.vy) + Math.cos(th) * sp + rnd(-.04, .04), age: 0, seq: ++Jet.seq, r: (1.8 + .5 * pow) * k * (.55 + .45 * ramp), brk: 8 + Math.random() * 12, dead: false });
+  },
+  // The last spurt when the water runs out: a gush and then nothing.
+  spurt() {
+    const m = Player.jetMouth();
+    for (let i = 0; i < 5; i++) { Jet.emit(m.x + rnd(-1, 1), m.y + i, 1.35, 1, 1); const d = L.jetDrops[L.jetDrops.length - 1]; d.vx += rnd(-.5, .5); d.brk = 4 + i * 2; }
+    for (let i = 0; i < 6; i++) L.parts.push({ x: m.x + rnd(-2, 2), y: m.y + rnd(0, 3), vx: rnd(-.7, .7), vy: rnd(-.3, .5), life: rnd(16, 28) | 0, max: 28, color: '#e8fbff', size: 1, g: -.01, kind: 'mist' });
+  },
+  update() {
+    const D = L.jetDrops, S = L.jetSplash;
+    if (S && (S.heat -= .035) <= 0) L.jetSplash = null;
+    if (!D || !D.length) return;
+    for (const d of D) {
+      if (d.dead) continue;
+      d.age++; d.vx *= .985; d.vy = Math.min(d.vy + .19, 6); if (d.age > 6) d.vx += rnd(-.05, .05);   // whole at first, scattering as it falls
+      const n = Math.ceil(Math.max(Math.abs(d.vx), Math.abs(d.vy)) / 2) || 1;
+      for (let i = 0; i < n && !d.dead; i++) { const ox = d.x, oy = d.y; d.x += d.vx / n; d.y += d.vy / n; Jet.hit(d, ox, oy); }
+      if (!d.dead && (d.age > 150 || d.y > L.h * TS + 20)) d.dead = true;
+      // A falling stream sheds a fine mist.
+      if (!d.dead && d.age > 16 && Math.random() < .025) L.parts.push({ x: d.x + rnd(-2, 2), y: d.y, vx: d.vx * .3 + rnd(-.2, .2), vy: rnd(-.1, .2), life: rnd(14, 24) | 0, max: 24, color: '#e8fbff', size: 1, g: -.004, kind: 'mist' });
+    }
+    L.jetDrops = D.filter(d => !d.dead);
+  },
+  // Whatever the drop just moved into: water (at its surface line), fire, a wall, the ground or a plank top.
+  hit(d, ox, oy) {
+    const x = d.x, y = d.y, tx = Math.floor(x) >> 4, ty = Math.floor(y) >> 4, ch = tileAt(tx, ty);
+    if (ch === '~') { let top = ty; while (top > 0 && tileAt(tx, top - 1) === '~') top--; const sy = top * TS + 3; if (y >= sy) Jet.land(d, x, sy, 'water'); return; }
+    if (ch === 'F') { Jet.land(d, x, y, 'fire'); return; }
+    if (rectSolid(x, y, 1, 1)) {
+      if (!rectSolid(ox, y, 1, 1)) { Jet.land(d, ox, y, 'wall', x > ox ? -1 : 1); return; }
+      let sy = Math.floor(y); for (let yy = Math.floor(oy); yy <= y; yy++) if (rectSolid(x, yy, 1, 1)) { sy = yy; break; }
+      Jet.land(d, x, sy, 'ground'); return;
+    }
+    if (y > oy) { const ow = oneWayBelow(x - .5, 1, oy, y); if (ow) Jet.land(d, x, ow.top, 'ground'); }
+  },
+  // A drop lands: it builds the splash where the stream keeps hitting (a crown, a spreading ring, a puddle on the
+  // ground or ripples on water), throws droplets back up, and a fire nearby ducks and hisses.
+  land(d, x, y, kind, nx) {
+    d.dead = true; const S = L.jetSplash, t = L.time;
+    if (S && S.kind === kind && Math.abs(S.x - x) < 12 && Math.abs(S.y - y) < 8) { S.x += (x - S.x) * .3; S.y = y; S.heat = Math.min(1, S.heat + .12); S.n++; }
+    else {
+      L.jetSplash = { x, y, kind, heat: .4, n: 0, nx: nx || 0 };
+      if (!S || S.heat < .25) { Sound.play('splash', null, { x }); L.parts.push({ x, y, vx: 0, vy: 0, life: 12, max: 12, color: '#dffcf6', size: 1, g: 0, kind: 'wring', flat: true, nx: nx || 0, ny: nx ? 0 : -1, big: 1.1 }); }
+    }
+    const sp = Math.hypot(d.vx, d.vy), big = d.r > 1.1 ? 2 : 1;
+    for (let i = 0; i < big; i++) {
+      const up = kind === 'wall' ? rnd(-1.2, .2) : -rnd(.6, .9 + sp * .35), side = kind === 'wall' ? nx * rnd(.4, 1.4) : rnd(-1.4, 1.4) + d.vx * .3;
+      L.parts.push({ x: x + rnd(-1, 1), y: y - 1, vx: side, vy: up, life: rnd(10, 20) | 0, color: Math.random() < .35 ? '#f2fffb' : Math.random() < .5 ? '#8fd9d0' : '#5cc4bc', size: 1, g: .16, kind: 'spray', bounce: .2 });
+    }
+    if (Math.random() < .12) L.parts.push({ x: x + rnd(-4, 4), y: y - 2, vx: rnd(-.4, .4), vy: -rnd(.1, .4), life: rnd(16, 28) | 0, max: 28, color: '#e8fbff', size: 1, g: -.005, kind: 'mist' });
+    if (kind === 'water') { if (t % 6 === 0) L.parts.push({ x, y, vx: 0, vy: 0, life: 16, color: '#c8f2ea', size: 1, g: 0, kind: 'ripple' }); }
+    else if (kind === 'ground') Jet.puddle(x, y);
+    else if (kind === 'fire') { if (t % 5 === 0) MUNDO.fire.splash(L, x, y, Math.sign(d.vx)); }
+    else if (kind === 'wall' && Math.random() < .08) L.parts.push({ x: x + (nx > 0 ? 0 : -1), y, y0: 0, vx: 0, vy: rnd(.12, .3), life: rnd(70, 120) | 0, max: 120, color: '#5cc4bc', size: 1, g: 0, kind: 'wetrun' });
+  },
+  // Water on the ground gathers into a puddle that spreads while the jet keeps hitting it, then dries up.
+  puddle(x, y, grow = .14, life = 170) {
+    for (const q of L.parts) if (q.kind === 'puddle' && Math.abs(q.y - y) < 2 && Math.abs(q.x - x) < q.size + 2) { q.size = Math.min(15, q.size + grow); q.x += (x - q.x) * .05; q.life = Math.max(q.life, life); q.max = Math.max(q.max || 0, q.life); q.hitT = L.time; return q; }
+    const q = { x, y, vx: 0, vy: 0, life, max: life, color: '#2a8a90', size: 2.5, g: 0, kind: 'puddle', hitT: L.time }; L.parts.push(q); return q;
+  },
+  drawPuddle(g, q, x, y) {
+    // Dries from the edges in: it shrinks and fades over its last seconds.
+    const k = Math.min(1, q.life / 70), r = Math.max(1, Math.round(q.size * (.35 + .65 * k))), fresh = L.time - (q.hitT || -99) < 6;
+    g.globalAlpha = .45 + .4 * k; g.fillStyle = Water.C.rim; g.fillRect(x - r, y, r * 2 + 1, 1);
+    g.fillStyle = Water.C.body; g.fillRect(x - r + 1, y - 1, r * 2 - 1, 1); if (r > 3) g.fillRect(x - r + 1, y, r * 2 - 1, 1);
+    g.fillStyle = Water.C.inner; if (r > 2) g.fillRect(x - r + 2, y - 1, Math.max(1, r - 2), 1);
+    g.globalAlpha = .6 + .4 * k; g.fillStyle = Water.C.shine; g.fillRect(x - (r >> 1), y - 1, 1, 1); if (r > 5) g.fillRect(x + (r >> 1) + 1, y - 1, 1, 1);
+    if (fresh && r > 2) { g.fillStyle = Water.C.foam; for (let i = 0; i < 3; i++) g.fillRect(x + ((Game.t * 3 + i * 5) % (r * 2)) - r, y - 1, 1, 1); }
+    g.globalAlpha = 1;
+  },
+  draw(g) {
+    const D = L.jetDrops || [], S = L.jetSplash, t = Game.t, C = Water.C, p = Player; if (!D.length && !S) return;
+    // Chains of drops still joined: near the mouth the stream is whole; further down each link breaks at its own age.
+    const runs = []; let run = null;
+    for (let i = 0; i < D.length; i++) {
+      const d = D[i], q = i > 0 ? D[i - 1] : null;
+      if (run && q && q.seq === d.seq - 1 && q.age < q.brk && Math.abs(d.x - q.x) + Math.abs(d.y - q.y) < 16) run.push(d); else runs.push(run = [d]);
+    }
+    const last = D[D.length - 1], hd = Player.fishHead;
+    if (p.hover && last && last.seq === Jet.seq && last.age < 3 && hd && Player.fishHeadT >= t - 5) run.push({ x: hd.x + Cam.x, y: hd.y + Cam.y + 2, age: 0, r: last.r, seq: last.seq + .5, mouth: true });
+    if (!Jet.cv) { Jet.cv = document.createElement('canvas'); Jet.cv.width = W; Jet.cv.height = H; }
+    const b = Jet.cv.getContext('2d'); b.clearRect(0, 0, W, H);
+    // Thickness: full at the mouth, thinning as it falls, with swellings that travel down with the water.
+    const rad = d => d.r * Math.max(.25, 1 - d.age / 16) * (1 + .2 * Math.sin(d.seq * 1.3));
+    const blob = (x, y, R, col) => { b.fillStyle = col; if (R <= 0) { b.fillRect(x, y, 1, 1); return; } b.fillRect(x - R, y - R + 1, R * 2 + 1, R * 2 - 1); b.fillRect(x - R + 1, y - R, R * 2 - 1, R * 2 + 1); };
+    const samples = [];
+    for (const c of runs) {
+      if (c.length === 1) { const d = c[0], x = Math.round(d.x - Cam.x), y = Math.round(d.y - Cam.y), big = rad(d) > 1.1; samples.push({ x, y, R: big ? 1 : 0, s: d.seq * 3, drop: true, vy: d.vy }); continue; }
+      for (let i = 1; i < c.length; i++) {
+        const a = c[i - 1], e = c[i], len = Math.max(1, Math.ceil(Math.hypot(e.x - a.x, e.y - a.y))), ra = rad(a), re = rad(e);
+        for (let k = 0; k < len; k++) { const u = k / len; samples.push({ x: Math.round(a.x + (e.x - a.x) * u - Cam.x), y: Math.round(a.y + (e.y - a.y) * u - Cam.y), R: Math.round(ra + (re - ra) * u - .25), s: a.seq * 3 + u * 3 }); }
+      }
+    }
+    // Layers: a dark rim, the body, a lighter core; thin threads and loose drops are aerated, so paler.
+    for (const q of samples) { const col = q.R > 0 ? C.rim : C.body; blob(q.x, q.y, q.R + 1, col); if (q.drop && q.vy > 2) blob(q.x, q.y + 1, q.R + 1, col); }
+    for (const q of samples) { blob(q.x, q.y, q.R, q.R > 1 ? C.body : q.R > 0 ? C.inner : C.light); if (q.drop && q.vy > 2) b.fillRect(q.x, q.y + 1, 1, 1); }
+    for (const q of samples) if (q.R >= 2) blob(q.x + 1, q.y, q.R - 2, C.inner);
+    g.globalAlpha = .86; g.drawImage(Jet.cv, 0, 0);
+    // A soft light line down the lit side, as through glass.
+    g.globalAlpha = .4; g.fillStyle = C.light; for (const q of samples) if (q.R >= 1 && !q.drop) g.fillRect(q.x - q.R + (q.R >= 2 ? 1 : 0), q.y, 1, 1);
+    g.globalAlpha = 1;
+    // Glints on the lit side run down with the flow; a shine on each loose drop.
+    for (const q of samples) {
+      const ph = ((q.s * 2.2 - t * 1.4) % 9 + 9) % 9;
+      if (q.drop) { g.fillStyle = C.shine; g.fillRect(q.x - (q.R ? 1 : 0), q.y - q.R, 1, 1); continue; }
+      if (q.R >= 1 && ph < 4) { g.fillStyle = ph < 1.5 ? C.shine : C.light; g.fillRect(q.x - q.R + (q.R >= 2 ? 1 : 0), q.y, 1, 1); }
+      if (q.R >= 2 && ph > 6 && ph < 7) { g.fillStyle = C.light; g.fillRect(q.x + q.R - 1, q.y, 1, 1); }
+    }
+    // Where the stream lands: a crown of foam that grows while it keeps pouring on the same spot.
+    if (S) {
+      const x = Math.round(S.x - Cam.x), y = Math.round(S.y - Cam.y), h = S.heat, w = Math.round(2 + h * 5);
+      if (S.kind === 'wall') { g.fillStyle = C.foam; for (let i = 0; i < 3 + h * 4; i++) g.fillRect(x + S.nx * ((t + i * 3) % 4), y + ((t * 2 + i * 5) % 7) - 3, 1, 1); return; }
+      g.globalAlpha = .9; g.fillStyle = C.body; g.fillRect(x - w, y - 1, w * 2 + 1, 1); g.fillStyle = C.inner; g.fillRect(x - w + 1, y - 2, w * 2 - 1, 1);
+      for (let i = -w; i <= w; i++) {
+        const f = 1 - Math.abs(i) / (w + 1), hh = Math.round(f * h * (2.5 + 1.8 * Math.abs(Math.sin(t * .7 + i * 1.9))));
+        if (hh > 0) { g.fillStyle = C.light; g.fillRect(x + i, y - 2 - hh, 1, hh); g.fillStyle = C.foam; g.fillRect(x + i, y - 2 - hh, 1, 1); }
+      }
+      g.fillStyle = C.foam; for (let i = 0; i < 2 + Math.round(h * 3); i++) { const a = (t * 5 + i * 37) % 17 - 8; g.fillRect(x + a, y - 3 - ((t + i * 7) % 5), 1, 1); }
+      g.globalAlpha = 1;
+    }
   }
 };
 
@@ -2007,7 +2160,7 @@ const Proj = {
     Water.impact(x, y, nx, ny, strong, wall ? (wall > 0 ? p.x + p.w + 1 : p.x - 1) : undefined);
     MUNDO.fire.splash(L, x, y, Math.sign(p.vx));   // a fire close by ducks and hisses
     if (first || Math.random() < .5) L.parts.push({ x: p.x + 4, y: p.y + (ground ? 8 : 4), vx: 0, vy: 0, life: 16, color: '#c8f2ea', size: 1, g: 0, kind: 'ripple' });
-    if (ground) L.parts.push({ x: p.x + 4, y: p.y + 8, vx: 0, vy: 0, life: 90, color: '#2f7f88', size: 5 + Math.random() * 3 + (first ? 3 : 0), g: 0, kind: 'puddle' });
+    if (ground) Jet.puddle(p.x + 4, Math.round(p.y + 8), first ? 5 : 1.5, 200);
   },
   splat(p) { const fake = { kind: p.kind, x: p.x, y: p.y, w: p.w, h: p.h, dead: false }; Enemy.kill(fake, 'proj'); Sound.play('hit'); Cam.shake(2, 5); },
   dropAsItem(p, bounceBack) {
@@ -2253,6 +2406,7 @@ const Game = {
     if (L.gusts) { for (const q of L.gusts) Player.gustUpdate(q); L.gusts = L.gusts.filter(q => !q.dead); }
     Hud.update();
     for (const p of L.projs) if (!p.dead) Proj.update(p);
+    Jet.update();
     L.ents = L.ents.filter(e => !e.dead); L.projs = L.projs.filter(p => !p.dead); L.solids = L.solids.filter(s => !s.dead);
     updateParts();
     // Deferred tile breaks and gate openings for a staggered feel.
@@ -2466,7 +2620,7 @@ const Game = {
     if (Player.sucking) Game.drawSuction(g);
     for (const e of ents) if (!e.dead && order(e) > 1) e.draw(e, g);
     for (const gh of L.ghosts) { const sx = 1 + (5 - gh.life) * gh.grow; g.save(); g.translate(Math.round(gh.x - Cam.x + gh.sprite.width / 2), Math.round(gh.y - Cam.y + gh.sprite.height / 2)); g.scale(sx, sx); g.globalAlpha = gh.life / 5; g.drawImage(ART.tint(gh.sprite, '#ffffff'), -gh.sprite.width / 2, -gh.sprite.height / 2); g.restore(); }
-    if (Game.arrival) Barca.drawFront(g); else { Player.draw(g); Player.drawLoadsInFront(g); }
+    if (Game.arrival) Barca.drawFront(g); else { Player.draw(g); Jet.draw(g); Player.drawLoadsInFront(g); }
     if (!Game.arrival) Game.drawHookAim(g);
     for (const p of L.projs) if (!p.dead) Proj.draw(p, g);
     Game.drawParts(g);
@@ -2602,7 +2756,7 @@ const Game = {
       if (p.kind === 'cria') { const sp = ART.criaFree[(p.life >> 2) % 2]; g.globalAlpha = Math.min(1, p.life / 14); g.drawImage(p.vx < 0 ? ART.flip(sp) : sp, x, y); g.globalAlpha = 1; continue; }
       if (p.kind === 'feather') { g.fillStyle = p.color; g.fillRect(x + Math.round(Math.sin(p.life / 5) * 2), y, 2, 1); continue; }
       if (p.kind === 'ripple') { const r = Math.max(.5, (16 - p.life) * 1.1 + 2); g.strokeStyle = p.color; g.globalAlpha = Math.min(1, p.life / 16); g.beginPath(); g.ellipse(x, y, r, r * .35, 0, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1; continue; }
-      if (p.kind === 'puddle') { g.globalAlpha = Math.min(1, p.life / 40) * .6; g.fillStyle = '#2f7f88'; g.beginPath(); g.ellipse(x, y, p.size, 1.5, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#8fd9d0'; g.fillRect(x - p.size / 2, y - 1, Math.max(1, p.size / 2), 1); g.globalAlpha = 1; continue; }
+      if (p.kind === 'puddle') { Jet.drawPuddle(g, p, x, y); continue; }
       if (p.kind === 'ring') { const r = Math.max(.5, (8 - p.life) * 1.6 + 2); g.strokeStyle = p.color; g.globalAlpha = Math.min(1, p.life / 8); g.beginPath(); g.ellipse(x + 8, y, r, r * .45, 0, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1; continue; }
       if (p.kind === 'smoke') { g.globalAlpha = Math.min(1, p.life / 20) * .8; g.fillStyle = p.color; const sz = p.life > 30 ? 2 : 3; g.fillRect(x, y, sz, sz); g.globalAlpha = 1; continue; }
       if (p.kind === 'amb') { g.globalAlpha = .35 + Math.sin(p.life / 9 + p.ph) * .35; g.fillStyle = p.color; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; continue; }

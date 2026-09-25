@@ -34,14 +34,16 @@ const DIANA_OLGA = DO('diana en la fachada', g => {
   return g.L.hitTargets.size === 1 || 'la diana no se abrió';
 });
 // Jump from the ground (flapping at the top if `flap`) and hold the jet drifting `dir`; with a target column `tx`
-// (a lily pad), steer onto its middle once close.
-const JUMP_JET = (label, dir, flap, tx, tol = 0) => RETRY(label, g => {
+// (a lily pad), steer onto its middle once close. The jet holds her height: with `low` (a y in pixels) she sinks
+// with {down} until her feet are that low, skimming the water.
+const JUMP_JET = (label, dir, flap, tx, tol = 0, low) => RETRY(label, g => {
   const d = side(dir);
   g.run(Object.assign({ jump: 1 }, d), flap ? 16 : 10); if (flap) { g.frame(d); g.run(Object.assign({ jump: 1 }, d), 12); }
   for (let n = 0; n < 400 && !g.P.onGround; n++) {
     if (g.P.dead) return 'Nila murió';
     let inp = d;
     if (tx !== undefined) { const c = g.P.x + 5, t = tx * TS + 8, gap = t - c; if (Math.abs(gap) < 40) inp = gap > 2 + g.P.vx * 6 ? { right: 1 } : gap < -2 + g.P.vx * 6 ? { left: 1 } : {}; }
+    if (low !== undefined && g.P.hover && g.P.y + g.P.h < low) inp = Object.assign({ down: 1 }, inp);
     g.frame(Object.assign(g.P.held ? { fish: 1 } : {}, inp));
   }
   if (!g.P.onGround) return 'no aterrizó';
@@ -136,7 +138,7 @@ const repaso = { powers: 'todos', steps: [...A1,
   ...A2,
   ...A3,
   // la cría baja sobre el río: salto corto y chorro raso hasta el nenúfar
-  JUMP_JET('raso al nenúfar', 1, false, 171), onCol(171, 'el nenúfar'),
+  JUMP_JET('raso al nenúfar', 1, false, 171, 0, 9 * TS + 12), onCol(171, 'el nenúfar'),
   ...A5,
   // el sótano del canal de fuego: panzazo en las losas agrietadas
   R(189, 11), ...HOP_POUND, { check: g => g.tileAt(189, 11) !== 'x' || 'el suelo no se rompió' }, { wait: 20 }, R(189, 13), R(191, 11),

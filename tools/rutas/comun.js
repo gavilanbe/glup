@@ -5,8 +5,14 @@ const R = (x, y, o) => Object.assign({ reach: [x, y] }, o || {});
 const D = (name, ...args) => ({ do: name, args });
 // Spit straight up: hold {up} with {fish}; the aim latches for a few frames after {up} is let go.
 const UP = [{ hold: { fish: 1, up: 1 }, n: 2 }, { hold: { up: 1 }, n: 1 }, { wait: 10 }];
-// Jump, flap and keep {fish} held: with water in the mouth the jet holds Nila up while she drifts `dir`.
-const HOVER = (dir, n = 150, run = 0) => { const d = dir < 0 ? { left: 1 } : { right: 1 }; return [...(run ? [{ hold: d, n: run }] : []), { hold: Object.assign({ jump: 1 }, d), n: 16 }, { hold: d, n: 1 }, { hold: Object.assign({ jump: 1 }, d), n: 12 }, { hold: Object.assign({ fish: 1 }, d), n }]; };
+// Jump, flap and keep {fish} held: with water in the mouth the jet holds Nila up while she drifts `dir`. The jet
+// holds her height, so to come down onto something on the way she sinks with {down}: `dip` = [from, to], the frames
+// of the hover (counted from the first with {fish}) during which {down} is held too.
+const HOVER = (dir, n = 150, run = 0, dip = null) => {
+  const d = dir < 0 ? { left: 1 } : { right: 1 }, jet = Object.assign({ fish: 1 }, d);
+  const fly = dip ? [{ hold: jet, n: dip[0] }, { hold: Object.assign({ down: 1 }, jet), n: dip[1] - dip[0] }, { hold: jet, n: n - dip[1] }] : [{ hold: jet, n }];
+  return [...(run ? [{ hold: d, n: run }] : []), { hold: Object.assign({ jump: 1 }, d), n: 16 }, { hold: d, n: 1 }, { hold: Object.assign({ jump: 1 }, d), n: 12 }, ...fly];
+};
 // Free-form step: runs `fn(g)` frame by frame (for timing that depends on where Nila is).
 const DO = (label, fn) => ({ check: g => { const r = fn(g); return r === undefined ? true : r; }, label });
 // Belly-flop once Nila is past `px` (pixels) while walking `dir`: walk off, wait out the coyote time (unless `fall` is false), then {down}+{jump}.
