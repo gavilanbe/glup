@@ -1262,7 +1262,8 @@ const Player = {
   },
   hurt(fromDir) {
     const p = Player; if (p.inv > 0 || p.dead || p.win) return;
-    p.hp--; p.inv = 90; p.hurtT = 20; p.dizzyT = 80; p.vx = Player.safeSide(-fromDir) ? -fromDir * 2.4 : (p.carrier ? p.carrier.vx || 0 : 0);   // on a moving raft she keeps its speed, so she lands back on it p.vy = -3.2; p.onGround = false; p.charge = 0; p.hover = false; Player.letGo(); Sound.jet(false); Sound.play('hurt'); Cam.shake(3, 10); Game.stop(5); Game.hurtFlash = 14; Input.rumble(200, 1, .6);
+    p.hp--; p.inv = 90; p.hurtT = 20; p.dizzyT = 80; p.vx = Player.safeSide(-fromDir) ? -fromDir * 1.2 : (p.carrier ? p.carrier.vx || 0 : 0);   // on a moving raft she keeps its speed, so she lands back on it
+    p.vy = -2.2;   // a short hop back: it reads as a hit without flinging her into the water p.onGround = false; p.charge = 0; p.hover = false; Player.letGo(); Sound.jet(false); Sound.play('hurt'); Cam.shake(3, 10); Game.stop(5); Game.hurtFlash = 14; Input.rumble(200, 1, .6);
     if (p.held) { const h = p.held; p.held = null; if (h.kind !== 'agua') { const e = Item.fromHeld(h, p.x + 5 - h.w / 2, p.y - h.h - 2); if (e) { e.vy = -2; e.vx = -fromDir * 1.5; L.ents.push(e); } } else spawnParts(8, p.x + 5, p.y + 8, { color: ['#8fd9d0', '#c8f2ea'], speed: [1, 2.5], life: [10, 18], g: .08 }); }
     if (p.hp <= 0) { p.dead = true; p.deadT = 0; p.vy = -4.5; p.vx = -fromDir * 1; }
   },
